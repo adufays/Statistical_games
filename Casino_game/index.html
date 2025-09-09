@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casino Investigation: A Binomial Test Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .game-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+        .dialogue-box {
+            border: 4px solid #4a5568;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            min-height: 120px;
+            position: relative;
+            z-index: 10;
+        }
+        .character-name {
+            background-color: #2d3748;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            display: inline-block;
+            border: 4px solid #4a5568;
+            border-bottom: none;
+            transform: translateY(4px);
+            position: relative;
+            z-index: 20;
+        }
+        .objection-btn {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .choice-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .custom-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.4);
+        }
+        .music-controls {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-800 flex items-center justify-center min-h-screen p-4 overflow-hidden">
+
+    <!-- Music Controls -->
+    <div class="music-controls">
+        <button id="music-toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg w-full mb-2">Music Off</button>
+    </div>
+    
+    <!-- HTML5 Audio Players -->
+    <audio id="casino-audio-player" loop></audio>
+    <audio id="trial-audio-player" loop></audio>
+    <audio id="win-audio-player"></audio>
+    <audio id="loss-audio-player"></audio>
+
+    <div id="game-container" class="w-full max-w-4xl mx-auto relative">
+        <!-- Copyright -->
+        <div class="absolute bottom-2 right-2 text-xs text-gray-500 z-50">
+            © Arnaud Dufays
+        </div>
+
+        <!-- Introduction Screen -->
+        <div id="intro-screen">
+            <div class="bg-gray-800 rounded-lg shadow-2xl text-white text-center p-8">
+                <h1 class="game-font text-3xl mb-4">Casino Investigation</h1>
+                <p class="mb-6">You are a statistical investigator. A local casino is suspected of using a rigged roulette wheel that unfairly favors RED outcomes. Your mission is to gather data from the roulette table and use it to prove their guilt in a court of law.</p>
+                <p class="mb-8">Collect enough evidence, then proceed to the trial to make your case. Good luck, investigator.</p>
+                <button id="start-game-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg transition duration-300 game-font text-xl">Enter the Casino</button>
+            </div>
+        </div>
+
+        <!-- Phase 1: The Casino -->
+		<div id="casino-phase" class="hidden">
+			<div class="bg-gray-800 rounded-lg shadow-2xl overflow-hidden">
+				<div class="flex justify-center py-4"> <img src="https://www.dropbox.com/scl/fi/nnkfs79l6uhazhot27l2c/Salle_casino.png?rlkey=uk3i5asqnigdhi2kygobh64de&dl=1" alt="A bustling casino with a roulette table" class="w-1/2 h-100 md:h-128 object-cover">
+				</div>
+				<div class="p-6 md:p-8">
+					<h1 class="game-font text-2xl md:text-3xl text-white text-center mb-2">Investigation: The Rigged Roulette</h1>
+					<p class="text-gray-400 text-center mb-6">Click "Spin 10 Times" to collect data. Go to trial when you have strong evidence.</p>
+					
+					<div class="flex flex-col md:flex-row gap-6">
+						<div class="md:w-1/3 bg-gray-700 p-4 rounded-lg">
+							<h2 class="text-white font-bold text-lg mb-4 text-center">Actions</h2>
+							<div class="flex flex-col gap-3">
+								<button id="spin-btn" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300">Spin 10 Times</button>
+								<button id="trial-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 disabled:bg-gray-500" disabled>Go to Trial</button>
+							</div>
+							<div id="stats" class="text-white mt-4 text-sm bg-gray-800 p-3 rounded">
+								<p>Spins: <span id="spin-count">0</span></p>
+								<p>Reds: <span id="red-count">0</span></p>
+								<p>Blacks: <span id="black-count">0</span></p>
+								<p>Greens: <span id="green-count">0</span></p>
+							</div>
+						</div>
+						<div class="md:w-2/3 bg-gray-100 p-4 rounded-lg">
+							<h2 class="font-bold text-lg mb-2 text-center">Roulette Outcomes</h2>
+							<div id="results-log" class="h-48 overflow-y-auto bg-white border rounded p-2 font-mono text-sm">
+								Welcome, Investigator. Click "Spin 10 Times" to begin collecting data.
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+        <!-- Phase 2: The Trial -->
+        <div id="trial-phase" class="hidden">
+            <div class="bg-gray-800 rounded-lg shadow-2xl overflow-hidden relative">
+                <img src="https://placehold.co/896x300/4a5568/ffffff?text=The+Courtroom" alt="A courtroom during a trial" class="w-full h-48 md:h-64 object-cover">
+                <img id="character-sprite" src="" alt="Administrator Character" class="hidden absolute bottom-60 right-2 h-2/5 object-contain">
+                <div class="p-6 md:p-8 relative">
+                    <div id="dialogue-area">
+                        <p class="character-name" id="character-name"></p>
+                        <div class="dialogue-box">
+                            <p id="dialogue-text"></p>
+                        </div>
+                    </div>
+                    <div id="interaction-area" class="mt-6 text-center"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Guilty Screen -->
+        <div id="guilty-screen" class="hidden text-center text-white">
+             <img src="https://placehold.co/896x300/1a202c/ffffff?text=GUILTY!" alt="Administrator being led away" class="w-full h-48 md:h-64 object-cover rounded-t-lg">
+            <div class="bg-gray-800 p-8 rounded-b-lg">
+                <h1 class="game-font text-4xl text-green-400 mb-4">CONVICTED!</h1>
+                <p class="text-lg mb-6">The administrator has been found guilty. Thanks to your statistical prowess, justice has been served!</p>
+                
+                <!-- Statistical Theory Recap -->
+                <div class="bg-gray-700 p-6 rounded-lg mb-6 text-left max-w-4xl mx-auto">
+                    <h2 class="game-font text-2xl text-yellow-400 mb-4 text-center">Statistical Theory Applied</h2>
+                    <div class="space-y-4 text-sm">
+                        <div>
+                            <h3 class="font-bold text-blue-300 mb-2">Binomial Test</h3>
+                            <p class="text-gray-300">The Binomial Test was used to determine if the observed number of red outcomes was significantly different from what would be expected under fair conditions. This test is appropriate for binary outcomes (red vs. not red) with a known probability of success.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-blue-300 mb-2">Null Hypothesis (H₀)</h3>
+                            <p class="text-gray-300">H₀: The probability of red is fair (18/37 ≈ 0.4865). This represents the assumption of innocence - that the casino is operating fairly and the roulette wheel is not rigged.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-blue-300 mb-2">P-value</h3>
+                            <p class="text-gray-300">The p-value of <span id="final-p-value" class="font-bold text-yellow-300"></span> represents the probability of observing the data (or more extreme results) if the null hypothesis were true. Since this value is less than 0.05 (the conventional significance level), we reject the null hypothesis and conclude that the casino was indeed cheating.</p>
+                        </div>
+                        <div class="text-center mt-4">
+                            <p class="text-gray-400 italic">"The smaller the p-value, the stronger the evidence against the null hypothesis."</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <button onclick="window.location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Play Again</button>
+            </div>
+        </div>
+
+        <!-- Innocent Screen -->
+        <div id="innocent-screen" class="hidden text-center text-white">
+             <img src="https://placehold.co/896x300/1a202c/ffffff?text=INNOCENT" alt="Judge bangs gavel" class="w-full h-48 md:h-64 object-cover rounded-t-lg">
+            <div class="bg-gray-800 p-8 rounded-b-lg">
+                <h1 class="game-font text-4xl text-red-400 mb-4">ACQUITTED!</h1>
+                <p class="text-lg mb-6" id="innocent-reason">The administrator has been found innocent. A crucial error was made in the proceedings.</p>
+                <button onclick="window.location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Play Again</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="custom-modal hidden">
+        <div id="modal-content" class="modal-content">
+            <p id="modal-text" class="text-lg mb-4"></p>
+            <div id="modal-buttons">
+                <button id="modal-close-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CUSTOM MUSIC URLS ---
+        // PASTE YOUR MP3 URLS HERE. Leave as "" to use the default synth music.
+        const CASINO_MUSIC_URL = "https://freepd.com/music/Asking%20Questions.mp3"; // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        const TRIAL_MUSIC_URL = "https://freepd.com/music/Think%20About%20It.mp3";  // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+        const WIN_MUSIC_URL = "https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3";    // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+        const LOSS_MUSIC_URL = "https://freepd.com/music/Cursed%20Intro.mp3";   // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3"
+        
+        // Disable default music to avoid Tone.js issues
+        const USE_DEFAULT_MUSIC = false;
+
+        // --- GAME STATE ---
+        let totalSpins = 0, redCount = 0, blackCount = 0, greenCount = 0;
+        let trialStep = 0, pValue = 0, testimonyIndex = 0;
+        let isMusicMuted = false;
+        
+        // --- MUSIC PLAYERS ---
+        let defaultCasinoMusic, defaultTrialMusic;
+        const casinoAudioPlayer = document.getElementById('casino-audio-player');
+        const trialAudioPlayer = document.getElementById('trial-audio-player');
+        const winAudioPlayer = document.getElementById('win-audio-player');
+        const lossAudioPlayer = document.getElementById('loss-audio-player');
+
+        // --- DOM ELEMENTS ---
+        const introScreen = document.getElementById('intro-screen');
+        const casinoPhase = document.getElementById('casino-phase');
+        const trialPhase = document.getElementById('trial-phase');
+        const guiltyScreen = document.getElementById('guilty-screen');
+        const innocentScreen = document.getElementById('innocent-screen');
+        const innocentReasonEl = document.getElementById('innocent-reason');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const spinBtn = document.getElementById('spin-btn');
+        const trialBtn = document.getElementById('trial-btn');
+        const spinCountEl = document.getElementById('spin-count');
+        const redCountEl = document.getElementById('red-count');
+        const blackCountEl = document.getElementById('black-count');
+        const greenCountEl = document.getElementById('green-count');
+        const resultsLog = document.getElementById('results-log');
+        const characterNameEl = document.getElementById('character-name');
+        const dialogueTextEl = document.getElementById('dialogue-text');
+        const interactionArea = document.getElementById('interaction-area');
+        const characterSprite = document.getElementById('character-sprite');
+        const customModal = document.getElementById('custom-modal');
+        const modalText = document.getElementById('modal-text');
+        const modalButtons = document.getElementById('modal-buttons');
+        const musicToggleBtn = document.getElementById('music-toggle-btn');
+        
+        // --- MODAL & MUSIC ---
+        function showAlert(message) {
+            modalText.textContent = message;
+            modalButtons.innerHTML = `<button onclick="customModal.classList.add('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">OK</button>`;
+            customModal.classList.remove('hidden');
+        }
+
+        function setupDefaultMusic() {
+            try {
+                if (!USE_DEFAULT_MUSIC) {
+                    console.log('Default music disabled, using external audio files only');
+                    return;
+                }
+                
+                if (typeof Tone === 'undefined') {
+                    console.warn('Tone.js not loaded, skipping default music setup');
+                    return;
+                }
+                
+                // Only setup if Tone is ready
+                if (Tone.context.state !== 'running') {
+                    console.warn('Tone.js context not ready, skipping default music setup');
+                    return;
+                }
+                
+                const casinoSynth = new Tone.Synth({ oscillator: { type: "pulse", width: 0.6 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.4 } }).toDestination();
+                defaultCasinoMusic = new Tone.Sequence((time, note) => {
+                    casinoSynth.triggerAttackRelease(note, "8n", time);
+                }, ["C4", ["E4", "G4"], "C5", ["E5", "G4"]], "4n");
+                
+                const trialSynth = new Tone.AMSynth({ harmonicity: 1.5, envelope: { attack: 0.1, decay: 1, sustain: 0.5, release: 1 } }).toDestination();
+                defaultTrialMusic = new Tone.Loop(time => {
+                    trialSynth.triggerAttackRelease("C2", "1n", time);
+                }, "1n");
+
+                Tone.Transport.bpm.value = 120;
+            } catch (error) {
+                console.error('Error setting up default music:', error);
+            }
+        }
+
+        musicToggleBtn.addEventListener('click', () => {
+            isMusicMuted = !isMusicMuted;
+            if (typeof Tone !== 'undefined' && Tone.Master) {
+                Tone.Master.mute = isMusicMuted;
+            }
+            casinoAudioPlayer.muted = isMusicMuted;
+            trialAudioPlayer.muted = isMusicMuted;
+            winAudioPlayer.muted = isMusicMuted;
+            lossAudioPlayer.muted = isMusicMuted;
+            musicToggleBtn.textContent = isMusicMuted ? 'Music On' : 'Music Off';
+        });
+
+        function playMusic(scene) {
+            try {
+                // Stop all music first
+                if (defaultCasinoMusic && defaultCasinoMusic.state === 'started') defaultCasinoMusic.stop();
+                if (defaultTrialMusic && defaultTrialMusic.state === 'started') defaultTrialMusic.stop();
+                casinoAudioPlayer.pause();
+                trialAudioPlayer.pause();
+                winAudioPlayer.pause();
+                lossAudioPlayer.pause();
+
+                const playPromise = (player) => {
+                    try {
+                        const promise = player.play();
+                        if (promise !== undefined) {
+                            promise.catch(error => console.error(`Audio playback failed for ${player.id}:`, error));
+                        }
+                    } catch (error) {
+                        console.error(`Error playing audio for ${player.id}:`, error);
+                    }
+                };
+
+                if (scene === 'casino') {
+                    if (CASINO_MUSIC_URL) playPromise(casinoAudioPlayer);
+                    else if(USE_DEFAULT_MUSIC && defaultCasinoMusic && Tone.context.state === 'running') {
+                        // Use Tone.now() + 0.1 to ensure we start in the future
+                        defaultCasinoMusic.start(Tone.now() + 0.1);
+                    }
+                } else if (scene === 'trial') {
+                    if (TRIAL_MUSIC_URL) playPromise(trialAudioPlayer);
+                    else if(USE_DEFAULT_MUSIC && defaultTrialMusic && Tone.context.state === 'running') {
+                        // Use Tone.now() + 0.1 to ensure we start in the future
+                        defaultTrialMusic.start(Tone.now() + 0.1);
+                    }
+                } else if (scene === 'win') {
+                    if (WIN_MUSIC_URL) playPromise(winAudioPlayer);
+                } else if (scene === 'loss') {
+                    if (LOSS_MUSIC_URL) playPromise(lossAudioPlayer);
+                }
+            } catch (error) {
+                console.error('Error in playMusic function:', error);
+            }
+        }
+
+        // --- GAME FLOW ---
+        startGameBtn.addEventListener('click', async () => {
+            try {
+                if (typeof Tone !== 'undefined') {
+                    await Tone.start();
+                    
+                    // Wait a bit for the context to be fully ready
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    setupDefaultMusic();
+                    
+                    if (typeof Tone.Transport !== 'undefined') {
+                        Tone.Transport.start();
+                    }
+                } else {
+                    console.warn('Tone.js not loaded, continuing without audio');
+                }
+                
+                if (CASINO_MUSIC_URL) casinoAudioPlayer.src = CASINO_MUSIC_URL;
+                if (TRIAL_MUSIC_URL) trialAudioPlayer.src = TRIAL_MUSIC_URL;
+                if (WIN_MUSIC_URL) winAudioPlayer.src = WIN_MUSIC_URL;
+                if (LOSS_MUSIC_URL) lossAudioPlayer.src = LOSS_MUSIC_URL;
+                
+                introScreen.classList.add('hidden');
+                casinoPhase.classList.remove('hidden');
+                
+                // Delay music start to ensure everything is ready
+                setTimeout(() => {
+                    playMusic('casino');
+                }, 200);
+            } catch (error) {
+                console.error('Error starting game:', error);
+                // Continue with game even if audio fails
+                introScreen.classList.add('hidden');
+                casinoPhase.classList.remove('hidden');
+            }
+        });
+
+        // --- PHASE 1: CASINO LOGIC ---
+        spinBtn.addEventListener('click', () => {
+            let newResults = [];
+            for (let i = 0; i < 10; i++) {
+                const rand = Math.random();
+                let result;
+                if (rand < 0.60) { result = 'RED'; redCount++; } 
+                else if (rand < 0.98) { result = 'BLACK'; blackCount++; } 
+                else { result = 'GREEN'; greenCount++; }
+                newResults.push(result);
+            }
+            totalSpins += 10;
+            updateStats();
+            logResults(newResults);
+            if (totalSpins > 0) trialBtn.disabled = false;
+        });
+        
+        trialBtn.addEventListener('click', () => {
+            modalText.textContent = 'Are you sure you have enough evidence to convict the casino administrator?';
+            modalButtons.innerHTML = `
+                <button id="confirm-trial-yes" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg mr-2">Yes</button>
+                <button onclick="customModal.classList.add('hidden')" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">No</button>
+            `;
+            document.getElementById('confirm-trial-yes').onclick = () => {
+                customModal.classList.add('hidden');
+                pValue = calculatePValue(totalSpins, redCount, 18 / 37);
+                if (pValue < 0.05) {
+                    playMusic('trial');
+                    casinoPhase.classList.add('hidden');
+                    trialPhase.classList.remove('hidden');
+                    startTrial();
+                } else {
+                    const reason = `You went to trial with insufficient evidence! Your p-value was ${pValue.toFixed(4)}, which is not less than 0.05. The case was dismissed.`;
+                    endGame(false, reason);
+                }
+            };
+            customModal.classList.remove('hidden');
+        });
+
+        function updateStats() {
+            spinCountEl.textContent = totalSpins;
+            redCountEl.textContent = redCount;
+            blackCountEl.textContent = blackCount;
+            greenCountEl.textContent = greenCount;
+        }
+
+        function logResults(results) {
+            if (totalSpins === 10) resultsLog.innerHTML = '';
+            const resultsHtml = results.map(r => `<span class="font-bold ${r === 'RED' ? 'text-red-600' : (r === 'BLACK' ? 'text-black' : 'text-green-600')}">${r}</span>`).join(', ');
+            resultsLog.innerHTML += `<div>Spins ${totalSpins-9}-${totalSpins}: ${resultsHtml}</div>`;
+            resultsLog.scrollTop = resultsLog.scrollHeight;
+        }
+
+        // --- AVATAR LOGIC ---
+        const adminExpressions = [
+            { eye: 'Default', eyebrow: 'Default', mouth: 'Default' }, // 0: Neutral
+            { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Smile' }, // 1: Cocky
+            { eye: 'Side', eyebrow: 'UpDown', mouth: 'Concerned' }, // 2: Concerned
+            { eye: 'EyeRoll', eyebrow: 'SadConcerned', mouth: 'Grimace' }, // 3: Annoyed
+            { eye: 'Surprised', eyebrow: 'RaisedExcited', mouth: 'ScreamOpen' }, // 4: Panicked
+        ];
+
+        function getAvatarUrl(expression) {
+            const baseUrl = `https://avataaars.io/?avatarStyle=Circle&topType=ShortHairShortFlat&accessoriesType=Prescription02&hairColor=Auburn&facialHairType=MoustacheFancy&facialHairColor=Red&clotheType=ShirtCrewNeck&clotheColor=PastelYellow&skinColor=Pale`;
+            return `${baseUrl}&eyeType=${expression.eye}&eyebrowType=${expression.eyebrow}&mouthType=${expression.mouth}`;
+        }
+
+        // --- PHASE 2: TRIAL LOGIC ---
+        const adminTestimony = [
+            "Your honor, my casino, the 'Lucky Seven', has been a pillar of this community for over 20 years. We employ 150 local residents and contribute significantly to the town's charity funds.",
+            "This investigator waltzes in and makes wild accusations based on a few lucky spins! It's absurd. Our equipment is state-of-the-art and regularly inspected.",
+            "Frankly, you can't PROVE I'm cheating. It's impossible. It's just random chance, and sometimes chance looks streaky. That's the nature of the game!",
+            "This whole trial is a waste of time and taxpayer money. I should be at my casino, ensuring my customers are having a wonderful, fair, and entertaining experience."
+        ];
+        
+        const trialScript = [
+            { character: "Judge", dialogue: "This court is now in session... Let's hear the administrator's opening statement first.", action: { type: 'button', text: 'Begin Testimony', next: 1 } },
+            { character: "Administrator", expression: 1, dialogue: () => adminTestimony[testimonyIndex], action: { type: 'testimony' } },
+            { character: "You (The Investigator)", dialogue: "It's not about 'proving' with 100% certainty. We can use statistics to show how incredibly unlikely these results are if the wheel were fair. There is a method.", action: { type: 'button', text: 'Present the method...', next: 3 } },
+            { character: "Administrator", expression: 2, dialogue: "'Statistics'? What nonsense is that? There's no accepted scientific method for something like this. You're just making things up!", action: { type: 'choice', question: 'Which statistical test is appropriate here?', options: ['The Bernoulli Distribution', 'The unsupervised learning', 'Binomial Test', 'Linear Regression'], correct: 'Binomial Test', next: 4, failReason: "You chose the wrong statistical test, undermining your entire argument." } },
+            { character: "You (The Investigator)", dialogue: "The correct method is the Binomial Test... We use it to calculate a p-value.", action: { type: 'button', text: 'Continue...', next: 5 } },
+            { character: "Administrator", expression: 3, dialogue: `A 'p-value'? Sounds complicated. I bet you can't even calculate it!`, action: { type: 'input', question: 'Based on your data, what is the p-value? (Round to 4 decimal places)', next: 6 } },
+            { character: "Administrator", expression: 4, dialogue: () => `(Stammering) ${pValue.toFixed(4)}... So what?! It's a tiny number, but that's meaningless! You probably don't even know what it represents!`, action: { type: 'button', text: 'Explain what it means...', next: 7 } },
+            { character: "You (The Investigator)", dialogue: "This p-value is the key to the entire case. But first, we must be clear on what we were testing.", action: { type: 'choice', question: "What was the Null Hypothesis (H₀) for our test?", options: ['H₀: The casino is cheating.', 'H₀: The probability of Red is fair (18/37).', 'H₀: The number of Reds equals the number of Blacks.', 'H₀: The p-value is less than 0.05.'], correct: 'H₀: The probability of Red is fair (18/37).', next: 8, failReason: "You incorrectly identified the null hypothesis. The foundation of your argument is flawed." } },
+            { character: "You (The Investigator)", dialogue: "Correct. The null hypothesis is the assumption of innocence... Our p-value is the probability of seeing our data... IF that assumption is true.", action: { type: 'choice', question: "Given our small p-value (< 0.05), what is the correct conclusion?", options: ['We accept the null hypothesis.', 'The results are inconclusive.', 'We reject the null hypothesis.', 'We need to collect more data.'], correct: 'We reject the null hypothesis.', next: 9, failReason: "You failed to draw the correct conclusion from the p-value." } },
+            { character: "You (The Investigator)", dialogue: "Because the p-value is so small, we REJECT the null hypothesis. The evidence strongly suggests the assumption of fairness is wrong. You're caught!", action: { type: 'button', text: 'GUILTY!', next: 10, style: 'large' } }
+        ];
+
+        function startTrial() { renderTrialStep(0); }
+
+        function renderTrialStep(step) {
+            trialStep = step;
+            if (step === 10) { 
+                endGame(true); 
+                return; 
+            }
+
+            const currentStep = trialScript[step];
+            if (!currentStep) return;
+
+            characterNameEl.textContent = currentStep.character;
+            dialogueTextEl.textContent = typeof currentStep.dialogue === 'function' ? currentStep.dialogue() : currentStep.dialogue;
+            interactionArea.innerHTML = '';
+            
+            if (currentStep.character === 'Administrator') {
+                const expression = adminExpressions[currentStep.expression] || adminExpressions[0];
+                characterSprite.src = getAvatarUrl(expression);
+                characterSprite.classList.remove('hidden');
+            } else {
+                characterSprite.classList.add('hidden');
+            }
+
+            switch (currentStep.action.type) {
+                case 'button':
+                    const btn = document.createElement('button');
+                    btn.textContent = currentStep.action.text;
+                    let btnClass = 'objection-btn bg-yellow-400 hover:bg-yellow-500 text-gray-800 game-font text-xl py-3 px-6 rounded-lg shadow-lg';
+                    if (currentStep.action.style === 'large') {
+                        btnClass = 'objection-btn bg-red-600 hover:bg-red-700 text-white game-font text-4xl py-6 px-10 rounded-lg shadow-lg';
+                    }
+                    btn.className = btnClass;
+                    btn.onclick = () => renderTrialStep(currentStep.action.next);
+                    interactionArea.appendChild(btn);
+                    break;
+                case 'testimony':
+                    const nextBtn = document.createElement('button');
+                    nextBtn.textContent = 'Next';
+                    nextBtn.className = 'bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg transition duration-300 mx-2';
+                    nextBtn.onclick = handleTestimonyNext;
+                    const objectionBtn = document.createElement('button');
+                    objectionBtn.textContent = 'Objection!';
+                    objectionBtn.className = 'objection-btn bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 mx-2 game-font';
+                    objectionBtn.onclick = handleObjection;
+                    interactionArea.appendChild(nextBtn);
+                    interactionArea.appendChild(objectionBtn);
+                    break;
+                case 'choice':
+                    const questionP = document.createElement('p');
+                    questionP.className = 'text-white mb-4';
+                    questionP.textContent = currentStep.action.question;
+                    interactionArea.appendChild(questionP);
+                    const choicesContainer = document.createElement('div');
+                    choicesContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+                    currentStep.action.options.forEach(optionText => {
+                        const choiceBtn = document.createElement('button');
+                        choiceBtn.textContent = optionText;
+                        choiceBtn.className = 'choice-btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300';
+                        choiceBtn.onclick = () => handleChoice(optionText, currentStep.action.correct, currentStep.action.next, currentStep.action.failReason);
+                        choicesContainer.appendChild(choiceBtn);
+                    });
+                    interactionArea.appendChild(choicesContainer);
+                    break;
+                case 'input':
+                    const inputQuestionP = document.createElement('p');
+                    inputQuestionP.className = 'text-white mb-4';
+                    inputQuestionP.textContent = currentStep.action.question;
+                    interactionArea.appendChild(inputQuestionP);
+                    const inputEl = document.createElement('input');
+                    inputEl.type = 'number';
+                    inputEl.step = '0.0001';
+                    inputEl.id = 'pvalue-input';
+                    inputEl.className = 'p-2 rounded text-center';
+                    inputEl.placeholder = 'e.g., 0.0012';
+                    interactionArea.appendChild(inputEl);
+                    const submitBtn = document.createElement('button');
+                    submitBtn.textContent = 'Submit';
+                    submitBtn.className = 'ml-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded';
+                    submitBtn.onclick = () => handlePValueInput(currentStep.action.next);
+                    interactionArea.appendChild(submitBtn);
+                    break;
+            }
+        }
+
+        function handleTestimonyNext() {
+            if (testimonyIndex < adminTestimony.length - 1) {
+                testimonyIndex++;
+                renderTrialStep(trialStep);
+            } else {
+                modalText.textContent = "There must be a flaw in his argument. Let's listen to it again carefully.";
+                modalButtons.innerHTML = `<button id="restart-testimony-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">OK</button>`;
+                document.getElementById('restart-testimony-btn').onclick = () => {
+                    customModal.classList.add('hidden');
+                    testimonyIndex = 0;
+                    renderTrialStep(trialStep);
+                };
+                customModal.classList.remove('hidden');
+            }
+        }
+
+        function handleObjection() {
+            if (testimonyIndex === 2) { renderTrialStep(2); }
+            else { endGame(false, "You objected at the wrong time, disrupting the court for no reason and losing credibility."); }
+        }
+
+        function handleChoice(selected, correct, nextStep, failReason) {
+            if (selected === correct) { renderTrialStep(nextStep); }
+            else { endGame(false, failReason); }
+        }
+
+        function handlePValueInput(nextStep) {
+            const userInput = parseFloat(document.getElementById('pvalue-input').value);
+            if (!isNaN(userInput) && Math.abs(userInput - pValue) <= 0.01) {
+                renderTrialStep(nextStep);
+            } else {
+                const reason = `Your p-value calculation was incorrect. The correct value was approximately ${pValue.toFixed(4)}. This critical error discredited your case.`;
+                endGame(false, reason);
+            }
+        }
+
+        function endGame(isGuilty, reason = "") {
+            try {
+                playMusic('none'); // Stop all background music
+                if (typeof Tone !== 'undefined' && Tone.Transport) {
+                    Tone.Transport.stop();
+                }
+            } catch (error) {
+                console.error('Error stopping music:', error);
+            }
+            
+            casinoPhase.classList.add('hidden');
+            trialPhase.classList.add('hidden');
+
+            if (isGuilty) { 
+                playMusic('win');
+                // Update the p-value in the statistical recap
+                document.getElementById('final-p-value').textContent = pValue.toFixed(4);
+                guiltyScreen.classList.remove('hidden'); 
+            } else { 
+                playMusic('loss');
+                innocentReasonEl.textContent = reason; 
+                innocentScreen.classList.remove('hidden'); 
+            }
+        }
+
+        // --- STATISTICAL CALCULATIONS ---
+        // --- Lanczos approximation for logGamma(z) ---
+		function logGamma(z) {
+			const cof = [
+				676.5203681218851, -1259.1392167224028, 771.32342877765313,
+				-176.61502916214059, 12.507343278686905, -0.13857109526572012,
+				9.9843695780195716e-6, 1.5056327351493116e-7
+			];
+			if (z < 0.5) {
+				return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * z)) - logGamma(1 - z);
+			}
+			z -= 1;
+			let x = 0.99999999999980993;
+			for (let i = 0; i < cof.length; i++) x += cof[i] / (z + i + 1);
+			const t = z + cof.length - 0.5;
+			return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+		}
+
+		// --- logFactorial helper ---
+		function logFactorial(n) {
+			if (n < 0 || Math.floor(n) !== n) return NaN;
+			if (n === 0 || n === 1) return 0;
+			return logGamma(n + 1);
+		}
+
+		// Keep same function names/structure -----------------------------
+
+		function factorial(n) {
+			// Return factorial in "normal" space if small enough, else Infinity
+			if (n < 0) return NaN;
+			if (n === 0 || n === 1) return 1;
+			if (n > 170) {
+				// Beyond 170! exceeds JS double range, return Infinity
+				return Infinity;
+			}
+			// Compute via exp(logFactorial) for robustness
+			return Math.exp(logFactorial(n));
+		}
+
+		function combinations(n, k) {
+			if (k < 0 || k > n) return 0;
+			// Use log-space to compute C(n,k)
+			const logC = logFactorial(n) - logFactorial(k) - logFactorial(n - k);
+			return Math.exp(logC);
+		}
+
+		function binomialProbability(n, k, p) {
+			if (p < 0 || p > 1) return NaN;
+			if (k < 0 || k > n) return 0;
+
+			// Handle edge cases cleanly
+			if (p === 0) return (k === 0 ? 1 : 0);
+			if (p === 1) return (k === n ? 1 : 0);
+
+			const logC = logFactorial(n) - logFactorial(k) - logFactorial(n - k);
+			const logPmf = logC + k * Math.log(p) + (n - k) * Math.log(1 - p);
+
+			return Math.exp(logPmf); // may underflow to 0 for very small values
+		}
+		
+		function calculatePValue(n, k, p) {
+            let cumulativeProbability = 0;
+            for (let i = k; i <= n; i++) { cumulativeProbability += binomialProbability(n, i, p); }
+            return cumulativeProbability;
+        }
+    </script>
+</body>
+</html>
