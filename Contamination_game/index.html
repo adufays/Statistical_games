@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statlock vs. Toxworth: A Normal Distribution Trial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .game-font { font-family: 'Press Start 2P', cursive; }
+        .dialogue-box {
+            border: 4px solid #4a5568;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            min-height: 120px;
+            position: relative;
+            z-index: 10;
+        }
+        .character-name {
+            background-color: #2d3748;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            display: inline-block;
+            border: 4px solid #4a5568;
+            border-bottom: none;
+            transform: translateY(4px);
+            position: relative;
+            z-index: 20;
+        }
+        .objection-btn { animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .choice-btn:hover, .location-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .custom-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white; padding: 2rem; border-radius: 0.5rem;
+            text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            max-width: 90%; width: 500px;
+        }
+        .music-controls {
+            position: fixed; top: 1rem; right: 1rem; z-index: 100;
+        }
+        .location-btn.visited {
+            background-color: #4a5568;
+            border-color: #2d3748;
+            color: #a0aec0;
+        }
+        .heart { display: inline-block; width: 30px; height: 30px; background-color: red; margin: 0 5px; clip-path: polygon(50% 100%, 0 45%, 0 0, 100% 0, 100% 45%); }
+        .heart.lost { background-color: #4a5568; }
+        .feedback {
+            transition: all 0.2s ease-in-out;
+        }
+        .feedback.correct {
+            box-shadow: 0 0 20px 10px rgba(74, 222, 128, 0.7);
+        }
+        .feedback.incorrect {
+            box-shadow: 0 0 20px 10px rgba(248, 113, 113, 0.7);
+            animation: shake 0.5s;
+        }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-800 flex items-center justify-center min-h-screen p-4 overflow-hidden">
+
+    <!-- Music Controls -->
+    <div class="music-controls">
+        <button id="music-toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg w-full mb-2">Music Off</button>
+    </div>
+    
+    <!-- Audio Players -->
+    <audio id="phase1-audio-player" loop></audio>
+    <audio id="phase2-audio-player" loop></audio>
+    <audio id="calculation-audio-player" loop></audio>
+    <audio id="twist-audio-player" loop></audio>
+    <audio id="win-audio-player"></audio>
+    <audio id="loss-audio-player"></audio>
+
+    <div id="game-container" class="w-full max-w-5xl mx-auto">
+        <!-- Copyright -->
+        <div class="absolute bottom-2 right-2 text-xs text-gray-500 z-50">
+            © Arnaud Dufays
+        </div>
+
+        <!-- Introduction Screen -->
+        <div id="intro-screen" class="relative">
+            <div class="bg-gray-800 rounded-lg shadow-2xl text-white text-center p-8">
+                <h1 class="game-font text-3xl mb-4">Statlock vs. Toxworth</h1>
+                <p class="mb-6">You are Detective Statlock, a renowned statistical investigator. The Toxworth Chemical Plant is suspected of releasing a pollutant into the city's water supply, exceeding the legal limit.</p>
+                <p class="mb-8">Your mission is to gather evidence from around the city and then face the plant's administrator, Mr. Toxworth, in court. Use your knowledge of statistics to prove his guilt. The fate of the city is in your hands.</p>
+                <button id="start-game-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg transition duration-300 game-font text-xl">Begin Investigation</button>
+            </div>
+            <!-- Copyright for intro screen -->
+            <div class="absolute bottom-2 right-2 text-xs text-gray-500 z-50">
+                © Arnaud Dufays
+            </div>
+        </div>
+
+        <!-- Phase 1: Investigation -->
+        <div id="phase1-screen" class="hidden">
+             <div class="bg-gray-800 rounded-lg shadow-2xl text-white p-8">
+                <h1 class="game-font text-2xl md:text-3xl text-center mb-6">Phase 1: Investigation</h1>
+                <div class="flex flex-col md:flex-row gap-8">
+                    <!-- Map -->
+                    <div class="md:w-3/5">
+                        <h2 class="text-xl font-bold mb-4 text-center">City Map</h2>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button id="loc-fountain" class="location-btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">1. City Park Fountain</button>
+                            <button id="loc-archives" class="location-btn bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">2. City Hall Archives</button>
+                            <button id="loc-lab" class="location-btn bg-purple-500 hover:bg-purple-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">3. University Lab</button>
+                            <button id="loc-facility" class="location-btn bg-teal-500 hover:bg-teal-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">4. Water Treatment Facility</button>
+                            <button id="loc-plant" class="location-btn bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">5. Chemical Plant PR Office</button>
+                        </div>
+                         <div class="mt-6 text-center">
+                            <button id="trial-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed game-font text-lg" disabled>Proceed to Trial</button>
+                        </div>
+                    </div>
+                    <!-- Notebook -->
+                    <div class="md:w-2/5 bg-gray-700 p-4 rounded-lg">
+                        <h2 class="text-xl font-bold mb-4 text-center border-b-2 border-gray-500 pb-2">Detective's Notebook</h2>
+                        <div id="notebook-content" class="h-64 overflow-y-auto space-y-3 text-sm">
+                            <p><i>Your notebook is empty. Visit locations to gather clues.</i></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 2: Trial -->
+        <div id="phase2-screen" class="hidden">
+            <div class="bg-gray-800 rounded-lg shadow-2xl overflow-hidden relative">
+                <div class="h-64 bg-cover bg-center" style="background-image: url('https://placehold.co/1024x256/4a5568/ffffff?text=The+Courtroom');">
+                    <div id="life-bar" class="absolute top-4 left-4 flex"></div>
+                </div>
+                
+                <img id="character-sprite" src="" alt="Character Sprite" class="absolute bottom-60 right-4 h-3/5 object-contain pointer-events-none">
+
+                <div class="p-6 md:p-8 relative">
+                    <div id="dialogue-area">
+                        <p class="character-name" id="character-name"></p>
+                        <div class="dialogue-box">
+                            <p id="dialogue-text"></p>
+                            <div id="math-panel" class="hidden mt-4 p-2 bg-gray-100 rounded border"></div>
+                        </div>
+                    </div>
+                    <div id="interaction-area" class="mt-6 text-center"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Win/Loss Screens -->
+        <div id="end-screen-container" class="hidden text-center text-white">
+            <div class="bg-gray-800 p-8 rounded-lg">
+                <h1 id="end-title" class="game-font text-4xl mb-4"></h1>
+                <p id="end-message" class="text-lg mb-6"></p>
+                <div id="end-recap" class="text-left bg-gray-700 p-4 rounded-lg mb-6 space-y-2"></div>
+                <button onclick="window.location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Play Again</button>
+            </div>
+        </div>
+
+    </div>
+    
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="custom-modal hidden">
+        <div id="modal-content" class="modal-content">
+            <h2 id="modal-title" class="text-2xl font-bold mb-4"></h2>
+            <div id="modal-text" class="text-left mb-6"></div>
+            <div id="modal-buttons" class="space-x-2"></div>
+        </div>
+    </div>
+
+<script>
+// --- CHARACTER & MUSIC SETUP ---
+const CHARACTERS = {
+    STATLOCK: { 
+        name: "Det. Statlock", 
+        sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairShortWaved&accessoriesType=Kurt&hairColor=BrownDark&facialHairType=Blank&clotheType=ShirtVNeck&clotheColor=Gray02&skinColor=Light" 
+    },
+    TOXWORTH: { 
+        name: "Mr. Toxworth", 
+        sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairTheCaesar&accessoriesType=Prescription02&hairColor=Black&facialHairType=BeardLight&facialHairColor=Black&clotheType=CollarSweater&clotheColor=Red&skinColor=Tanned" 
+    },
+    JUDGE: { 
+        name: "Judge Axiom", 
+        sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=LongHairNotTooLong&accessoriesType=Blank&hairColor=SilverGray&facialHairType=Blank&clotheType=BlazerShirt&skinColor=Pale" 
+    },
+};
+
+// --- LOCATION IMAGES ---
+const LOCATION_IMAGES = {
+    fountain: "https://www.dropbox.com/scl/fi/em9dbhy0qcjw30b1hvtv4/Contamination_City_Fountain.png?rlkey=w508tgip622s2v0tmoylxrbay&raw=1",
+    archives: "https://www.dropbox.com/scl/fi/0321twrnw3mhb1l4xk4r3/Contamination_Archives.png?rlkey=069niz37f35qe4b22wiljyft8&raw=1",
+    lab: "https://www.dropbox.com/scl/fi/i1iwhh8ffg5dxfzjq2k6k/Contamination_University.png?rlkey=387zxp6qy65pj6y7o2292b40z&raw=1",
+    facility: "https://www.dropbox.com/scl/fi/ng2t5vk9e4ixis8558u33/Contamination_Water_Treatment.png?rlkey=k673rywroins5ltkz192jp7bj&raw=1",
+    plant: "https://www.dropbox.com/scl/fi/rjqwbaq29ap74zd62bl6r/Contamination_Chemical_Plant.png?rlkey=iritigqy0vm72wckv4ucappkg&raw=1"
+};
+
+
+const expressions = {
+    TOXWORTH: [
+        { eye: 'Side', eyebrow: 'AngryNatural', mouth: 'Serious' }, // 0: Neutral/Annoyed
+        { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Smile' }, // 1: Cocky/Confident
+        { eye: 'Surprised', eyebrow: 'UpDown', mouth: 'Concerned' }, // 2: Concerned
+        { eye: 'Squint', eyebrow: 'Angry', mouth: 'Grimace' }, // 3: Angry/Dismissive
+        { eye: 'Wink', eyebrow: 'RaisedExcited', mouth: 'Twinkle' }, // 4: Sly
+        { eye: 'Surprised', eyebrow: 'SadConcerned', mouth: 'ScreamOpen' }, // 5: Panicked
+    ],
+    JUDGE: [
+        { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Serious' }, // 0: Neutral
+        { eye: 'Side', eyebrow: 'UpDown', mouth: 'Concerned' }, // 1: Considering
+        { eye: 'Default', eyebrow: 'Default', mouth: 'Default' }, // 2: Attentive
+        { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Smile' }, // 4: Cocky/Confident
+    ]
+};
+
+function getAvatarUrl(characterKey, expressionIndex) {
+    const char = CHARACTERS[characterKey];
+    const expr = expressions[characterKey][expressionIndex];
+    if (!char || !expr) return CHARACTERS[characterKey].sprite; // Fallback to default
+    
+    // Base URL without emotion-related parameters
+    const baseUrl = char.sprite;
+    return `${baseUrl}&eyeType=${expr.eye}&eyebrowType=${expr.eyebrow}&mouthType=${expr.mouth}`;
+}
+
+
+const MUSIC_URLS = {
+    PHASE1: "https://freepd.com/music/Dreams%20of%20Vain.mp3",
+    PHASE2: "https://freepd.com/music/Think%20About%20It.mp3",
+    CALCULATION: "https://freepd.com/music/Meditating%20Beat.mp3",
+    TWIST: "https://freepd.com/music/After%20the%20End.mp3",
+    WIN: "https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3",
+    LOSS: "https://freepd.com/music/Cursed%20Intro.mp3",
+};
+
+// --- GAME STATE ---
+const gameState = {
+    phase: 0,
+    lives: 3,
+    trialStep: 0,
+    locationsVisited: { fountain: false, archives: false, lab: false, facility: false, plant: false },
+    notebook: {
+        fountainSample: { data: [], n: 0, mean: null, stdDev: null },
+        legalLimit: null,
+        cltNote: false,
+        errorNote: false,
+        companySample: null,
+    },
+    playerEvidence: {
+        sampleMean: 0,
+        sampleStdDev: 0,
+        sampleSize: 0,
+        stdErr: 0,
+        zStat: 0,
+        pValue: 0,
+    }
+};
+
+// --- RANDOM DATA PARAMETERS ---
+const PARAMS = {
+    LEGAL_LIMIT: 50,
+    TRUE_MEAN: 52, // The actual mean pollution level. This is fixed.
+    MEASUREMENT_ERROR_STD_DEV: 2.25, // The only source of variation is the measurement device.
+};
+
+// --- DOM ELEMENTS ---
+const screens = {
+    intro: document.getElementById('intro-screen'),
+    phase1: document.getElementById('phase1-screen'),
+    phase2: document.getElementById('phase2-screen'),
+    end: document.getElementById('end-screen-container'),
+};
+const musicToggleBtn = document.getElementById('music-toggle-btn');
+const audioPlayers = {
+    phase1: document.getElementById('phase1-audio-player'),
+    phase2: document.getElementById('phase2-audio-player'),
+    calculation: document.getElementById('calculation-audio-player'),
+    twist: document.getElementById('twist-audio-player'),
+    win: document.getElementById('win-audio-player'),
+    loss: document.getElementById('loss-audio-player'),
+};
+const customModal = document.getElementById('custom-modal');
+
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('start-game-btn').addEventListener('click', startGame);
+    document.getElementById('loc-fountain').addEventListener('click', () => visitLocation('fountain'));
+    document.getElementById('loc-archives').addEventListener('click', () => visitLocation('archives'));
+    document.getElementById('loc-lab').addEventListener('click', () => visitLocation('lab'));
+    document.getElementById('loc-facility').addEventListener('click', () => visitLocation('facility'));
+    document.getElementById('loc-plant').addEventListener('click', () => visitLocation('plant'));
+    document.getElementById('trial-btn').addEventListener('click', startTrialPhase);
+    musicToggleBtn.addEventListener('click', toggleMusic);
+});
+
+async function startGame() {
+    await Tone.start();
+    console.log("Audio context started.");
+    
+    Object.keys(audioPlayers).forEach(key => {
+        if (MUSIC_URLS[key.toUpperCase()]) {
+            audioPlayers[key].src = MUSIC_URLS[key.toUpperCase()];
+        }
+    });
+
+    console.log(`This session's true mean pollutant level: ${PARAMS.TRUE_MEAN} mg/L`);
+
+    screens.intro.classList.add('hidden');
+    screens.phase1.classList.remove('hidden');
+    gameState.phase = 1;
+    playMusic('phase1');
+    updateNotebook();
+}
+
+// --- MUSIC & MODAL ---
+let isMusicMuted = false;
+
+function toggleMusic() {
+    isMusicMuted = !isMusicMuted;
+    Object.values(audioPlayers).forEach(player => player.muted = isMusicMuted);
+    musicToggleBtn.textContent = isMusicMuted ? 'Music On' : 'Music Off';
+}
+
+function playMusic(scene) {
+    if (isMusicMuted) return;
+    Object.values(audioPlayers).forEach(player => {
+        if (!player.paused) {
+            player.pause();
+        }
+    });
+    if (audioPlayers[scene]) {
+        audioPlayers[scene].currentTime = 0;
+        const promise = audioPlayers[scene].play();
+        if (promise !== undefined) {
+            promise.catch(error => console.error(`Audio playback failed for ${scene}:`, error));
+        }
+    }
+}
+
+function showModal(title, content, buttons, imageUrl = null) {
+    document.getElementById('modal-title').innerHTML = title;
+    
+    // Add image if provided
+    let fullContent = content;
+    if (imageUrl) {
+        fullContent = `<div class="flex justify-center mb-4">
+            <img src="${imageUrl}" alt="${title}" class="max-w-full h-64 object-contain rounded-lg shadow-lg">
+        </div>` + content;
+    }
+    
+    document.getElementById('modal-text').innerHTML = fullContent;
+    const buttonsContainer = document.getElementById('modal-buttons');
+    buttonsContainer.innerHTML = '';
+    buttons.forEach(btn => {
+        const buttonEl = document.createElement('button');
+        buttonEl.textContent = btn.text;
+        buttonEl.className = btn.classes;
+        buttonEl.onclick = () => {
+            // FIX: Only close the modal if the button configuration doesn't say to keep it open.
+            if (!btn.keepOpen) {
+                customModal.classList.add('hidden');
+            }
+            if (btn.callback) btn.callback();
+        };
+        buttonsContainer.appendChild(buttonEl);
+    });
+    customModal.classList.remove('hidden');
+}
+
+// --- STATISTICAL HELPER FUNCTIONS ---
+function randomNormal(mean, stdDev) { // Sample from a mixture normal with std=2
+    let u1 = Math.random();
+    let u2 = Math.random();
+    let randStdNormal = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2);
+    let weight = Math.random();
+    let draw = 0
+    if(weight>0.3) {
+        draw = mean + stdDev * randStdNormal;
+    } else {
+        draw = (mean-3) + (1.332) * randStdNormal;
+    }
+    return draw;
+}
+
+function generateDataset(n, trueMean, errorStdDev) {
+    const data = [];
+    for (let i = 0; i < n; i++) {
+        // The "true" value is always the same
+        const measurementError = randomNormal(0, errorStdDev);
+        const finalValue = trueMean + measurementError;
+        data.push(Math.max(0, finalValue)); // Ensure non-negative
+    }
+    return data;
+}
+
+function calculateMean(data) {
+    if (data.length === 0) return 0;
+    return data.reduce((a, b) => a + b, 0) / data.length;
+}
+
+function calculateStdDev(data) {
+    if (data.length < 2) return 0;
+    const mean = calculateMean(data);
+    const sqDiffs = data.map(val => (val - mean) ** 2);
+    return Math.sqrt(sqDiffs.reduce((a, b) => a + b, 0) / (data.length - 1));
+}
+
+// Standard Normal CDF (approximation)
+function phi(z) {
+    const b1 =  0.319381530;
+    const b2 = -0.356563782;
+    const b3 =  1.781477937;
+    const b4 = -1.821255978;
+    const b5 =  1.330274429;
+    const p  =  0.2316419;
+    const c  =  0.39894228;
+
+    if (z >= 0.0) {
+        const t = 1.0 / (1.0 + p * z);
+        return (1.0 - c * Math.exp(-z * z / 2.0) * t * (t * (t * (t * (t * b5 + b4) + b3) + b2) + b1));
+    } else {
+        const t = 1.0 / (1.0 - p * z);
+        return (c * Math.exp(-z * z / 2.0) * t * (t * (t * (t * (t * b5 + b4) + b3) + b2) + b1));
+    }
+}
+
+// --- PHASE 1: INVESTIGATION ---
+function visitLocation(loc) {
+    // Allow revisiting the fountain
+    if (gameState.locationsVisited[loc] && loc !== 'fountain') return;
+
+    let title = "", content = "", buttons = [];
+    const closeBtn = { text: 'Close Notebook', classes: 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg', callback: updateNotebookAndCheckProgress };
+
+    switch (loc) {
+        case 'fountain':
+            title = "City Park Fountain";
+            
+            const buildFountainModalContent = (newSamples = []) => {
+                const sample = gameState.notebook.fountainSample;
+                let statsHTML = `<p class="italic my-2">You haven't collected any samples yet.</p>`;
+                if (sample.n > 0) {
+                    statsHTML = `<div class="text-left bg-gray-100 p-3 my-4 rounded border">
+                        <h4 class="font-bold text-center">Current Sample Summary</h4>
+                        <p><strong>Total Samples (n):</strong> ${sample.n}</p>
+                        <p><strong>Sample Mean (x̄):</strong> ${sample.mean.toFixed(4)} mg/L</p>
+                        <p><strong>Sample SD (s):</strong> ${sample.stdDev.toFixed(4)} mg/L</p>
+                    </div>`;
+                }
+
+                const newDrawsHTML = newSamples.length > 0 
+                    ? `<strong>Last 10 draws:</strong><br>${newSamples.map(d => d.toFixed(2)).join(', ')}`
+                    : '<!-- No new draws to show yet -->';
+
+                return `<p>The water here seems... murky. This is a direct source to sample the city's water.</p>
+                        ${statsHTML}
+                        <div id="new-draws" class="text-left font-mono text-sm bg-white p-2 border rounded my-2 h-20 overflow-y-auto text-gray-800">${newDrawsHTML}</div>`;
+            };
+            
+            const takeTenSamples = () => {
+                const newSamples = generateDataset(10, PARAMS.TRUE_MEAN, PARAMS.MEASUREMENT_ERROR_STD_DEV);
+                const sample = gameState.notebook.fountainSample;
+                
+                sample.data.push(...newSamples);
+                sample.n = sample.data.length;
+                
+                sample.mean = calculateMean(sample.data);
+                sample.stdDev = calculateStdDev(sample.data);
+                
+                const fullContent = `<div class="flex justify-center mb-4">
+                    <img src="${LOCATION_IMAGES.fountain}" alt="${title}" class="max-w-full h-64 object-contain rounded-lg shadow-lg">
+                </div>` + buildFountainModalContent(newSamples);
+                
+                document.getElementById('modal-text').innerHTML = fullContent;
+                
+                gameState.locationsVisited.fountain = true;
+                updateNotebook(); // Update the main notebook on the right
+            };
+
+            const modalButtons = [
+                { text: 'Take 10 Additional Samples', classes: 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg', callback: takeTenSamples, keepOpen: true },
+                { text: 'Leave Fountain', classes: 'bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg', callback: updateNotebookAndCheckProgress }
+            ];
+
+            showModal(title, buildFountainModalContent(), modalButtons, LOCATION_IMAGES.fountain);
+            return; 
+
+        case 'archives':
+            title = "City Hall Archives";
+            content = `<p>You blow dust off a thick legal volume titled "Municipal Environmental Regulations".</p>
+                       <p>After some searching, you find the relevant statute:</p>
+                       <p class="font-bold text-xl text-center my-2 p-2 bg-yellow-100 border-2 border-yellow-400 text-gray-800">"The maximum allowable concentration of Contaminant X is 50 mg/L."</p>`;
+            gameState.notebook.legalLimit = PARAMS.LEGAL_LIMIT;
+            gameState.locationsVisited.archives = true;
+            buttons.push(closeBtn);
+            showModal(title, content, buttons, LOCATION_IMAGES.archives);
+            updateNotebookAndCheckProgress();
+            return;
+        case 'lab':
+            title = "University Laboratory";
+            content = `<p>A friendly statistician, Dr. Elyse, explains a concept to you.</p>
+                       <p class="italic p-2 bg-purple-100 border-l-4 border-purple-500 text-gray-800">"Remember the <strong>Central Limit Theorem (CLT)</strong>, Detective. Even if the individual pollution measurements are distributed in a strange, non-normal way, the average (the sample mean) of many measurements will be approximately normally distributed. This is crucial for your tests!"</p>`;
+            gameState.notebook.cltNote = true;
+            gameState.locationsVisited.lab = true;
+            buttons.push(closeBtn);
+            showModal(title, content, buttons, LOCATION_IMAGES.lab);
+            updateNotebookAndCheckProgress();
+            return;
+        case 'facility':
+            title = "Water Treatment Facility";
+            content = `<p>An engineer shows you the monitoring equipment.</p>
+                       <p class="italic p-2 bg-teal-100 border-l-4 border-teal-500 text-gray-800">"These sensors are good, but not perfect. There's always some random measurement error. I'd estimate any single reading could be off by as much as ±5 mg/L due to device noise and environmental factors, assuming a Normal distribution. Unfortunately the sensor's randomness is not normally distributed."</p>`;
+            gameState.notebook.errorNote = true;
+            gameState.locationsVisited.facility = true;
+            buttons.push(closeBtn);
+            showModal(title, content, buttons, LOCATION_IMAGES.facility);
+            updateNotebookAndCheckProgress();
+            return;
+        case 'plant':
+            title = "Chemical Plant PR Office";
+            const companySampleData = generateDataset(10, 48, 2); // Make it look good for them
+            const companyMean = calculateMean(companySampleData);
+            const companystd = calculateStdDev(companySampleData);
+            gameState.notebook.companySample = { n: 10, mean: companyMean, data: companySampleData, std: companystd };
+            content = `<p>A cheerful PR representative hands you the plant's latest water quality report.</p>
+                       <p class="p-2 bg-red-100 border-l-4 border-red-500 text-gray-800">"As you can see, our own recent sample of <strong>n=10</strong> measurements shows an average pollutant level of <strong>${companyMean.toFixed(1)} mg/L</strong>, well within the legal limits! We are a responsible corporate citizen."</p>`;
+            gameState.locationsVisited.plant = true;
+            buttons.push(closeBtn);
+            showModal(title, content, buttons, LOCATION_IMAGES.plant);
+            updateNotebookAndCheckProgress();
+            return;
+    }
+}
+
+function updateNotebookAndCheckProgress() {
+    updateNotebook();
+    // Mark all visited locations, not just one
+    Object.keys(gameState.locationsVisited).forEach(loc => {
+        if (gameState.locationsVisited[loc]) {
+            document.getElementById(`loc-${loc}`).classList.add('visited');
+        }
+    });
+    
+    const trialBtn = document.getElementById('trial-btn');
+    const allVisited = Object.values(gameState.locationsVisited).every(v => v);
+    const hasLargeSample = gameState.notebook.fountainSample.n >= 30;
+
+    if (hasLargeSample) {
+        trialBtn.disabled = false;
+        if (allVisited) {
+            trialBtn.textContent = "All Evidence Collected! Proceed to Trial";
+            trialBtn.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+            trialBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+        } else {
+            trialBtn.textContent = "Data Ready, but Clues Missing... Proceed?";
+            trialBtn.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+            trialBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+        }
+    } else {
+        trialBtn.disabled = true;
+        trialBtn.textContent = `Locked (Collect at least 30 samples)`;
+    }
+}
+
+function updateNotebook() {
+    const contentEl = document.getElementById('notebook-content');
+    contentEl.innerHTML = '';
+
+    if (gameState.notebook.legalLimit !== null) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Legal Limit:</strong> ${gameState.notebook.legalLimit} mg/L found in archives.</div>`;
+    }
+    if (gameState.notebook.cltNote) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>CLT Note:</strong> Sample means tend to be Normal, even if data isn't.</div>`;
+    }
+    if (gameState.notebook.errorNote) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Measurement Error:</strong> Expect noise in readings.</div>`;
+    }
+    if (gameState.notebook.companySample) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Toxworth's Report:</strong> A small sample (n=10) with mean ${gameState.notebook.companySample.mean.toFixed(1)} mg/L. Seems suspicious.</div>`;
+    }
+    const sample = gameState.notebook.fountainSample;
+    if (sample.n > 0) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Fountain Sample:</strong> n=${sample.n}, Mean=${sample.mean.toFixed(2)}, SD=${sample.stdDev.toFixed(2)}</div>`;
+    }
+
+    if (contentEl.innerHTML === '') {
+        contentEl.innerHTML = '<p><i>Your notebook is empty. Visit locations to gather clues.</i></p>';
+    }
+}
+
+// --- PHASE 2: TRIAL ---
+function startTrialPhase() {
+    // If the player hasn't visited the plant, auto-load the evidence for them.
+    if (!gameState.locationsVisited.plant) {
+        console.log("Plant not visited. Auto-loading company report.");
+        const companySampleData = generateDataset(10, 48, 2); // Make it look good for them
+        const companyMean = calculateMean(companySampleData);
+        const companystd = calculateStdDev(companySampleData);
+        gameState.notebook.companySample = { n: 10, mean: companyMean, data: companySampleData, std: companystd };
+        // Do NOT mark as visited, just load the data. The modal will handle the rest.
+    }
+
+    const allVisited = Object.values(gameState.locationsVisited).every(v => v);
+
+    if (!allVisited) {
+        showModal(
+            "Missing Context!",
+            `<p>While you have enough data, you haven't visited all locations. Information from the Archives or the University Lab could be critical in court.</p>
+             <p class="font-bold mt-4">Are you sure you want to proceed without all the evidence?</p>`,
+            [
+                { text: 'Proceed to Trial', classes: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg', callback: proceedToTrialLogic },
+                { text: 'Keep Investigating', classes: 'bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg' }
+            ]
+        );
+        return; 
+    }
+    
+    proceedToTrialLogic();
+}
+
+function proceedToTrialLogic() {
+    const largestDataset = gameState.notebook.fountainSample;
+    
+    if (largestDataset.mean <= PARAMS.LEGAL_LIMIT) {
+        showModal("Case Dismissed!", `<p>You proceed to trial, but your strongest evidence, a sample of n=${largestDataset.n}, has a mean of ${largestDataset.mean.toFixed(1)} mg/L.</p><p>This is not above the legal limit of 50 mg/L. The judge dismisses the case before it even begins due to lack of incriminating evidence.</p>`, [{text: "Try Again", classes: 'bg-blue-600 text-white font-bold py-2 px-4 rounded-lg', callback: () => window.location.reload()}]);
+        return;
+    }
+    
+    const p = gameState.playerEvidence;
+    p.sampleSize = largestDataset.n;
+    p.sampleMean = largestDataset.mean;
+    p.sampleStdDev = largestDataset.stdDev;
+    p.stdErr = p.sampleStdDev / Math.sqrt(p.sampleSize);
+    p.zStat = (p.sampleMean - PARAMS.LEGAL_LIMIT) / p.stdErr;
+    p.pValue = 1 - phi(p.zStat);
+
+    gameState.phase = 2;
+    screens.phase1.classList.add('hidden');
+    screens.phase2.classList.remove('hidden');
+    playMusic('phase2');
+    renderLifeBar();
+    renderTrialStep(0);
+}
+
+const trialScript = [
+    { char: 'JUDGE', expression: 0, text: "This court is now in session. The city accuses Toxworth Chemical of violating environmental regulations. Detective Statlock, you may begin.", action: { type: 'button', text: 'Present Evidence', next: 1 } },
+    { char: 'STATLOCK', text: () => `Your honor, my investigation has revealed a consistent pattern of pollution. My strongest evidence is a water sample of n=${gameState.playerEvidence.sampleSize}, which showed an average pollutant concentration of ${gameState.playerEvidence.sampleMean.toFixed(1)} mg/L.`, action: { type: 'button', text: 'Continue', next: 2 } },
+    { char: 'TOXWORTH', expression: 1, text: "A single sample? That could be anything! A random fluke! A flock of birds! You can't convict a pillar of the community based on 'random chance'!", action: { type: 'choice', q: "How do you counter this?", opts: ["It is not a sample, we have the entire population.", "We can use a hypothesis test.", "Your factory is evil."], correct: "We can use a hypothesis test.", next: 3 } },
+    { char: 'STATLOCK', text: "It's not about eliminating random chance, it's about quantifying it. We can perform a statistical hypothesis test to determine how likely it is to get a sample mean this high if the plant were truly compliant.", action: { type: 'button', text: 'Explain the test', next: 4 } },
+    { char: 'TOXWORTH', expression: 3, text: "Nonsense! Your data is probably skewed and unreliable. You can't use your fancy normal distribution calculations on messy real-world data!", action: { type: 'choice', q: "What statistical principle justifies your method?", opts: ["The sample mean", "The Central Limit Theorem", "The Binomial test"], correct: "The Central Limit Theorem", next: 5 } },
+    { char: 'STATLOCK', text: () => `That's where you're wrong. The <strong>Central Limit Theorem</strong> states that for a large sample size like ours (n=${gameState.playerEvidence.sampleSize}), the distribution of sample means will be approximately normal, which allows us to proceed with a Z-test.`, action: { type: 'button', text: 'Continue', next: 6 } },
+    { char: 'TOXWORTH', expression: 4, text: () => `Fine, fine! A Z-test. But you're probably doing it wrong. A 95% confidence interval for the true pollution level would be ${gameState.playerEvidence.sampleMean.toFixed(1)} ± 1.96 * ${gameState.playerEvidence.sampleStdDev.toFixed(1)}, which is (${(gameState.playerEvidence.sampleMean - 1.96 * gameState.playerEvidence.sampleStdDev).toFixed(1)}, ${(gameState.playerEvidence.sampleMean + 1.96 * gameState.playerEvidence.sampleStdDev).toFixed(1)}). The legal limit of 50 is clearly in there!`, action: { type: 'choice', q: "What is wrong with Toxworth's calculation?", opts: ["He used the wrong Z-score.", "He used Standard Deviation (SD), not Standard Error (SE).", "Confidence intervals are irrelevant."], correct: "He used Standard Deviation (SD), not Standard Error (SE).", next: 7 } },
+    { char: 'STATLOCK', text: "Objection! You're building a confidence interval for individual measurements, not for the sample mean! For the mean, we must use the <strong>Standard Error</strong>.", action: { type: 'button', text: "Let's do the math", next: 8, showEvidence: true } },
+    { char: 'JUDGE', expression: 1, text: "The detective is correct. Let's see the proper calculations. Detective, what is the Standard Error (SE) for your sample?", action: { type: 'input', q: () => `Calculate SE. (Round to 2 decimals)`, answer: () => gameState.playerEvidence.stdErr, next: 9 } },
+    { char: 'JUDGE', expression: 2, text: () => `Very well. The Standard Error is ${gameState.playerEvidence.stdErr.toFixed(2)}. Now, compute the Z-statistic.`, action: { type: 'input', q: () => `Calculate Z. (Round to 1 decimals)`, answer: () => gameState.playerEvidence.zStat, margin: 0.1, next: 10 } },
+    { char: 'JUDGE', expression: 1, text: () => `The Z-statistic is ${gameState.playerEvidence.zStat.toFixed(2)}. Finally, what is the one-sided p-value for this Z-statistic? This is the probability of observing a mean this high or higher, assuming the true mean is 50.`, action: { type: 'input', q: "Provide the one-sided p-value. (Round to 3 decimals)", answer: () => gameState.playerEvidence.pValue, margin: 0.01, next: 11 } },
+    { char: 'TOXWORTH', expression: 2, text: () => `A p-value of ${gameState.playerEvidence.pValue.toFixed(3)}! A so tiny value! That must mean that the contamination is so small that it is not relevant to mention it... `,action: { type: 'choice', q: "Does a small p-value measure the size of the effect?",opts: ["No, p is the probability of no contamination, so the contamination is huge.","No, p tells us how surprising the data are under H₀, not the size of the effect.","Yes, p is the same as the difference in means."],correct: "No, p tells us how surprising the data are under H₀, not the size of the effect.",next: 12} },
+    { char: 'TOXWORTH', expression: 3, text: () => {
+        if (gameState.notebook.companySample) {
+            return `This is a witch hunt! My own report, which I submitted to the press, showed our plant was perfectly fine! With a sample of ${gameState.notebook.companySample.n}, we found an average of ${gameState.notebook.companySample.mean.toFixed(1)} mg/L! It is pretty clear that we are not causing any contamination!`;
+        }
+        return "This is a witch hunt! I've been framed! There's no other evidence!";
+    }, action: { type: 'choice', q: () => gameState.notebook.companySample ? "What's the fatal flaw in his report?" : "How do you respond?", opts: () => gameState.notebook.companySample ? ["The numbers were fabricated.", "The sample size is too small to be reliable.", "The average is below 50 but the median of the series is above the legal limit!"] : ["He's right, there's no other evidence.", "The statistical evidence is sufficient.", "Let's ask for a recess."], correct: () => gameState.notebook.companySample ? "The sample size is too small to be reliable." : "The statistical evidence is sufficient.", next: 13, twist: true } },
+    { char: 'JUDGE', expression: 4, text: "The evidence is clear and the statistical reasoning is sound. The defense's arguments are invalid. Based on the extremely low p-value and the deliberate use of misleading data, this court finds the Toxworth Chemical Plant...", action: { type: 'button', text: 'GUILTY!', next: 99} },
+];
+
+function renderTrialStep(step) {
+    gameState.trialStep = step;
+
+    if (step >= 99) {
+        endGame(true);
+        return;
+    }
+
+    const s = trialScript[step];
+    if (!s) return;
+
+    // Music cues based on trial step
+    if (step === 8) { playMusic('calculation'); }
+    if (step === 11) { playMusic('phase2'); }
+    if (s.action.twist) { playMusic('twist'); }
+    if (step === 13) { playMusic('win'); }
+
+    const charKey = s.char;
+    const char = CHARACTERS[charKey];
+    document.getElementById('character-name').textContent = char.name;
+    
+    // Update sprite with emotion if specified
+    if (s.expression !== undefined && expressions[charKey]) {
+        document.getElementById('character-sprite').src = getAvatarUrl(charKey, s.expression);
+    } else {
+        // Otherwise, use the base sprite URL
+        document.getElementById('character-sprite').src = char.sprite + "&eyeType=Default&eyebrowType=Default&mouthType=Default";
+    }
+
+    document.getElementById('dialogue-text').innerHTML = typeof s.text === 'function' ? s.text() : s.text;
+    
+    const mathPanel = document.getElementById('math-panel');
+    if (step >= 6 && step <= 11) {
+        const p = gameState.playerEvidence;
+        mathPanel.innerHTML = `<h4 class="font-bold text-center">Your Evidence</h4>
+            <p><strong>Sample Size (n):</strong> ${p.sampleSize}</p>
+            <p><strong>Sample Mean (x̄):</strong> ${p.sampleMean.toFixed(4)} mg/L</p>
+            <p><strong>Sample SD (s):</strong> ${p.sampleStdDev.toFixed(4)} mg/L</p>`;
+        mathPanel.classList.remove('hidden');
+    } else {
+        mathPanel.classList.add('hidden');
+    }
+
+    const interactionArea = document.getElementById('interaction-area');
+    interactionArea.innerHTML = '';
+    interactionArea.className = 'mt-6 text-center'; 
+
+    const { type, text, next, q, opts, correct, answer } = s.action;
+
+    switch (type) {
+        case 'button':
+            const btn = document.createElement('button');
+            btn.textContent = text;
+            btn.className = 'objection-btn bg-yellow-400 hover:bg-yellow-500 text-gray-800 game-font text-xl py-3 px-6 rounded-lg shadow-lg';
+            if (step === 15) btn.className = 'objection-btn bg-red-600 hover:bg-red-700 text-white game-font text-4xl py-6 px-10 rounded-lg shadow-lg';
+            btn.onclick = () => renderTrialStep(next);
+            interactionArea.appendChild(btn);
+            break;
+        case 'choice':
+            const qEl = document.createElement('p');
+            qEl.className = 'text-white mb-4 text-lg';
+            qEl.textContent = typeof q === 'function' ? q() : q;
+            interactionArea.appendChild(qEl);
+            
+            const currentOpts = typeof opts === 'function' ? opts() : opts;
+            let shuffledOpts = currentOpts
+                .map(value => ({ value, sort: Math.random() }))
+                .sort((a, b) => a.sort - b.sort)
+                .map(({ value }) => value);
+
+            const optsContainer = document.createElement('div');
+            optsContainer.className = 'grid grid-cols-1 md:grid-cols-3 gap-4';
+            shuffledOpts.forEach((optText) => {
+                const optBtn = document.createElement('button');
+                optBtn.textContent = optText;
+                optBtn.className = 'choice-btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300';
+                optBtn.onclick = () => handleChoice(optText, (typeof correct === 'function' ? correct() : correct), next);
+                optsContainer.appendChild(optBtn);
+            });
+            interactionArea.appendChild(optsContainer);
+            break;
+        case 'input':
+            const inputQEl = document.createElement('p');
+            inputQEl.className = 'text-white mb-4';
+            inputQEl.innerHTML = typeof q === 'function' ? q() : q;
+            interactionArea.appendChild(inputQEl);
+            const inputEl = document.createElement('input');
+            inputEl.type = 'number';
+            inputEl.id = 'calc-input';
+            inputEl.className = 'p-2 rounded text-center text-black';
+            interactionArea.appendChild(inputEl);
+            const submitBtn = document.createElement('button');
+            submitBtn.textContent = 'Submit';
+            submitBtn.className = 'ml-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded';
+            submitBtn.onclick = () => handleInput(answer(), next);
+            interactionArea.appendChild(submitBtn);
+            break;
+    }
+}
+
+function handleChoice(selectedText, correctText, nextStep) {
+    const interactionArea = document.getElementById('interaction-area');
+    if (selectedText === correctText) {
+        interactionArea.classList.add('feedback', 'correct');
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'correct');
+            renderTrialStep(nextStep);
+        }, 1000);
+    } else {
+        interactionArea.classList.add('feedback', 'incorrect');
+        gameState.lives--;
+        renderLifeBar();
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'incorrect');
+            if (gameState.lives <= 0) {
+                endGame(false, "A critical error in your reasoning has discredited your case. The judge has no choice but to rule in favor of the defendant.");
+            }
+        }, 1000);
+    }
+}
+
+function handleInput(correctAnswer, nextStep) {
+    const inputVal = parseFloat(document.getElementById('calc-input').value);
+    const interactionArea = document.getElementById('interaction-area');
+    const margin = trialScript[gameState.trialStep].action.margin || 0.1;
+
+    if (!isNaN(inputVal) && Math.abs(inputVal - correctAnswer) < margin) {
+        interactionArea.classList.add('feedback', 'correct');
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'correct');
+            renderTrialStep(nextStep);
+        }, 1000);
+    } else {
+        interactionArea.classList.add('feedback', 'incorrect');
+        gameState.lives--;
+        renderLifeBar();
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'incorrect');
+            if (gameState.lives <= 0) {
+                endGame(false, `Your calculation was incorrect. The correct value was approximately ${correctAnswer.toFixed(3)}. This mathematical error has destroyed your credibility.`);
+            }
+        }, 1000);
+    }
+}
+
+function renderLifeBar() {
+    const lifeBar = document.getElementById('life-bar');
+    lifeBar.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+        const heart = document.createElement('div');
+        heart.className = i < gameState.lives ? 'heart' : 'heart lost';
+        lifeBar.appendChild(heart);
+    }
+}
+
+// --- END GAME ---
+function endGame(isWin, reason = "") {
+    screens.phase2.classList.add('hidden');
+    screens.end.classList.remove('hidden');
+
+    const titleEl = document.getElementById('end-title');
+    const messageEl = document.getElementById('end-message');
+    const recapEl = document.getElementById('end-recap');
+
+    if (isWin) {
+        playMusic('win');
+        titleEl.textContent = "GUILTY!";
+        titleEl.className = 'game-font text-4xl mb-4 text-green-400';
+        messageEl.textContent = "Your sharp statistical analysis has proven Toxworth's guilt beyond a reasonable doubt. Justice is served!";
+        recapEl.innerHTML = `<h3 class="font-bold text-lg mb-2">Key Takeaways:</h3>
+            <p>✔️ <strong>Hypothesis Testing:</strong> You used it to show that the high pollution levels were statistically significant, not just random chance.</p>
+            <p>✔️ <strong>Central Limit Theorem:</strong> This allowed you to use the powerful Z-test even if the underlying pollution data wasn't perfectly normal.</p>
+            <p>✔️ <strong>Standard Error (SE):</strong> You correctly identified that inference about a sample mean depends on SE (s/√n), not just the sample's Standard Deviation (s).</p>
+            <p>✔️ <strong>P-Value:</strong> You correctly interpreted the small p-value as strong evidence against the null hypothesis (the assumption of innocence).</p>
+            <p>✔️ <strong>Sample Size Matters:</strong> You exposed the defendant's use of a tiny, unreliable sample (n=10) as a misleading tactic.</p>`;
+    } else {
+        playMusic('loss');
+        titleEl.textContent = "NOT GUILTY!";
+        titleEl.className = 'game-font text-4xl mb-4 text-red-400';
+        messageEl.textContent = reason;
+        recapEl.innerHTML = `<h3 class="font-bold text-lg mb-2">What Went Wrong?</h3>
+            <p>A successful prosecution requires both collecting good data and interpreting it correctly. Every step of a hypothesis test is crucial.</p>
+            <p>Review the concepts of the <strong>Null Hypothesis</strong>, the <strong>Central Limit Theorem</strong>, the difference between <strong>Standard Deviation</strong> and <strong>Standard Error</strong>, and the correct interpretation of a <strong>p-value</strong>.</p>
+            <p>Even a small error can undermine an entire case!</p>`;
+    }
+}
+</script>
+</body>
+</html>
+
