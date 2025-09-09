@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Chosen Palette: Warm Neutrals with Blue/Gold Accents -->
+    <!-- Application Structure Plan: The application follows a two-act structure inspired by narrative games like Phoenix Wright. Act 1 is the "Investigation Phase," a non-linear exploration where the user gathers data and conceptual knowledge. This empowers the user and provides context. Act 2 is the "Trial Phase," a linear, guided dialogue where the user applies their knowledge. This structure was chosen because it transforms the learning process from passive reading into an active, goal-oriented quest, making the statistical concepts more memorable and engaging. The user first builds their toolkit, then uses it to win. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Raw data (Words vs. Adverbs). Goal: Exploration/Collection. Method: Interactive data table in a modal. Interaction: User clicks to "sample" data. Justification: Simulates the act of investigation and builds the dataset for later analysis.
+        - Report Info: Vellum's fraudulent N=3 model. Goal: Expose Flaw. Method: Static image placeholder and dialogue. Interaction: Multiple-choice question. Justification: Focuses on the conceptual flaw (small N) rather than complex visualization.
+        - Report Info: Player's regression model. Goal: Analysis/Comparison. Method: Scatter plot with regression line (Chart.js). Interaction: Chart is dynamically generated from user's collected data. Justification: Provides clear visual confirmation of the linear relationship and the model's fit.
+        - Report Info: Statistical concepts (Slope, SE, t-stat, p-value, CLT). Goal: Application/Testing. Method: Dialogue with input fields and multiple-choice questions. Interaction: User must calculate and input values or select the correct interpretation. Justification: Directly assesses the user's understanding of the core learning objectives in a high-stakes context.
+        - Report Info: Residuals QQ-Plot. Goal: Introduce advanced concept/twist. Method: Static image placeholder and dialogue. Interaction: Multiple-choice question. Justification: A dynamic QQ-plot is overly complex; a static representation effectively serves the narrative twist and tests the user's knowledge of the underlying assumptions and the CLT.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <title>Detective Lexi Conn and the Forger's Signature</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #fdf6e3; }
+        .game-font { font-family: 'Press Start 2P', cursive; }
+        .dialogue-box {
+            border: 4px solid #657b83;
+            background-color: rgba(255, 255, 255, 0.85);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            min-height: 120px;
+            position: relative;
+            z-index: 10;
+        }
+        .character-name {
+            background-color: #073642;
+            color: #eee8d5;
+            padding: 0.5rem 1rem;
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+            display: inline-block;
+            border: 4px solid #657b83;
+            border-bottom: none;
+            transform: translateY(4px);
+            position: relative;
+            z-index: 20;
+        }
+        .objection-btn { animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .choice-btn:hover, .location-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .custom-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #fdf6e3; padding: 2rem; border-radius: 0.5rem;
+            text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.4);
+            max-width: 90%; width: 600px;
+        }
+        .music-controls {
+            position: fixed; top: 1rem; right: 1rem; z-index: 100;
+        }
+        .location-btn.visited {
+            background-color: #93a1a1;
+            border-color: #586e75;
+            color: #073642;
+        }
+        .heart { display: inline-block; width: 30px; height: 30px; background-color: #dc322f; margin: 0 5px; clip-path: polygon(50% 100%, 0 45%, 0 0, 100% 0, 100% 45%); }
+        .heart.lost { background-color: #657b83; }
+        .feedback {
+            transition: all 0.2s ease-in-out;
+        }
+        .feedback.correct {
+            box-shadow: 0 0 20px 10px rgba(133, 153, 0, 0.7);
+        }
+        .feedback.incorrect {
+            box-shadow: 0 0 20px 10px rgba(220, 50, 47, 0.7);
+            animation: shake 0.5s;
+        }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+        .data-display { word-wrap: break-word; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4 overflow-hidden">
+
+    <div class="music-controls">
+        <button id="music-toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg w-full mb-2">Music Off</button>
+    </div>
+    
+    <audio id="phase1-audio-player" loop></audio>
+    <audio id="phase2-audio-player" loop></audio>
+    <audio id="calculation-audio-player" loop></audio>
+    <audio id="twist-audio-player" loop></audio>
+    <audio id="win-audio-player"></audio>
+    <audio id="loss-audio-player"></audio>
+
+    <div id="game-container" class="w-full max-w-5xl mx-auto">
+
+
+        <div id="intro-screen" class="relative">
+            <div class="bg-gray-800 rounded-lg shadow-2xl text-white text-center p-8" style="background-color: #002b36;">
+                <h1 class="game-font text-3xl mb-4 text-yellow-400">The Forger's Signature</h1>
+                <p class="mb-6">You are Detective Lexi Conn, a renowned statistical investigator. A disgraced academic, Silas Vellum, claims to have found a lost manuscript by the famous author Alistair Quill, authenticated by a unique "stylometric signature."</p>
+                <p class="mb-8">Your mission: gather evidence, analyze the manuscript, and expose Vellum's flawed statistical claims in court. The integrity of literary history is on the line.</p>
+                <button id="start-game-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg transition duration-300 game-font text-xl">Begin Investigation</button>
+            </div>
+            <!-- Copyright -->
+            <div class="absolute bottom-2 right-2 text-xs text-gray-500 z-50">
+                © Arnaud Dufays
+            </div>
+        </div>
+
+        <div id="phase1-screen" class="hidden">
+             <div class="bg-gray-800 rounded-lg shadow-2xl text-white p-8" style="background-color: #002b36;">
+                <h1 class="game-font text-2xl md:text-3xl text-center mb-6 text-yellow-400">Phase 1: Investigation</h1>
+                <div class="flex flex-col md:flex-row gap-8">
+                    <div class="md:w-3/5">
+                        <h2 class="text-xl font-bold mb-4 text-center">Case Locations</h2>
+                        <div class="grid grid-cols-2 gap-4">
+                            <button id="loc-archives" class="location-btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">1. The Quill Foundation</button>
+                            <button id="loc-lab" class="location-btn bg-purple-500 hover:bg-purple-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">2. Police Forensics Lab</button>
+                            <button id="loc-prof" class="location-btn bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">3. Prof. Axiom's Office</button>
+                            <button id="loc-press" class="location-btn bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-2 rounded-lg transition duration-300">4. Vellum's Press Video</button>
+                        </div>
+                         <div class="mt-6 text-center">
+                            <button id="trial-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-bold py-3 px-4 rounded-lg transition duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed game-font text-lg" disabled>Proceed to Trial</button>
+                        </div>
+                    </div>
+                    <div class="md:w-2/5 bg-gray-700 p-4 rounded-lg" style="background-color: #073642;">
+                        <h2 class="text-xl font-bold mb-4 text-center border-b-2 border-gray-500 pb-2">Detective's Notebook</h2>
+                        <div id="notebook-content" class="h-64 overflow-y-auto space-y-3 text-sm">
+                            <p><i>Your notebook is empty. Visit locations to gather clues.</i></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="phase2-screen" class="hidden">
+            <div class="rounded-lg shadow-2xl overflow-hidden relative" style="background-color: #002b36;">
+                <div class="h-64 bg-cover bg-center" style="background-image: url('https://placehold.co/1024x256/586e75/fdf6e3?text=The+Courtroom');">
+                    <div id="life-bar" class="absolute top-4 left-4 flex"></div>
+                </div>
+                
+                <img id="character-sprite" src="" alt="Character Sprite" class="absolute bottom-60 right-4 h-3/5 object-contain pointer-events-none">
+
+                <div class="p-6 md:p-8 relative">
+                    <div id="dialogue-area">
+                        <p class="character-name" id="character-name"></p>
+                        <div class="dialogue-box">
+                            <p id="dialogue-text"></p>
+                            <div id="math-panel" class="hidden mt-4 p-2 bg-gray-100 rounded border text-sm"></div>
+                            <div id="chart-panel" class="hidden mt-4">
+                                <div class="chart-container">
+                                    <canvas id="regressionChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="interaction-area" class="mt-6 text-center"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="end-screen-container" class="hidden text-center text-white">
+            <div class="p-8 rounded-lg" style="background-color: #002b36;">
+                <h1 id="end-title" class="game-font text-4xl mb-4"></h1>
+                <p id="end-message" class="text-lg mb-6"></p>
+                <div id="end-recap" class="text-left bg-gray-700 p-4 rounded-lg mb-6 space-y-2" style="background-color: #073642;"></div>
+                <button id="play-again-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 mt-4">Play Again</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="custom-modal" class="custom-modal hidden">
+        <div id="modal-content" class="modal-content">
+            <h2 id="modal-title" class="text-2xl font-bold mb-4"></h2>
+            <div id="modal-text" class="text-left mb-6"></div>
+            <div id="modal-buttons"></div>
+        </div>
+    </div>
+
+<script>
+const CHARACTERS = {
+    CONN: { 
+        name: "Det. Lexi Conn", 
+        sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairShortWaved&accessoriesType=Kurt&hairColor=BrownDark&facialHairType=Blank&clotheType=ShirtVNeck&clotheColor=Gray02&skinColor=Light" 
+    },
+    VELLUM: { 
+        name: "Mr. Silas Vellum", 
+        sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairFrizzle&accessoriesType=Blank&hairColor=Auburn&facialHairType=MoustacheMagnum&facialHairColor=Auburn&clotheType=BlazerSweater&clotheColor=PastelGreen&skinColor=Pale"
+    },
+    JUDGE: { 
+        name: "Judge Statler", 
+        sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=LongHairNotTooLong&accessoriesType=Blank&hairColor=SilverGray&facialHairType=Blank&clotheType=BlazerShirt&skinColor=Pale" 
+    },
+};
+
+// Location Images
+const LOCATION_IMAGES = {
+    archives: "https://www.dropbox.com/scl/fi/xehm6m71t4xc9ndcif8c3/Quill-foundation.png?rlkey=w0q7095d65n2aujtala5oehjz&dl=1",
+    lab: "https://www.dropbox.com/scl/fi/swdkj9exhkqw15z1n1syn/Police_forensics.png?rlkey=4jnbkfkyrx7781klj5zkwerkj&dl=1",
+    prof: "https://www.dropbox.com/scl/fi/s3xmauauxd2fro1cnx4dg/Professor_Office.png?rlkey=j3nbekp4l0q3tvuz2mg91jh3a&dl=1",
+    press: "https://www.dropbox.com/scl/fi/r3skipsjpijxcv5swd97y/Vellum-press-conference.png?rlkey=lzsdgl8wg0zjgmsukzs2qkdd2&dl=1"
+};
+
+const expressions = {
+    CONN: [
+        { eye: 'Default', eyebrow: 'Default', mouth: 'Default' },
+        { eye: 'Side', eyebrow: 'RaisedExcited', mouth: 'Serious' },
+        { eye: 'Default', eyebrow: 'Default', mouth: 'Smile' },
+        { eye: 'Wink', eyebrow: 'RaisedExcited', mouth: 'Twinkle' },
+    ],
+    VELLUM: [
+        { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Smile' },
+        { eye: 'Side', eyebrow: 'AngryNatural', mouth: 'Serious' },
+        { eye: 'Surprised', eyebrow: 'UpDown', mouth: 'Concerned' },
+        { eye: 'Surprised', eyebrow: 'SadConcerned', mouth: 'ScreamOpen' },
+        { eye: 'Squint', eyebrow: 'Angry', mouth: 'Grimace' },
+    ],
+    JUDGE: [
+        { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Serious' },
+        { eye: 'Side', eyebrow: 'UpDown', mouth: 'Concerned' },
+        { eye: 'Default', eyebrow: 'Default', mouth: 'Default' },
+        { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Smile' },
+    ]
+};
+
+function getAvatarUrl(characterKey, expressionIndex) {
+    const char = CHARACTERS[characterKey];
+    const expr = expressions[characterKey][expressionIndex];
+    if (!char || !expr) return char.sprite;
+    const baseUrl = char.sprite;
+    return `${baseUrl}&eyeType=${expr.eye}&eyebrowType=${expr.eyebrow}&mouthType=${expr.mouth}`;
+}
+
+const MUSIC_URLS = {
+    PHASE1: "https://freepd.com/music/Dreams%20of%20Vain.mp3",
+    PHASE2: "https://freepd.com/music/Limit%2070.mp3",
+    CALCULATION: "https://freepd.com/music/Meditating%20Beat.mp3",
+    TWIST: "https://freepd.com/music/After%20the%20End.mp3",
+    WIN: "https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3",
+    LOSS: "https://freepd.com/music/Cursed%20Intro.mp3",
+};
+
+const gameState = {
+    phase: 0,
+    lives: 3,
+    trialStep: 0,
+    locationsVisited: { archives: false, lab: false, prof: false, press: false },
+    notebook: {
+        trueSlope: null,
+        trueAvgAdverbs: null,
+        formulas: false,
+        vellumEvidence: false,
+        manuscriptData: [],
+    },
+    playerEvidence: {
+        N: 0,
+        avgX: 0,
+        avgY: 0,
+        varX: 0,
+        covXY: 0,
+        slope: 0,
+        intercept: 0,
+        rSquared: 0,
+        stdErrorSlope: 0,
+        tStat: 0,
+    }
+};
+
+const PARAMS = {
+    TRUE_SLOPE: 0.1,
+    TRUE_INTERCEPT: 0,
+    TRUE_AVG_ADVERBS: 3.25,
+    FORGERY_SLOPE: 0.05,
+    FORGERY_INTERCEPT: 0,
+    DATA_STD_DEV: 0.5,
+    NULL_HYPOTHESIS_SLOPE: 0.1
+};
+
+const screens = {
+    intro: document.getElementById('intro-screen'),
+    phase1: document.getElementById('phase1-screen'),
+    phase2: document.getElementById('phase2-screen'),
+    end: document.getElementById('end-screen-container'),
+};
+const musicToggleBtn = document.getElementById('music-toggle-btn');
+const audioPlayers = {
+    phase1: document.getElementById('phase1-audio-player'),
+    phase2: document.getElementById('phase2-audio-player'),
+    calculation: document.getElementById('calculation-audio-player'),
+    twist: document.getElementById('twist-audio-player'),
+    win: document.getElementById('win-audio-player'),
+    loss: document.getElementById('loss-audio-player'),
+};
+const customModal = document.getElementById('custom-modal');
+let regressionChart = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('start-game-btn').addEventListener('click', startGame);
+    document.getElementById('loc-archives').addEventListener('click', () => visitLocation('archives'));
+    document.getElementById('loc-lab').addEventListener('click', () => visitLocation('lab'));
+    document.getElementById('loc-prof').addEventListener('click', () => visitLocation('prof'));
+    document.getElementById('loc-press').addEventListener('click', () => visitLocation('press'));
+    document.getElementById('trial-btn').addEventListener('click', startTrialPhase);
+    document.getElementById('play-again-btn').addEventListener('click', () => window.location.reload());
+    musicToggleBtn.addEventListener('click', toggleMusic);
+});
+
+
+async function startGame() {
+    await Tone.start();
+    Object.keys(audioPlayers).forEach(key => {
+        if (MUSIC_URLS[key.toUpperCase()]) {
+            audioPlayers[key].src = MUSIC_URLS[key.toUpperCase()];
+        }
+    });
+    screens.intro.classList.add('hidden');
+    screens.phase1.classList.remove('hidden');
+    gameState.phase = 1;
+    playMusic('phase1');
+    updateNotebook();
+}
+
+let isMusicMuted = false;
+function toggleMusic() {
+    isMusicMuted = !isMusicMuted;
+    Object.values(audioPlayers).forEach(player => player.muted = isMusicMuted);
+    musicToggleBtn.textContent = isMusicMuted ? 'Music On' : 'Music Off';
+}
+
+function playMusic(scene) {
+    if (isMusicMuted) return;
+    Object.values(audioPlayers).forEach(player => {
+        if (!player.paused) player.pause();
+    });
+    if (audioPlayers[scene]) {
+        audioPlayers[scene].currentTime = 0;
+        const promise = audioPlayers[scene].play();
+        if (promise !== undefined) {
+            promise.catch(error => console.error(`Audio playback failed for ${scene}:`, error));
+        }
+    }
+}
+
+function showModal(title, content, buttons, imageUrl = null) {
+    document.getElementById('modal-title').innerHTML = title;
+    
+    // Add image if provided
+    let fullContent = content;
+    if (imageUrl) {
+        fullContent = `<div class="flex justify-center mb-4">
+            <img src="${imageUrl}" alt="${title}" class="max-w-full h-64 object-contain rounded-lg shadow-lg">
+        </div>` + content;
+    }
+    
+    document.getElementById('modal-text').innerHTML = fullContent;
+    const buttonsContainer = document.getElementById('modal-buttons');
+    buttonsContainer.innerHTML = '';
+    buttons.forEach(btn => {
+        const buttonEl = document.createElement('button');
+        buttonEl.textContent = btn.text;
+        buttonEl.className = btn.classes;
+        buttonEl.onclick = () => {
+            if (!btn.keepOpen) {
+                 customModal.classList.add('hidden');
+            }
+            if (btn.callback) btn.callback();
+        };
+        buttonsContainer.appendChild(buttonEl);
+    });
+    customModal.classList.remove('hidden');
+}
+
+function randomNormal(mean, stdDev) {
+    let u1 = Math.random(), u2 = Math.random();
+    let randStdNormal = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2);
+    return mean + stdDev * randStdNormal;
+}
+
+function generateSentenceData(n, slope, intercept, stdDev) {
+    const data = [];
+    for (let i = 0; i < n; i++) {
+        const x = Math.floor(randomNormal(50, 5));
+        const error = randomNormal(0, stdDev);
+        const y_raw = intercept + slope * x + error;
+        data.push({ x: Math.max(5, x), y: Math.max(0, Math.round(y_raw)) });
+    }
+    return data;
+}
+
+function calculateMean(data, key) {
+    if (data.length === 0) return 0;
+    return data.reduce((sum, item) => sum + item[key], 0) / data.length;
+}
+
+function calculateVariance(data, key) {
+    if (data.length < 2) return 0;
+    const mean = calculateMean(data, key);
+    return data.reduce((sum, item) => sum + (item[key] - mean) ** 2, 0) / (data.length - 1);
+}
+
+function calculateCovariance(data) {
+    if (data.length < 2) return 0;
+    const meanX = calculateMean(data, 'x');
+    const meanY = calculateMean(data, 'y');
+    return data.reduce((sum, item) => sum + (item.x - meanX) * (item.y - meanY), 0) / (data.length - 1);
+}
+
+function calculateSlope(data) {
+    if (data.length < 2) return 0;
+    const covXY = calculateCovariance(data);
+    const varX = calculateVariance(data, 'x');
+    return varX === 0 ? 0 : covXY / varX;
+}
+
+function calculateIntercept(data, slope) {
+    if (data.length === 0) return 0;
+    const meanX = calculateMean(data, 'x');
+    const meanY = calculateMean(data, 'y');
+    return meanY - slope * meanX;
+}
+
+function calculateRsquared(data, slope, intercept) {
+    if (data.length < 2) return 0;
+    const meanY = calculateMean(data, 'y');
+    let ssTotal = 0;
+    let ssResidual = 0;
+    for (const point of data) {
+        const predictedY = intercept + slope * point.x;
+        ssTotal += (point.y - meanY) ** 2;
+        ssResidual += (point.y - predictedY) ** 2;
+    }
+    return ssTotal === 0 ? 1 : 1 - (ssResidual / ssTotal);
+}
+
+function calculateStdErrorOfSlope(data, slope, intercept) {
+    if (data.length < 3) return 0;
+    const n = data.length;
+    let ssResidual = 0;
+    let ssX = 0;
+    const meanX = calculateMean(data, 'x');
+    for (const point of data) {
+        const predictedY = intercept + slope * point.x;
+        ssResidual += (point.y - predictedY) ** 2;
+        ssX += (point.x - meanX) ** 2;
+    }
+    const residualStdErr = Math.sqrt(ssResidual / (n - 2));
+    return ssX === 0 ? 0 : residualStdErr / Math.sqrt(ssX);
+}
+
+function calculateTStat(slope, nullHypothesisSlope, stdError) {
+    return stdError === 0 ? 0 : (slope - nullHypothesisSlope) / stdError;
+}
+
+function visitLocation(loc) {
+    if (gameState.locationsVisited[loc] && loc !== 'lab') return;
+
+    let title = "", content = "", buttons = [];
+    const closeBtn = { text: 'Close Notebook', classes: 'bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg ml-2' };
+
+    switch (loc) {
+        case 'archives':
+            title = "The Quill Foundation Archives";
+            content = `<p>You access a massive database of Alistair Quill's authenticated works. After analyzing tens of thousands of sentences, two key facts emerge.</p>
+                       <div class="font-bold text-lg text-center my-2 p-2 bg-yellow-100 border-2 border-yellow-400 text-gray-800">
+                        <p>1. Quill's true stylistic slope (using a linear regression with an intercept) is <strong>0.05 adverbs per word</strong>.</p>
+                        <p>2. His average adverbs per sentence of 50 words is <strong>${PARAMS.TRUE_INTERCEPT + PARAMS.TRUE_SLOPE*50}</strong>.</p>
+                       </div>
+                       <p>These will be the benchmarks for your case.</p>`;
+            gameState.notebook.trueSlope = PARAMS.TRUE_SLOPE;
+			gameState.notebook.trueIntercept = PARAMS.TRUE_INTERCEPT;
+            gameState.notebook.trueAvgAdverbs = PARAMS.TRUE_AVG_ADVERBS;
+            gameState.locationsVisited.archives = true;
+            buttons.push({ text: 'Close', classes: 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg' });
+            showModal(title, content, buttons, LOCATION_IMAGES.archives);
+            return;
+        case 'lab':
+            title = "Police Forensics Lab";
+            const buildLabModalContent = () => {
+                let data = gameState.notebook.manuscriptData;
+                let statsHTML = `<p class="italic my-2">You haven't analyzed any pages from the manuscript yet.</p>`;
+                if (data.length > 0) {
+                    const x_values = data.map(d => d.x).join(',');
+                    const y_values = data.map(d => d.y).join(',');
+                    statsHTML = `<div class="text-left bg-gray-100 p-3 my-4 rounded border">
+                        <h4 class="font-bold text-center mb-2">Current Sample (N=${data.length})</h4>
+                        <div class="font-mono text-xs data-display">
+                            <p><strong>Words/Sentence (X):</strong><br>${x_values}</p>
+                            <p class="mt-2"><strong>Adverbs/Sentence (Y):</strong><br>${y_values}</p>
+                        </div>
+                    </div>`;
+                }
+                return `<p>You can now analyze the suspicious manuscript page by page.</p>${statsHTML}`;
+            };
+            
+            const takeFiveSamples = () => {
+                const newSamples = generateSentenceData(20, PARAMS.FORGERY_SLOPE, PARAMS.FORGERY_INTERCEPT, PARAMS.DATA_STD_DEV);
+                gameState.notebook.manuscriptData.push(...newSamples);
+                document.getElementById('modal-text').innerHTML = buildLabModalContent();
+                gameState.locationsVisited.lab = true;
+                updateNotebookAndCheckProgress();
+            };
+
+            buttons = [
+                { text: 'Analyze 20 More Sentences', classes: 'bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg', callback: takeFiveSamples, keepOpen: true },
+                closeBtn
+            ];
+            content = buildLabModalContent();
+            showModal(title, content, buttons, LOCATION_IMAGES.lab);
+            return; 
+        case 'prof':
+            title = "Professor Axiom's Office";
+            content = `<p>The professor scribbles furiously on a whiteboard.</p>
+                       <p class="italic p-2 bg-green-100 border-l-4 border-green-500 text-gray-800">"To challenge his slope, you'll need a t-test. The formula is t = (b₁ - β₀) / SE(b₁). But remember, the t-test assumes normal residuals. Given your data—counts of adverbs—that assumption might not hold. Keep that in your back pocket, detective."</p>`;
+            gameState.notebook.formulas = true;
+            gameState.locationsVisited.prof = true;
+            buttons.push({ text: 'Close', classes: 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg' });
+            showModal(title, content, buttons, LOCATION_IMAGES.prof);
+            return;
+        case 'press':
+            title = "Vellum's Press Conference Video";
+            content = `<p>You watch the recording. Vellum stands smugly beside a chart showing just three data points in a near-perfect line.</p>
+                       <p class="p-2 bg-red-100 border-l-4 border-red-500 text-gray-800">"The R-squared is 0.98, with an estimate slope of 0.052! The science is undeniable! It perfectly matches my theory of the 0.05 slope signature. This manuscript is genuine!"</p>
+                       <p>His arrogance is palpable. This evidence of his flawed methodology is crucial.</p>`;
+            gameState.notebook.vellumEvidence = true;
+            gameState.locationsVisited.press = true;
+            buttons.push({ text: 'Close', classes: 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg' });
+            showModal(title, content, buttons, LOCATION_IMAGES.press);
+            return;
+    }
+}
+
+function updateNotebookAndCheckProgress() {
+    updateNotebook();
+    Object.keys(gameState.locationsVisited).forEach(loc => {
+        if (gameState.locationsVisited[loc]) {
+            document.getElementById(`loc-${loc}`).classList.add('visited');
+        }
+    });
+    
+    const trialBtn = document.getElementById('trial-btn');
+    const hasEnoughData = gameState.notebook.manuscriptData.length >= 100;
+
+    if (hasEnoughData) {
+        trialBtn.disabled = false;
+        trialBtn.textContent = "Data Ready! Proceed to Trial";
+    } else {
+        trialBtn.disabled = true;
+        trialBtn.textContent = `Locked (Collect at least 100 samples)`;
+    }
+}
+
+function updateNotebook() {
+    const contentEl = document.getElementById('notebook-content');
+    contentEl.innerHTML = '';
+    if (gameState.notebook.trueSlope !== null) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Quill's True Slope:</strong> ${PARAMS.NULL_HYPOTHESIS_SLOPE} (H₀ Value)</div>`;
+    }
+    if (gameState.notebook.trueAvgAdverbs !== null) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Quill's Avg Adverbs/sentence (50 Words):</strong> ${gameState.notebook.trueIntercept + gameState.notebook.trueSlope*50}</div>`;
+    }
+    if (gameState.notebook.formulas) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Prof's Note:</strong> Use t-test for slope, but beware of non-normal residuals.</div>`;
+    }
+    if (gameState.notebook.vellumEvidence) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Vellum's "Proof":</strong> A suspicious N=3 model with R²=0.98.</div>`;
+    }
+    const data = gameState.notebook.manuscriptData;
+    if (data.length > 0) {
+        contentEl.innerHTML += `<div class="p-2 bg-gray-600 rounded"><strong>Manuscript Sample:</strong> N=${data.length} sentences collected.</div>`;
+    }
+    if (contentEl.innerHTML === '') {
+        contentEl.innerHTML = '<p><i>Your notebook is empty. Visit locations to gather clues.</i></p>';
+    }
+}
+
+function startTrialPhase() {
+    const allVisited = Object.values(gameState.locationsVisited).every(v => v);
+    if (!allVisited) {
+        showModal(
+            "Missing Context!",
+            `<p>While you have enough data, you haven't visited all locations. Information from the Quill Foundation or Professor Axiom could be critical in court.</p>
+             <p class="font-bold mt-4">Are you sure you want to proceed without all the evidence?</p>`,
+            [
+                { text: 'Proceed to Trial', classes: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg', callback: proceedToTrialLogic },
+                { text: 'Keep Investigating', classes: 'bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg' }
+            ]
+        );
+        return;
+    }
+    proceedToTrialLogic();
+}
+
+function proceedToTrialLogic() {
+    const data = gameState.notebook.manuscriptData;
+    const p = gameState.playerEvidence;
+    p.N = data.length;
+    p.avgX = calculateMean(data, 'x');
+    p.avgY = calculateMean(data, 'y');
+    p.varX = calculateVariance(data, 'x');
+	p.varY = calculateVariance(data, 'y');
+    p.covXY = calculateCovariance(data);
+    const rawSlope = calculateSlope(data);
+    p.slope = rawSlope;
+    p.intercept = calculateIntercept(data, rawSlope);
+    p.rSquared = calculateRsquared(data, rawSlope, p.intercept);
+    const rawStdError = calculateStdErrorOfSlope(data, rawSlope, p.intercept);
+    p.stdErrorSlope = rawStdError;
+    p.tStat = calculateTStat(p.slope, PARAMS.NULL_HYPOTHESIS_SLOPE, p.stdErrorSlope);
+
+    gameState.phase = 2;
+    screens.phase1.classList.add('hidden');
+    screens.phase2.classList.remove('hidden');
+    playMusic('phase2');
+    renderLifeBar();
+    renderTrialStep(0);
+}
+
+const trialScript = [
+    { char: 'JUDGE', expression: 0, text: "This court is now in session. Mr. Vellum claims this manuscript was written by Alistair Quill. Detective Conn, you may begin.", action: { type: 'button', text: 'Present Evidence', next: 1 } },
+    { char: 'CONN', expression: 1, text: () => `Your honor, the Quill Foundation has established that Alistair Quill's work averages <strong>${(PARAMS.TRUE_INTERCEPT + PARAMS.TRUE_SLOPE*50).toFixed(2)} adverbs per 50-word sentence</strong>. However, my analysis of N=${gameState.playerEvidence.N} sentences from this manuscript shows an average of <strong>${(gameState.playerEvidence.avgY).toFixed(2)} adverbs per sentence of ${gameState.playerEvidence.avgX.toFixed(2)} words</strong>.`, action: { type: 'button', text: 'Continue', next: 2 } },
+    { char: 'VELLUM', expression: 1, text: "Averages vary! You cannot trust an average, especially since the number of words and adverbs cannot be negative. The distribution is clearly not symmetric, which means the average is meaningless!", action: { type: 'choice', q: "How do you refute this claim about the average?", opts: ["The high correlation coefficient makes the average reliable.", "Due to the Law of Large Numbers, the average is a precise estimator even if the distribution is skewed.", "This is a case of overfitting, not unreliable averages.", "We should use unsupervised learning to find a better average."], correct: "Due to the Law of Large Numbers, the average is a precise estimator even if the distribution is skewed.", next: 3 } },
+    { char: 'CONN', expression: 2, text: "Exactly. The Law of Large Numbers ensures my average is reliable. And not only is the average different, but my analysis shows the slope of the relationship is also completely different from your claim.", action: { type: 'button', text: 'Challenge his slope', next: 4 } },
+    { char: 'VELLUM', expression: 1, text: "My regression is superior! I'm sure of it. What's the R-squared from your shoddy model, detective? It must be pitifully low.", action: { type: 'input', q: "Calculate the R-squared from your sample. (Round to 2 decimals)", answer: () => gameState.playerEvidence.rSquared, margin: 0.05, next: 5 } },
+    { char: 'VELLUM', expression: 0, text: () => `An R-squared of only ${gameState.playerEvidence.rSquared.toFixed(2)}? Pathetic! My model based on three sentences has an R-squared of 0.98 and a slope estimate very close to the Quill's one! It's clearly the better fit! The case is closed!`, action: { type: 'choice', q: "Why is Vellum's R-squared of 0.98 misleading?", opts: ["R-squared is like a probability; a smaller value is better.", "His high R-squared is due to overfitting from a tiny sample size of N=3.", "R-squared is distributed normally, so different values are expected.", "R-squared is 1 minus the squared correlation, so a smaller value is better."], correct: "His high R-squared is due to overfitting from a tiny sample size of N=3.", next: 6 } },
+    { char: 'JUDGE', expression: 1, text: "Very well, Detective. The court requires the facts. Please present your model's key statistics.", action: { type: 'input', q: "Calculate the slope estimate (adverbs per word) from your sample using a linear regression with an intercept. (Round to 2 decimals)", answer: () => gameState.playerEvidence.slope, margin: 0.01, next: 7 } },
+    { char: 'JUDGE', expression: 0, text: "You have your estimated slope. But how certain can we be of this estimate? Present the standard error.", action: { type: 'input', q: "Calculate the standard error of the slope. (Round to 2 decimals)", answer: () => gameState.playerEvidence.stdErrorSlope, margin: 0.01, next: 8 } },
+    { char: 'VELLUM', expression: 2, text: "Numbers, numbers! This is just statistical noise! It means nothing!", action: { type: 'button', text: 'Perform the test', next: 9 } },
+    { char: 'CONN', expression: 1, text: "It allows us to perform a hypothesis test to see if the manuscript's slope is statistically different from Quill's true slope of 0.1.", action: { type: 'input', q: "Calculate the t-statistic. (Round to 1 decimal)", answer: () => gameState.playerEvidence.tStat, margin: 0.1, next: 10 } },
+    { char: 'VELLUM', expression: 4, text: () => `A t-statistic of ${gameState.playerEvidence.tStat.toFixed(2)}?! That's a negative number! How can a probability be negative? Your test is nonsensical!`, action: { type: 'choice', q: "What does the t-statistic represent?", opts: ["It is the lower bound of the slope estimate at 95%.", "It is a draw from a student distribution when the null hypothesis is true.", "It is the upper bound of the slope estimate at 95%, which is far away from the true slope value of 0.1", "A negative value means the null hypothesis should be rejected."], correct: "It is a draw from a student distribution when the null hypothesis is true.", next: 11 } },
+    { char: 'VELLUM', expression: 1, text: "Hmph. Fine. But how can you possibly know the p-value from that number? This t-test is useless. Your honor, we are wasting our time here!", action: { type: 'choice', q: "How do you know this t-statistic implies a small p-value?", opts: ["I can integrate the t-distribution's probability density function.", "For a large sample, the t-distribution is like a normal distribution, and a value this far from zero is extremely rare.", "Any negative t-statistic gives a small p-value.", "The p-value is just 1 minus the t-statistic."], correct: "For a large sample, the t-distribution is like a normal distribution, and a value this far from zero is extremely rare.", next: 12, twist: true } },
+    { char: 'VELLUM', expression: 4, text: "Wait! I've found a flaw in the detective's own model! Your t-test is invalid! The entire case is built on a statistical fallacy!", action: { type: 'action', func: showQQPlot, next: 13 } },
+    { char: 'VELLUM', expression: 4, text: "I'm showing a QQ-plot of your model's residuals. Because the points don't fall on the line, the residuals aren't normal, which invalidates your so-called t-test!", action: { type: 'choice', q: "How do you counter this advanced statistical argument?", opts: ["We must use a non-parametric test like Spearman rank correlation instead.", "The QQ-plot tests if the residuals are homoskedastic. It is not about the normal distribution.", "With a large sample (N>100), the Central Limit Theorem applies to the slope estimate itself. The test is robust and can be treated as a Z-test, which is still valid.", "When the points do not fall on the line, the QQ-plot indicates that the exogeneity assumption holds. The test is thus valid!"], correct: "With a large sample (N>100), the Central Limit Theorem applies to the slope estimate itself. The test is robust and can be treated as a Z-test, which is still valid.", next: 14 } },
+    { char: 'CONN', expression: 3, text: "Your Honor, the defendant is confusing the distribution of the residuals with the sampling distribution of the slope estimator. With our large sample size, the Central Limit Theorem ensures our test is valid. His objection is a desperate, last-ditch attempt to mislead the court.", action: { type: 'button', text: 'The Verdict', next: 15 } },
+    { char: 'JUDGE', expression: 3, text: "The evidence is clear, and the statistical reasoning is sound. This court finds the manuscript a forgery and Mr. Vellum GUILTY!", action: { type: 'button', text: 'Case Closed', next: 99 } }
+];
+
+function renderTrialStep(step) {
+    gameState.trialStep = step;
+
+    if (step >= 99) {
+        endGame(true);
+        return;
+    }
+
+    const s = trialScript[step];
+    if (!s) return;
+
+    if (step === 3) { playMusic('calculation'); }
+    if (step === 8) { playMusic('phase2'); }
+    if (s.action.twist) { playMusic('twist'); }
+    if (step === 15) { playMusic('win'); }
+
+    const charKey = s.char;
+    const char = CHARACTERS[charKey];
+    document.getElementById('character-name').textContent = char.name;
+    
+    if (s.expression !== undefined && expressions[charKey]) {
+        document.getElementById('character-sprite').src = getAvatarUrl(charKey, s.expression);
+    } else {
+        document.getElementById('character-sprite').src = char.sprite;
+    }
+
+    document.getElementById('dialogue-text').innerHTML = typeof s.text === 'function' ? s.text() : s.text;
+    
+    document.getElementById('math-panel').classList.add('hidden');
+    document.getElementById('chart-panel').classList.add('hidden');
+
+    const interactionArea = document.getElementById('interaction-area');
+    interactionArea.innerHTML = '';
+    interactionArea.className = 'mt-6 text-center'; 
+
+    const { type, text, next, q, opts, correct, answer, func } = s.action;
+
+    switch (type) {
+        case 'button':
+            const btn = document.createElement('button');
+            btn.textContent = text;
+            btn.className = 'objection-btn bg-yellow-400 hover:bg-yellow-500 text-gray-800 game-font text-xl py-3 px-6 rounded-lg shadow-lg';
+            btn.onclick = () => renderTrialStep(next);
+            interactionArea.appendChild(btn);
+            break;
+        case 'choice':
+            const qEl = document.createElement('p');
+            qEl.className = 'text-white mb-4 text-lg';
+            qEl.textContent = typeof q === 'function' ? q() : q;
+            interactionArea.appendChild(qEl);
+            
+            let shuffledOpts = [...opts].sort(() => Math.random() - 0.5);
+
+            const optsContainer = document.createElement('div');
+            optsContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+            shuffledOpts.forEach((optText) => {
+                const optBtn = document.createElement('button');
+                optBtn.textContent = optText;
+                optBtn.className = 'choice-btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 h-full';
+                optBtn.onclick = () => handleChoice(optText, correct, next);
+                optsContainer.appendChild(optBtn);
+            });
+            interactionArea.appendChild(optsContainer);
+            break;
+        case 'input':
+            const p = gameState.playerEvidence;
+            const mathPanel = document.getElementById('math-panel');
+            mathPanel.innerHTML = `<h4 class="font-bold text-center">Your Evidence</h4>
+                <p><strong>Sample Size (N):</strong> ${p.N}</p>
+                <p><strong>Avg. Words (X̄):</strong> ${p.avgX.toFixed(2)}</p>
+                <p><strong>Avg. Adverbs (Ȳ):</strong> ${p.avgY.toFixed(2)}</p>
+                <p><strong>Variance of X (s²ₓ):</strong> ${p.varX.toFixed(2)}</p>
+				<p><strong>Variance of Y (s²y):</strong> ${p.varY.toFixed(2)}</p>
+                <p><strong>Covariance (sₓᵧ):</strong> ${p.covXY.toFixed(2)}</p>`;
+            mathPanel.classList.remove('hidden');
+            const inputQEl = document.createElement('p');
+            inputQEl.className = 'text-white mb-4';
+            inputQEl.innerHTML = typeof q === 'function' ? q() : q;
+            interactionArea.appendChild(inputQEl);
+            const inputEl = document.createElement('input');
+            inputEl.type = 'number';
+            inputEl.id = 'calc-input';
+            inputEl.className = 'p-2 rounded text-center text-black';
+            interactionArea.appendChild(inputEl);
+            const submitBtn = document.createElement('button');
+            submitBtn.textContent = 'Submit';
+            submitBtn.className = 'ml-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded';
+            submitBtn.onclick = () => handleInput(answer(), next);
+            interactionArea.appendChild(submitBtn);
+            break;
+        case 'action':
+            func();
+            renderTrialStep(next);
+            break;
+    }
+}
+
+function handleChoice(selectedText, correctText, nextStep) {
+    const interactionArea = document.getElementById('interaction-area');
+    if (selectedText === correctText) {
+        interactionArea.classList.add('feedback', 'correct');
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'correct');
+            renderTrialStep(nextStep);
+        }, 1000);
+    } else {
+        interactionArea.classList.add('feedback', 'incorrect');
+        gameState.lives--;
+        renderLifeBar();
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'incorrect');
+            if (gameState.lives <= 0) {
+                endGame(false, "A critical error in your reasoning has discredited your case. The judge has no choice but to rule in favor of the defendant.");
+            }
+        }, 1000);
+    }
+}
+
+function handleInput(correctAnswer, nextStep) {
+    const inputVal = parseFloat(document.getElementById('calc-input').value);
+    const interactionArea = document.getElementById('interaction-area');
+    const margin = trialScript[gameState.trialStep].action.margin || 0.1;
+
+    if (!isNaN(inputVal) && Math.abs(inputVal - correctAnswer) < margin) {
+        interactionArea.classList.add('feedback', 'correct');
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'correct');
+            renderTrialStep(nextStep);
+        }, 1000);
+    } else {
+        interactionArea.classList.add('feedback', 'incorrect');
+        gameState.lives--;
+        renderLifeBar();
+        setTimeout(() => {
+            interactionArea.classList.remove('feedback', 'incorrect');
+            if (gameState.lives <= 0) {
+                endGame(false, `Your calculation was incorrect. The correct value was approximately ${correctAnswer.toFixed(3)}. This mathematical error has destroyed your credibility.`);
+            }
+        }, 1000);
+    }
+}
+
+function renderLifeBar() {
+    const lifeBar = document.getElementById('life-bar');
+    lifeBar.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+        const heart = document.createElement('div');
+        heart.className = i < gameState.lives ? 'heart' : 'heart lost';
+        lifeBar.appendChild(heart);
+    }
+}
+
+function showChart() {
+    const chartPanel = document.getElementById('chart-panel');
+    chartPanel.classList.remove('hidden');
+    const ctx = document.getElementById('regressionChart').getContext('2d');
+    
+    const data = gameState.notebook.manuscriptData;
+    const p = gameState.playerEvidence;
+
+    const minX = Math.min(...data.map(d => d.x));
+    const maxX = Math.max(...data.map(d => d.x));
+    const lineData = [
+        { x: minX, y: p.intercept + p.slope * minX },
+        { x: maxX, y: p.intercept + p.slope * maxX }
+    ];
+
+    if (regressionChart) {
+        regressionChart.destroy();
+    }
+    regressionChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Manuscript Data',
+                data: data,
+                backgroundColor: 'rgba(211, 54, 130, 0.6)'
+            }, {
+                label: 'Regression Line',
+                data: lineData,
+                type: 'line',
+                borderColor: 'rgba(38, 139, 210, 1)',
+                borderWidth: 2,
+                fill: false,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { title: { display: true, text: 'Words per Sentence' } },
+                y: { title: { display: true, text: 'Adverbs per Sentence' } }
+            }
+        }
+    });
+}
+
+function showQQPlot() {
+    const dialogueText = document.getElementById('dialogue-text');
+    dialogueText.innerHTML += `<div class="mt-4 p-2 bg-gray-100 rounded border text-center">
+        <img src="https://placehold.co/400x300/eee8d5/002b36?text=QQ-Plot+of+Residuals" alt="QQ-Plot of Residuals" class="mx-auto rounded">
+    </div>`;
+}
+
+
+function endGame(isWin, reason = "") {
+    customModal.classList.add('hidden');
+    screens.phase2.classList.add('hidden');
+    screens.end.classList.remove('hidden');
+
+    const titleEl = document.getElementById('end-title');
+    const messageEl = document.getElementById('end-message');
+    const recapEl = document.getElementById('end-recap');
+
+    if (isWin) {
+        playMusic('win');
+        titleEl.textContent = "GUILTY!";
+        titleEl.className = 'game-font text-4xl mb-4 text-green-400';
+        messageEl.textContent = "Your sharp statistical analysis has exposed Vellum's fraud. Justice is served!";
+        recapEl.innerHTML = `<h3 class="font-bold text-lg mb-2">Key Takeaways:</h3>
+            <p>✔️ <strong>Averages Matter:</strong> You first spotted the fraud by comparing the manuscript's average adverbs to Quill's known average.</p>
+            <p>✔️ <strong>Hypothesis Testing:</strong> You used a t-test to prove the manuscript's slope was statistically different from Quill's true signature.</p>
+            <p>✔️ <strong>T-Statistic Interpretation:</strong> You correctly identified the t-statistic as a measure of distance in standard errors, not a probability.</p>
+            <p>✔️ <strong>Central Limit Theorem:</strong> You correctly argued that even with non-normal residuals, the CLT makes your test for the slope coefficient valid for a large sample.</p>`;
+
+    } else {
+        playMusic('loss');
+        titleEl.textContent = "NOT GUILTY!";
+        titleEl.className = 'game-font text-4xl mb-4 text-red-400';
+        messageEl.textContent = reason;
+        recapEl.innerHTML = `<h3 class="font-bold text-lg mb-2">What Went Wrong?</h3>
+            <p>A successful prosecution requires both collecting good data and interpreting it correctly. Every step of a hypothesis test is crucial.</p>
+            <p>Review the concepts of the <strong>Null Hypothesis</strong>, the limits of <strong>R-squared</strong>, and the role of the <strong>Central Limit Theorem</strong> in validating tests with large samples.</p>
+            <p>Even a small error can undermine an entire case!</p>`;
+    }
+}
+</script>
+</body>
+</html>
