@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scotland Yard Detective - Catch the Thief!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background: linear-gradient(45deg, #1a1a2e, #16213e, #0f3460);
+            color: #00ff00;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .game-container {
+            display: flex;
+            height: 100vh;
+            background: radial-gradient(circle, #0f3460 0%, #1a1a2e 100%);
+        }
+        
+        .main-game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+        }
+        
+        .countdown {
+            font-size: 14px;
+            color: #ff4444;
+            text-shadow: 2px 2px 0px #000;
+        }
+        
+        .music-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .music-btn {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 8px 12px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .music-btn:hover {
+            background: #44ff44;
+            transform: scale(1.1);
+        }
+        
+        .map-container {
+            flex: 1;
+            position: relative;
+            background: #2a2a2a;
+            border: 3px solid #00ff00;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .map-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: sepia(100%) hue-rotate(90deg) saturate(200%);
+        }
+        
+        .crime-point {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background: #000;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 15px #000;
+        }
+        
+        .prediction-point {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #00ff00;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse-green 2s infinite;
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.8; }
+        }
+        
+        @keyframes pulse-green {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.9; }
+        }
+        
+        .prediction-form {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .prediction-form input {
+            background: #000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 8px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            width: 100px;
+        }
+        
+        .prediction-form button {
+            background: #ff4444;
+            color: #fff;
+            border: none;
+            padding: 8px 15px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .prediction-form button:hover {
+            background: #ff6666;
+            transform: scale(1.1);
+        }
+        
+        .side-panel {
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border-left: 3px solid #00ff00;
+        }
+        
+        .thief-display {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .thief-avatar {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 10px;
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+        }
+        
+        .thief-name {
+            font-size: 10px;
+            color: #ff4444;
+            margin-bottom: 10px;
+        }
+        
+        .coordinates-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            padding: 15px;
+            flex: 1;
+        }
+        
+        .coordinates-title {
+            font-size: 12px;
+            color: #00ff00;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .coordinates-table {
+            width: 100%;
+            font-size: 8px;
+            color: #fff;
+        }
+        
+        .coordinates-table th {
+            color: #00ff00;
+            padding: 5px;
+            text-align: left;
+            border-bottom: 1px solid #00ff00;
+        }
+        
+        .coordinates-table td {
+            padding: 3px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .game-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .victory-screen, .gameover-screen {
+            text-align: center;
+            color: #00ff00;
+        }
+        
+        .victory-screen img, .gameover-screen img {
+            max-width: 400px;
+            max-height: 300px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+        }
+        
+        .victory-screen h1 {
+            color: #00ff00;
+            font-size: 24px;
+            margin-bottom: 15px;
+            text-shadow: 3px 3px 0px #000;
+        }
+        
+        .gameover-screen h1 {
+            color: #ff4444;
+            font-size: 24px;
+            margin-bottom: 15px;
+            text-shadow: 3px 3px 0px #000;
+        }
+        
+        .restart-btn {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 10px;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        
+        .restart-btn:hover {
+            background: #44ff44;
+            transform: scale(1.1);
+        }
+        
+        .introduction-screen {
+            text-align: center;
+            color: #00ff00;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .introduction-screen h1 {
+            color: #00ff00;
+            font-size: 20px;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 0px #000;
+        }
+        
+        .introduction-screen h2 {
+            color: #ff4444;
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 0px #000;
+        }
+        
+        .introduction-screen h3 {
+            color: #00ff00;
+            font-size: 12px;
+            margin: 15px 0 10px 0;
+            text-shadow: 2px 2px 0px #000;
+        }
+        
+        .intro-content {
+            text-align: left;
+            font-size: 10px;
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+        
+        .intro-content p {
+            margin-bottom: 10px;
+        }
+        
+        .intro-content ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .intro-content li {
+            margin-bottom: 5px;
+        }
+        
+        .intro-warning {
+            background: rgba(255, 68, 68, 0.2);
+            border: 2px solid #ff4444;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 9px;
+            text-align: center;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00ff00;
+            font-size: 16px;
+            text-shadow: 2px 2px 0px #000;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="main-game-area">
+            <div class="game-header">
+                <div class="countdown">CRIMES REMAINING: <span id="countdown">7</span></div>
+                <div class="music-controls">
+                    <button class="music-btn" id="musicToggle">MUSIC: ON</button>
+                </div>
+            </div>
+            
+            <div class="map-container" id="mapContainer">
+                <img src="https://www.dropbox.com/scl/fi/iq6mtw5zx3vi5vs5t5yr6/map.png?rlkey=vwqni3hxg69rlii3s58lwlrhp&dl=1" alt="France Map" class="map-image" id="mapImage">
+                <div class="loading" id="loading">Loading map...</div>
+            </div>
+            
+            <div class="prediction-form">
+                <label>Z (Height):</label>
+                <input type="number" id="zInput" step="0.001" placeholder="Enter Z coordinate">
+                <label>Y (Width):</label>
+                <input type="number" id="yInput" step="0.001" placeholder="Enter Y coordinate">
+                <button onclick="makePrediction()">PREDICT NEXT CRIME</button>
+            </div>
+        </div>
+        
+        <div class="side-panel">
+            <div class="thief-display">
+                <div class="thief-name" id="thiefName">Mr. Silas Vellum</div>
+                <img id="thiefAvatar" class="thief-avatar" alt="Thief">
+            </div>
+            
+            <div class="coordinates-panel">
+                <div class="coordinates-title">CRIME COORDINATES</div>
+                <div style="margin-bottom: 10px;">
+                    <button onclick="copyCoordinates()" style="background: #00ff00; color: #000; border: none; padding: 5px 10px; font-family: 'Press Start 2P', monospace; font-size: 8px; cursor: pointer; border-radius: 3px;">COPY ALL COORDS</button>
+                </div>
+                <table class="coordinates-table">
+                    <thead>
+                        <tr>
+                            <th>Crime #</th>
+                            <th>Z (Height)</th>
+                            <th>Y (Width)</th>
+                            <th>Distance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="coordinatesTable">
+                    </tbody>
+                </table>
+                <div style="margin-top: 10px; font-size: 8px; color: #00ff00;">
+                    <div>Z coordinates: <span id="zCoordinates"></span></div>
+                    <div>Y coordinates: <span id="yCoordinates"></span></div>
+                    <div>Distances: <span id="distanceCoordinates"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="game-overlay" id="victoryOverlay">
+        <div class="victory-screen">
+            <img src="https://www.dropbox.com/scl/fi/fg3vpo90cv4ixta6366xl/Victory.png?rlkey=eha9bb253dozmz17grxbgzgw0&dl=1" alt="Victory">
+            <h1>THIEF CAUGHT!</h1>
+            <p>Excellent detective work! You've successfully predicted the thief's pattern and caught them!</p>
+            <button class="restart-btn" onclick="restartGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+    
+    <div class="game-overlay" id="gameOverOverlay">
+        <div class="gameover-screen">
+            <img src="https://www.dropbox.com/scl/fi/uuxc70zrs78q821j8crlt/GameOver.png?rlkey=gsn1ytqjkuv7w3nc9pvt4rtes&dl=1" alt="Game Over">
+            <h1>THIEF ESCAPED!</h1>
+            <p>The thief has managed to escape after committing 10 crimes. Better luck next time, detective!</p>
+            <button class="restart-btn" onclick="restartGame()">TRY AGAIN</button>
+        </div>
+    </div>
+    
+    <div class="game-overlay" id="introductionOverlay">
+        <div class="introduction-screen">
+            <h1>🕵️ SCOTLAND YARD DETECTIVE 🕵️</h1>
+            <div class="intro-content">
+                <h2>THE CASE OF THE PATTERN THIEF</h2>
+                <p>Welcome, Detective! You are tasked with catching a notorious thief who has been operating in Northern France. This criminal is clever but predictable - they follow a mathematical pattern in their crimes.</p>
+                
+                <h3>🎯 YOUR MISSION:</h3>
+                <ul>
+                    <li>Analyze the black dots on the map showing past crime locations</li>
+                    <li>Study the Z (height) and Y (width) coordinates in the panel</li>
+                    <li>Look for patterns in how the coordinates relate to the distance from center</li>
+                    <li>Use linear regression to predict where the next crime will occur</li>
+                    <li>Input your prediction and catch the thief before they commit 10 crimes!</li>
+                </ul>
+                
+                <h3>📊 THE CLUES:</h3>
+                <p>Each crime shows:</p>
+                <ul>
+                    <li><strong>Z coordinate:</strong> Height position relative to map center</li>
+                    <li><strong>Y coordinate:</strong> Width position relative to map center</li>
+                    <li><strong>Distance:</strong> How far from center the crime occurred</li>
+                </ul>
+                
+                <h3>🎮 HOW TO PLAY:</h3>
+                <p>1. Study the pattern of the first 3 crimes<br>
+                2. Calculate the relationship between distance and coordinates<br>
+                3. Predict the Z and Y coordinates for the next crime<br>
+                4. You have 7 attempts to catch the thief!</p>
+                
+            </div>
+            <button class="restart-btn" onclick="startGame()">BEGIN INVESTIGATION</button>
+        </div>
+    </div>
+    
+    <audio id="backgroundMusic" loop>
+        <source src="https://www.dropbox.com/scl/fi/if4rjv0zf9y569cizj0yh/Investigation.mp3?rlkey=848w940r536qzokum989ptvqr&dl=1" type="audio/mpeg">
+    </audio>
+    <audio id="victoryMusic">
+        <source src="https://www.dropbox.com/scl/fi/cqbys18e9jaaiqoqv3r5n/Victory.mp3?rlkey=lzz7xbfmvl332u5d2sdriii06&dl=1" type="audio/mpeg">
+    </audio>
+    <audio id="gameOverMusic">
+        <source src="https://www.dropbox.com/scl/fi/wszmgqg60xjw69frpodqs/GameOver.mp3?rlkey=3trp6n3w233fv3jgf88efius6&dl=1" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Game state
+        let gameState = {
+            crimes: [],
+            currentCrimeCount: 3,
+            maxCrimes: 10,
+            countdown: 7,
+            isGameOver: false,
+            musicEnabled: true,
+            audioUnlocked: false,
+            mapCenter: { x: 0, y: 0 },
+            mapWidth: 0,
+            mapHeight: 0,
+            scaleX: 0,
+            scaleY: 0,
+            baseDistance: 1,
+            distanceIncrement: 4,
+            maxDistance: 0,
+            regressionParams: {
+                zTransform: null,
+                yTransform: null,
+                zIntercept: 0,
+                zSlope: 0,
+                yIntercept: 0,
+                ySlope: 0,
+                noiseStd: 0.001
+            }
+        };
+
+        // Character definitions
+        const CHARACTERS = {
+            CONN: { 
+                name: "Det. Lexi Conn", 
+                sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairShortWaved&accessoriesType=Kurt&hairColor=BrownDark&facialHairType=Blank&clotheType=ShirtVNeck&clotheColor=Gray02&skinColor=Light" 
+            },
+            VELLUM: { 
+                name: "Mr. Silas Vellum", 
+                sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairFrizzle&accessoriesType=Blank&hairColor=Auburn&facialHairType=MoustacheMagnum&facialHairColor=Auburn&clotheType=BlazerSweater&clotheColor=PastelGreen&skinColor=Pale"
+            },
+            JUDGE: { 
+                name: "Judge Statler", 
+                sprite: "https://avataaars.io/?avatarStyle=Transparent&topType=LongHairNotTooLong&accessoriesType=Blank&hairColor=SilverGray&facialHairType=Blank&clotheType=BlazerShirt&skinColor=Pale" 
+            },
+        };
+
+        const expressions = {
+            CONN: [
+                { eye: 'Default', eyebrow: 'Default', mouth: 'Default' },
+                { eye: 'Side', eyebrow: 'RaisedExcited', mouth: 'Serious' },
+                { eye: 'Default', eyebrow: 'Default', mouth: 'Smile' },
+                { eye: 'Wink', eyebrow: 'RaisedExcited', mouth: 'Twinkle' },
+            ],
+            VELLUM: [
+                { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Smile' },
+                { eye: 'Side', eyebrow: 'AngryNatural', mouth: 'Serious' },
+                { eye: 'Surprised', eyebrow: 'UpDown', mouth: 'Concerned' },
+                { eye: 'Surprised', eyebrow: 'SadConcerned', mouth: 'ScreamOpen' },
+                { eye: 'Squint', eyebrow: 'Angry', mouth: 'Grimace' },
+            ],
+            JUDGE: [
+                { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Serious' },
+                { eye: 'Side', eyebrow: 'UpDown', mouth: 'Concerned' },
+                { eye: 'Default', eyebrow: 'Default', mouth: 'Default' },
+                { eye: 'Default', eyebrow: 'RaisedExcited', mouth: 'Smile' },
+            ]
+        };
+
+        // Initialize game
+        function initGame() {
+            setupMusic();
+            measureMap();
+            computeMaxDistance();
+            generateRegressionParams();
+            generateInitialCrimes();
+            updateThiefExpression('VELLUM', 0); // Happy expression initially
+            updateCoordinatesTable();
+            updateCountdown();
+            document.getElementById('loading').style.display = 'none';
+            
+            // Show introduction screen
+            document.getElementById('introductionOverlay').style.display = 'flex';
+        }
+
+        // Start the actual game (called from introduction screen)
+        function startGame() {
+            document.getElementById('introductionOverlay').style.display = 'none';
+            // Start music on first user gesture
+            unlockAudio();
+        }
+
+        // Setup music controls
+        function setupMusic() {
+            const musicToggle = document.getElementById('musicToggle');
+            const backgroundMusic = document.getElementById('backgroundMusic');
+            
+            musicToggle.addEventListener('click', () => {
+                gameState.musicEnabled = !gameState.musicEnabled;
+                musicToggle.textContent = `MUSIC: ${gameState.musicEnabled ? 'ON' : 'OFF'}`;
+                
+                if (gameState.musicEnabled) {
+                    backgroundMusic.play().catch(e => console.log('Audio play failed:', e));
+                } else {
+                    backgroundMusic.pause();
+                }
+            });
+            
+            // Attempt to unlock audio on any first user interaction
+            const unlockHandler = () => {
+                unlockAudio();
+                document.removeEventListener('pointerdown', unlockHandler);
+                document.removeEventListener('keydown', unlockHandler);
+            };
+            document.addEventListener('pointerdown', unlockHandler);
+            document.addEventListener('keydown', unlockHandler);
+        }
+
+        // Unlock and start background audio after user gesture
+        function unlockAudio() {
+            if (gameState.audioUnlocked) return;
+            const backgroundMusic = document.getElementById('backgroundMusic');
+            if (gameState.musicEnabled) {
+                backgroundMusic.play().then(() => {
+                    gameState.audioUnlocked = true;
+                    const musicToggle = document.getElementById('musicToggle');
+                    if (musicToggle) musicToggle.textContent = 'MUSIC: ON';
+                }).catch(e => {
+                    // Autoplay may still fail; will try again on next interaction
+                    console.log('Audio unlock failed:', e);
+                });
+            }
+        }
+
+        // Measure map container and compute scales
+        function measureMap() {
+            const mapContainer = document.getElementById('mapContainer');
+            const rect = mapContainer.getBoundingClientRect();
+            gameState.mapWidth = rect.width;
+            gameState.mapHeight = rect.height;
+            gameState.mapCenter = { x: gameState.mapWidth / 2, y: gameState.mapHeight / 2 };
+            gameState.scaleX = gameState.mapWidth * 0.4 ;
+            gameState.scaleY = gameState.mapHeight * 0.4 ;
+
+            // Reposition existing points if any
+            if (gameState.crimes.length > 0) {
+                gameState.crimes.forEach(crime => {
+                    const el = document.getElementById(`crime-${crime.id}`);
+                    if (el) {
+                        el.style.left = `${crime.pixelX}px`;
+                        el.style.top = `${crime.pixelY}px`;
+                    }
+                });
+            }
+        }
+
+        // Compute max distance used in this game session
+        function computeMaxDistance() {
+            gameState.maxDistance = gameState.baseDistance + (gameState.distanceIncrement * (gameState.maxCrimes - 1));
+        }
+
+        // Generate random regression parameters
+        function generateRegressionParams() {
+            const transformations = ['square', 'log', 'sqrt', 'linear'];
+            gameState.regressionParams.zTransform = transformations[Math.floor(Math.random() * transformations.length)];
+            gameState.regressionParams.yTransform = transformations[Math.floor(Math.random() * transformations.length)];
+            
+            // Calculate the maximum transform value at distance 41 to ensure coordinates stay within bounds
+            const maxDistance = 41;
+            const maxZTransform = applyTransform(maxDistance, gameState.regressionParams.zTransform);
+            const maxYTransform = applyTransform(maxDistance, gameState.regressionParams.yTransform);
+            
+            // Generate intercepts that keep coordinates in bounds [-80, 80] even at max distance
+            gameState.regressionParams.zIntercept = (Math.random() * 40) - 20; 
+            gameState.regressionParams.yIntercept = (Math.random() * 40) - 20; 
+
+            // Calculate safe slope ranges to ensure coords stay within [-0.8, 0.8] at max distance
+            const maxAbsZ = 80 - Math.abs(gameState.regressionParams.zIntercept);
+            const maxAbsY = 80 - Math.abs(gameState.regressionParams.yIntercept);
+            
+            const maxZSlope = maxAbsZ / maxZTransform;
+            const maxYSlope = maxAbsY / maxYTransform;
+            
+            // Generate slopes that are significant but stay within bounds
+            function randomSlope(maxSlope) {
+                const sign = Math.random() < 0.5 ? -1 : 1;
+                const magnitude = Math.max(0.002, maxSlope * 0.8); // Use 80% of max safe slope
+                return sign * magnitude;
+            }
+            
+            gameState.regressionParams.zSlope = randomSlope(maxZSlope);
+            gameState.regressionParams.ySlope = randomSlope(maxYSlope);
+            gameState.regressionParams.noiseStd = 1 + Math.random() * 4; // Smaller noise
+        }
+
+
+        // Apply transformation to distance
+        function applyTransform(distance, transformType) {
+            switch(transformType) {
+                case 'square': return distance * distance;
+                case 'log': return Math.log(Math.max(distance, 1));
+                case 'sqrt': return Math.sqrt(distance);
+                case 'linear': return distance;
+                default: return distance;
+            }
+        }
+
+        // Generate coordinates from distance using regression
+        function generateCoordinates(distanceFromCenter) {
+            const zTransformed = applyTransform(distanceFromCenter, gameState.regressionParams.zTransform);
+            const yTransformed = applyTransform(distanceFromCenter, gameState.regressionParams.yTransform);
+            
+            const z = gameState.regressionParams.zIntercept + 
+                     gameState.regressionParams.zSlope * zTransformed + 
+                     (Math.random() - 0.5) * gameState.regressionParams.noiseStd;
+            
+            const y = gameState.regressionParams.yIntercept + 
+                     gameState.regressionParams.ySlope * yTransformed + 
+                     (Math.random() - 0.5) * gameState.regressionParams.noiseStd;
+            
+            return { z, y };
+        }
+
+        // Generate initial 3 crimes
+        function generateInitialCrimes() {
+            for (let i = 0; i < 3; i++) {
+                const distanceFromCenter = gameState.baseDistance + (i * gameState.distanceIncrement);
+                const coords = generateCoordinates(distanceFromCenter);
+                
+                // Convert to pixel coordinates for display
+                // Z is height (Y pixel), Y is width (X pixel)
+                const pixelX = (gameState.mapCenter.x + (coords.y * gameState.scaleX)/70);
+                const pixelY = (gameState.mapCenter.y + (coords.z * gameState.scaleY)/70);
+                
+                const crime = {
+                    id: i + 1,
+                    z: coords.z,
+                    y: coords.y,
+                    distanceFromCenter: distanceFromCenter,
+                    pixelX: pixelX,
+                    pixelY: pixelY
+                };
+                
+                gameState.crimes.push(crime);
+                addCrimePointToMap(crime);
+            }
+        }
+
+        // Add crime point to map
+        function addCrimePointToMap(crime) {
+            const mapContainer = document.getElementById('mapContainer');
+            const point = document.createElement('div');
+            point.className = 'crime-point';
+            point.style.left = `${crime.pixelX}px`;
+            point.style.top = `${crime.pixelY}px`;
+            point.id = `crime-${crime.id}`;
+            mapContainer.appendChild(point);
+        }
+
+        // Add prediction point to map
+        function addPredictionPointToMap(z, y) {
+            const mapContainer = document.getElementById('mapContainer');
+            const pixelX = gameState.mapCenter.x + (y * gameState.scaleX); // Y is width
+            const pixelY = gameState.mapCenter.y + (z * gameState.scaleY); // Z is height
+            
+            const point = document.createElement('div');
+            point.className = 'prediction-point';
+            point.style.left = `${pixelX}px`;
+            point.style.top = `${pixelY}px`;
+            point.id = 'prediction-point';
+            mapContainer.appendChild(point);
+            
+            // Remove prediction point after 3 seconds
+            setTimeout(() => {
+                if (point.parentNode) {
+                    point.parentNode.removeChild(point);
+                }
+            }, 3000);
+        }
+
+        // Update coordinates table
+        function updateCoordinatesTable() {
+            const tableBody = document.getElementById('coordinatesTable');
+            tableBody.innerHTML = '';
+            
+            let zCoords = '';
+            let yCoords = '';
+            let distances = '';
+            
+            gameState.crimes.forEach(crime => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${crime.id}</td>
+                    <td>${crime.z.toFixed(3)}</td>
+                    <td>${crime.y.toFixed(3)}</td>
+                    <td>${crime.distanceFromCenter.toFixed(1)}</td>
+                `;
+                tableBody.appendChild(row);
+                
+                // Build copyable coordinate strings
+                zCoords += crime.z.toFixed(3) + ', ';
+                yCoords += crime.y.toFixed(3) + ', ';
+                distances += crime.distanceFromCenter.toFixed(1) + ', ';
+            });
+            
+            // Update copyable coordinate displays (remove trailing comma and space)
+            document.getElementById('zCoordinates').textContent = zCoords.slice(0, -2);
+            document.getElementById('yCoordinates').textContent = yCoords.slice(0, -2);
+            document.getElementById('distanceCoordinates').textContent = distances.slice(0, -2);
+        }
+
+        // Update countdown
+        function updateCountdown() {
+            document.getElementById('countdown').textContent = gameState.countdown;
+        }
+
+        // Copy all coordinates to clipboard
+        function copyCoordinates() {
+            const zCoords = document.getElementById('zCoordinates').textContent;
+            const yCoords = document.getElementById('yCoordinates').textContent;
+            const distances = document.getElementById('distanceCoordinates').textContent;
+            
+            const allCoords = `Z coordinates: ${zCoords}\nY coordinates: ${yCoords}\nDistances: ${distances}`;
+            
+            navigator.clipboard.writeText(allCoords).then(() => {
+                // Show success message
+                const successDiv = document.createElement('div');
+                successDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: rgba(0, 255, 0, 0.95);
+                    color: #000;
+                    padding: 10px;
+                    border: 2px solid #00ff00;
+                    border-radius: 5px;
+                    font-family: 'Press Start 2P', monospace;
+                    font-size: 8px;
+                    z-index: 999;
+                `;
+                successDiv.textContent = 'COPIED!';
+                document.body.appendChild(successDiv);
+                
+                setTimeout(() => {
+                    if (successDiv.parentNode) {
+                        successDiv.parentNode.removeChild(successDiv);
+                    }
+                }, 2000);
+            }).catch(err => {
+                console.log('Failed to copy: ', err);
+                alert('Failed to copy coordinates to clipboard');
+            });
+        }
+
+        // Update thief expression
+        function updateThiefExpression(character, expressionIndex) {
+            const characterData = CHARACTERS[character];
+            const expression = expressions[character][expressionIndex];
+            
+            // Build avatar URL with expression
+            const baseUrl = characterData.sprite.split('?')[0];
+            const params = new URLSearchParams(characterData.sprite.split('?')[1]);
+            
+            if (expression.eye) params.set('eyeType', expression.eye);
+            if (expression.eyebrow) params.set('eyebrowType', expression.eyebrow);
+            if (expression.mouth) params.set('mouthType', expression.mouth);
+            
+            const newUrl = `${baseUrl}?${params.toString()}`;
+            document.getElementById('thiefAvatar').src = newUrl;
+            document.getElementById('thiefName').textContent = characterData.name;
+        }
+
+        // Taunt messages when player misses
+        const tauntMessages = [
+            "Haha! You'll never catch me! I'm too smart for you!",
+            "Easy as stealing candy from a baby! You're no match for me!",
+            "Another miss! I can steal whatever I want and you can't stop me!",
+            "Foolish detective! I'm always one step ahead of you!",
+            "You're getting closer, but I'm still free to roam and steal!",
+            "Nice try, but I'm the master thief here! You can't touch me!",
+            "I'm having too much fun watching you fail! Keep trying!"
+        ];
+
+        // Show taunt message
+        function showTauntMessage() {
+            const randomMessage = tauntMessages[Math.floor(Math.random() * tauntMessages.length)];
+            const tauntDiv = document.createElement('div');
+            tauntDiv.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(255, 68, 68, 0.96);
+                color: white;
+                padding: 28px 30px;
+                border: 4px solid #ff4444;
+                border-radius: 12px;
+                font-family: 'Press Start 2P', monospace;
+                font-size: 11px;
+                text-align: center;
+                z-index: 999;
+                max-width: 520px;
+                box-shadow: 0 0 28px #ff4444;
+            `;
+            tauntDiv.innerHTML = `<div style="margin-bottom: 14px; font-size: 12px;"> A MESSAGE WAS ON THE CRIME SCENE </div>${randomMessage}`;
+            
+            document.body.appendChild(tauntDiv);
+            
+            // Remove taunt message after 4 seconds
+            setTimeout(() => {
+                if (tauntDiv.parentNode) {
+                    tauntDiv.parentNode.removeChild(tauntDiv);
+                }
+            }, 4000);
+        }
+
+        // Make prediction
+        function makePrediction() {
+            if (gameState.isGameOver) return;
+            
+            const z = parseFloat(document.getElementById('zInput').value);
+            const y = parseFloat(document.getElementById('yInput').value);
+            
+            if (isNaN(z) || isNaN(y)) {
+                alert('Please enter valid coordinates!');
+                return;
+            }
+            
+            // Clear inputs
+            document.getElementById('zInput').value = '';
+            document.getElementById('yInput').value = '';
+            
+            // Add prediction point to map
+            addPredictionPointToMap(z, y);
+            
+            // Generate next crime
+            const nextCrime = generateNextCrime();
+            const nextCoords = generateCoordinates(nextCrime.distanceFromCenter);
+            
+            // Check if prediction is close enough (within 2 standard deviations)
+            const zError = Math.abs(z - nextCoords.z);
+            const yError = Math.abs(y - nextCoords.y);
+            const threshold = 2 * gameState.regressionParams.noiseStd;
+            
+            // Add suspense delay
+            setTimeout(() => {
+                if (zError <= threshold && yError <= threshold) {
+                    // Victory!
+                    gameState.isGameOver = true;
+                    updateThiefExpression('VELLUM', 4); // Very anxious
+                    showVictoryScreen();
+                } else {
+                    // Continue game - show taunt message
+                    showTauntMessage();
+                    addNewCrime(nextCrime, nextCoords);
+                    updateThiefExpression('VELLUM', Math.floor(Math.random() * 3)); // Random happy expressions
+                    
+                    if (gameState.currentCrimeCount >= gameState.maxCrimes) {
+                        gameState.isGameOver = true;
+                        updateThiefExpression('VELLUM', 0); // Happy - he escaped!
+                        showGameOverScreen();
+                    }
+                }
+            }, 1000);
+        }
+
+        // Generate next crime
+        function generateNextCrime() {
+            const distanceFromCenter = gameState.baseDistance + (gameState.currentCrimeCount * gameState.distanceIncrement);
+            
+            return {
+                id: gameState.currentCrimeCount + 1,
+                distanceFromCenter: distanceFromCenter
+            };
+        }
+
+        // Add new crime to the game
+        function addNewCrime(crimeTemplate, coords) {
+            const pixelX = gameState.mapCenter.x + (coords.y * gameState.scaleX/70); // Y is width
+            const pixelY = gameState.mapCenter.y + (coords.z * gameState.scaleY/70); // Z is height
+            
+            const crime = {
+                ...crimeTemplate,
+                z: coords.z,
+                y: coords.y,
+                pixelX: pixelX,
+                pixelY: pixelY
+            };
+            
+            gameState.crimes.push(crime);
+            gameState.currentCrimeCount++;
+            gameState.countdown--;
+            
+            // Add crime point to map with delay for suspense
+            setTimeout(() => {
+                addCrimePointToMap(crime);
+                updateCoordinatesTable();
+                updateCountdown();
+            }, 1500);
+        }
+
+        // Generate summary of what the player should have found
+        function generateSummary() {
+            const zTransformName = {
+                'square': 'Distance²',
+                'log': 'log(Distance)',
+                'sqrt': '√Distance',
+                'linear': 'Distance'
+            }[gameState.regressionParams.zTransform];
+            
+            const yTransformName = {
+                'square': 'Distance²',
+                'log': 'log(Distance)',
+                'sqrt': '√Distance',
+                'linear': 'Distance'
+            }[gameState.regressionParams.yTransform];
+            
+            return `
+                <div style="text-align: left; font-size: 9px; margin: 15px 0; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px;">
+                    <div style="color: #00ff00; font-size: 11px; margin-bottom: 10px; text-align: center;">🔍 THE SOLUTION:</div>
+                    <div style="margin-bottom: 8px;"><strong>Z Regression:</strong> Z = ${gameState.regressionParams.zIntercept.toFixed(3)} + ${gameState.regressionParams.zSlope.toFixed(6)} × ${zTransformName} + ε</div>
+                    <div style="margin-bottom: 8px;"><strong>Y Regression:</strong> Y = ${gameState.regressionParams.yIntercept.toFixed(3)} + ${gameState.regressionParams.ySlope.toFixed(6)} × ${yTransformName} + ε</div>
+                    <div style="margin-bottom: 8px;"><strong>Noise std:</strong> ≈ ${gameState.regressionParams.noiseStd.toFixed(3)}</div>
+                    <div style="margin-bottom: 8px;"><strong>Distance pattern:</strong> 1, 5, 9, 13, ..., 41 (starts at 1, increases by 4)</div>
+                    <div style="color: #ffff00; margin-top: 10px;">The key was to identify the transformation functions and fit linear regressions to predict coordinates!</div>
+                </div>
+            `;
+        }
+
+        // Show victory screen
+        function showVictoryScreen() {
+            const backgroundMusic = document.getElementById('backgroundMusic');
+            const victoryMusic = document.getElementById('victoryMusic');
+            
+            backgroundMusic.pause();
+            if (gameState.musicEnabled) {
+                victoryMusic.play().catch(e => console.log('Audio play failed:', e));
+            }
+            
+            // Add summary to victory screen
+            const victoryScreen = document.querySelector('.victory-screen');
+            const existingSummary = victoryScreen.querySelector('.analysis-summary');
+            if (existingSummary) existingSummary.remove();
+            
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'analysis-summary';
+            summaryDiv.innerHTML = generateSummary();
+            victoryScreen.insertBefore(summaryDiv, victoryScreen.querySelector('.restart-btn'));
+            
+            document.getElementById('victoryOverlay').style.display = 'flex';
+        }
+
+        // Show game over screen
+        function showGameOverScreen() {
+            const backgroundMusic = document.getElementById('backgroundMusic');
+            const gameOverMusic = document.getElementById('gameOverMusic');
+            
+            backgroundMusic.pause();
+            if (gameState.musicEnabled) {
+                gameOverMusic.play().catch(e => console.log('Audio play failed:', e));
+            }
+            
+            // Add summary to game over screen
+            const gameOverScreen = document.querySelector('.gameover-screen');
+            const existingSummary = gameOverScreen.querySelector('.analysis-summary');
+            if (existingSummary) existingSummary.remove();
+            
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'analysis-summary';
+            summaryDiv.innerHTML = generateSummary();
+            gameOverScreen.insertBefore(summaryDiv, gameOverScreen.querySelector('.restart-btn'));
+            
+            document.getElementById('gameOverOverlay').style.display = 'flex';
+        }
+
+        // Restart game
+        function restartGame() {
+            // Reset game state
+            gameState.crimes = [];
+            gameState.currentCrimeCount = 3;
+            gameState.countdown = 7;
+            gameState.isGameOver = false;
+            
+            // Clear map
+            const crimePoints = document.querySelectorAll('.crime-point');
+            crimePoints.forEach(point => point.remove());
+            
+            const predictionPoint = document.getElementById('prediction-point');
+            if (predictionPoint) predictionPoint.remove();
+            
+            // Hide overlays
+            document.getElementById('victoryOverlay').style.display = 'none';
+            document.getElementById('gameOverOverlay').style.display = 'none';
+            
+            // Reset music
+            const backgroundMusic = document.getElementById('backgroundMusic');
+            const victoryMusic = document.getElementById('victoryMusic');
+            const gameOverMusic = document.getElementById('gameOverMusic');
+            
+            victoryMusic.pause();
+            gameOverMusic.pause();
+            victoryMusic.currentTime = 0;
+            gameOverMusic.currentTime = 0;
+            
+            if (gameState.musicEnabled) {
+                backgroundMusic.play().catch(e => console.log('Audio play failed:', e));
+            }
+            
+            // Show introduction screen
+            document.getElementById('introductionOverlay').style.display = 'flex';
+            
+            // Restart game
+            generateRegressionParams();
+            generateInitialCrimes();
+            updateThiefExpression('VELLUM', 0);
+            updateCoordinatesTable();
+            updateCountdown();
+        }
+
+        // Initialize game when page loads
+        window.addEventListener('load', () => {
+            initGame();
+            // Ensure map is measured after image load as well
+            const img = document.getElementById('mapImage');
+            if (img && !img.complete) {
+                img.addEventListener('load', () => {
+                    measureMap();
+                });
+            } else {
+                measureMap();
+            }
+        });
+
+        // Update layout on resize
+        window.addEventListener('resize', () => {
+            measureMap();
+        });
+
+        // Allow Enter key to make prediction
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !gameState.isGameOver) {
+                makePrediction();
+            }
+        });
+    </script>
+</body>
+</html>
