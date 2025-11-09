@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lecture aléatoire</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, sans-serif;
+      background-color: #f5f5f5;
+      color: #222;
+      gap: 2rem;
+    }
+
+    img {
+      cursor: pointer;
+      max-width: 240px;
+      width: 40vw;
+      height: auto;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    img:hover,
+    img:focus {
+      transform: scale(1.05);
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      text-align: center;
+    }
+
+    a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+
+    a:hover,
+    a:focus {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <img id="playButton" src="Play.png" alt="Bouton lecture">
+
+  <ul id="linksList"></ul>
+
+  <script>
+    // Modifiez simplement les éléments du tableau pour changer les liens.
+    const links = [
+      { url: "https://www.youtube.com/watch?v=dDhTMIao-fM", label: "" },
+      { url: "https://www.youtube.com/watch?v=dDhTMIao-fM", label: "" },
+      { url: "https://www.youtube.com/watch?v=dDhTMIao-fM", label: "" }
+    ];
+
+    const linksList = document.getElementById("linksList");
+    const playButton = document.getElementById("playButton");
+
+    function renderLinks(list) {
+      linksList.innerHTML = list
+        .map(({ url, label }) => `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a></li>`)
+        .join("");
+    }
+
+    function goToRandomLink(list) {
+      if (!list.length) {
+        return;
+      }
+      const randomIndex = Math.floor(Math.random() * list.length);
+      window.location.href = list[randomIndex].url;
+    }
+
+    renderLinks(links);
+
+    playButton.addEventListener("click", () => goToRandomLink(links));
+  </script>
+</body>
+</html>
+
