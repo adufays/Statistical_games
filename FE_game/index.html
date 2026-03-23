@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The VaR Verdict: Turnabout Volatility</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #cbd5e0; overflow-x: hidden; user-select: none; }
+        .game-font { font-family: 'Press Start 2P', cursive; }
+        
+        /* Dialogue Box Styling */
+        .dialogue-box {
+            border: 4px solid #4a5568;
+            background-color: rgba(15, 23, 42, 0.95);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            min-height: 160px;
+            position: relative;
+            z-index: 10;
+            cursor: pointer;
+        }
+        .character-name {
+            background-color: #2563eb;
+            color: white;
+            padding: 0.25rem 1rem;
+            border-radius: 0.25rem;
+            font-weight: bold;
+            position: absolute;
+            top: -1.25rem;
+            left: 1rem;
+            border: 2px solid #4a5568;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Life Bar */
+        .life-token {
+            width: 24px;
+            height: 24px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            border: 2px solid #7f1d1d;
+            box-shadow: 0 0 8px #ef4444;
+        }
+        .life-token.lost {
+            background-color: #1f2937;
+            border-color: #111827;
+            box-shadow: none;
+        }
+
+        /* Modals & Textareas */
+        .evidence-modal {
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(4px);
+        }
+        
+        textarea.data-box {
+            font-family: monospace;
+            white-space: pre-wrap;
+            user-select: all;
+        }
+
+        /* Background Images */
+        .phase-2-bg {
+            background-image: url('https://www.dropbox.com/scl/fi/qg9b1coxg62mwhbkpkgai/Jury_court.png?rlkey=ossfptxzw8uoyd53y2tnjltel&raw=1');
+            background-size: cover;
+            background-position: center;
+        }
+        .phase-overlay {
+            background: linear-gradient(to top, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.2));
+        }
+        .character-stage {
+            position: absolute;
+            left: 1rem;
+            bottom: 9.5rem;
+            z-index: 9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            width: min(28vw, 260px);
+        }
+        .character-sprite {
+            max-height: min(44vh, 360px);
+            width: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.55));
+            transition: transform 0.35s ease, filter 0.35s ease, opacity 0.25s ease;
+        }
+        .emotion-panic {
+            animation: panic-shift 0.55s ease-in-out infinite alternate;
+            filter: drop-shadow(0 18px 36px rgba(220, 38, 38, 0.5));
+        }
+        .emotion-panic-lite {
+            animation: panic-shift 0.9s ease-in-out infinite alternate;
+            filter: drop-shadow(0 16px 30px rgba(245, 158, 11, 0.45));
+        }
+        .emotion-nervous {
+            transform: translateY(2px) scale(1.01);
+            filter: drop-shadow(0 16px 32px rgba(245, 158, 11, 0.4));
+        }
+        .emotion-confident {
+            transform: translateY(-2px) scale(1.01);
+        }
+        @keyframes panic-shift {
+            from { transform: translateX(-6px) rotate(-1deg) scale(1.03); }
+            to { transform: translateX(6px) rotate(1deg) scale(1.03); }
+        }
+        .trial-content {
+            position: relative;
+            z-index: 20;
+            width: min(100%, calc(100% - min(28vw, 260px) - 1.75rem));
+            margin-left: auto;
+        }
+        @media (max-width: 900px) {
+            .character-stage {
+                left: 0.75rem;
+                bottom: 10.5rem;
+                width: min(24vw, 170px);
+            }
+            .character-sprite {
+                max-height: min(30vh, 220px);
+            }
+            .trial-content {
+                width: min(100%, calc(100% - min(24vw, 170px) - 1rem));
+            }
+        }
+        @media (max-width: 700px) {
+            .character-stage {
+                left: 0.5rem;
+                bottom: 12rem;
+                width: 110px;
+                opacity: 0.9;
+            }
+            .character-sprite {
+                max-height: 150px;
+            }
+            .trial-content {
+                width: 100%;
+                margin-left: 0;
+            }
+        }
+
+        /* Buttons neutral styling to avoid hints */
+        .neutral-btn {
+            background-color: #1e293b;
+            border: 1px solid #475569;
+            color: #e2e8f0;
+            transition: all 0.2s ease;
+        }
+        .neutral-btn:hover {
+            background-color: #334155;
+            border-color: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center overflow-hidden">
+
+    <!-- Audio Elements -->
+	<audio id="audio-investigation" src="https://5ko.fr/pd/managing-mischief.mp3" loop></audio>
+    <audio id="audio-stress" src="https://www.dropbox.com/scl/fi/racy8tiu0uvqrp5jnh0h5/dark_mystery.mp3?rlkey=u0h779vmax6cxd4st38oi48yo&dl=1" loop></audio>
+    <audio id="audio-trial" src="https://5ko.fr/pd/meditating-beat.mp3" loop></audio>
+    <audio id="audio-calc" src="https://5ko.fr/pd/inspiration.mp3" loop></audio>
+    <audio id="audio-argue" src="https://5ko.fr/pd/limit-70.mp3" loop></audio>
+    <audio id="audio-win" src="https://5ko.fr/pd/happy-whistling-ukulele.mp3" loop></audio>
+
+    <!-- Main Menu -->
+    <div id="screen-menu" class="w-full h-full flex flex-col items-center justify-center bg-slate-900 z-50">
+        <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 text-center game-font leading-tight text-blue-400">THE VaR VERDICT:<br><span class="text-red-500">TURNABOUT VOLATILITY</span></h1>
+        <p class="text-lg text-gray-400 mb-8 max-w-2xl text-center">
+            A massive crash just wiped out a large amount of the Global Endowment Fund's portfolio. The fund manager, Richard Cashman, claims it was unpredictable. 
+            You are the Quantitative Expert Witness. Expose the mathematical truth.
+        </p>
+        <p class="text-sm text-gray-500 mb-6 text-center">Developped by Arnaud Dufays, EDHEC Business School</p>
+        <button onclick="startGame()" class="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg shadow-lg text-xl game-font transition-transform transform hover:scale-105">START INVESTIGATION</button>
+    </div>
+
+    <!-- Phase 1: Investigation -->
+    <div id="screen-phase1" class="hidden w-full h-full flex flex-col relative bg-slate-800">
+        <div class="bg-slate-900 text-white p-4 shadow-md flex justify-between items-center z-10">
+            <h2 class="text-xl font-bold uppercase tracking-wider text-blue-400">Phase 1: Cashman's Office</h2>
+            <div class="text-sm">Find 3 pieces of evidence. <span id="evidence-counter" class="font-bold text-red-400">0 / 3</span> collected.</div>
+        </div>
+        <div class="bg-slate-800/95 text-center text-sm text-gray-300 py-2 px-4 border-b border-slate-700">Click on the picture to discover the hidden evidence.</div>
+
+        <div class="flex-grow relative flex items-center justify-center overflow-hidden p-4">
+            <!-- Clickable Map Container -->
+            <div id="office-map" class="relative w-full max-w-5xl shadow-2xl border-4 border-slate-700">
+                <img src="https://www.dropbox.com/scl/fi/csfrxu63gwjqma39pwx55/Office.png?rlkey=zqdy4yecexksomrowuftcq2wj&dl=1" alt="Office" class="w-full h-auto block" draggable="false" />
+                
+                <!-- Invisible Click Zones (No hints!) -->
+                <!-- Computer Screen -->
+                <div onclick="collectEvidence('screen')" class="absolute top-[35%] left-[5%] w-[20%] h-[35%] cursor-default"></div>
+                <!-- Desk Drawer / Contract -->
+                <div onclick="collectEvidence('contract')" class="absolute top-[65%] left-[50%] w-[25%] h-[20%] cursor-default"></div>
+                <!-- Trash Bin / Report -->
+                <div onclick="collectEvidence('report')" class="absolute top-[75%] left-[75%] w-[15%] h-[25%] cursor-default"></div>
+            </div>
+        </div>
+        
+        <div class="p-4 bg-slate-900 text-center z-10">
+            <button id="btn-to-trial" onclick="startTrial()" class="hidden px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-lg game-font transition-transform transform hover:scale-105 mx-auto">PROCEED TO TRIAL</button>
+        </div>
+    </div>
+
+    <!-- Phase 2: Trial -->
+    <div id="screen-phase2" class="hidden w-full h-full flex flex-col relative phase-2-bg">
+        <div class="absolute inset-0 phase-overlay"></div>
+        <div class="bg-slate-900/90 text-white p-3 shadow-md flex justify-between items-center z-20">
+            <h2 class="text-xl font-bold uppercase tracking-wider text-red-400">Phase 2: Courtroom Battle</h2>
+            <div class="flex items-center">
+                <span class="mr-3 font-bold">CREDIBILITY:</span>
+                <div id="life-bar">
+                    <div class="life-token"></div>
+                    <div class="life-token"></div>
+                    <div class="life-token"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-grow relative w-full max-w-5xl mx-auto flex flex-col justify-end p-4 pb-8 z-10">
+            <div id="character-stage" class="character-stage">
+                <img id="character-sprite" src="" alt="Courtroom character" class="character-sprite hidden">
+            </div>
+            <div class="trial-content">
+                <!-- Dynamic Content Area (Choices / Calculations) -->
+                <div id="interaction-area" class="w-full mb-6"></div>
+
+                <!-- Dialogue Box -->
+                <div class="dialogue-box w-full" onclick="handleDialogueClick()">
+                    <div id="character-name" class="character-name">Judge</div>
+                    <div id="dialogue-text" class="text-lg md:text-xl leading-relaxed"></div>
+                    <div class="absolute bottom-2 right-4 text-xs text-gray-500 animate-pulse">Click to advance &#9654;</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Win / Lose Screens -->
+    <div id="screen-end" class="hidden w-full h-full flex flex-col items-center justify-center bg-slate-900 z-50 p-6 text-center">
+        <h1 id="end-title" class="text-4xl md:text-6xl font-bold text-white mb-6 game-font"></h1>
+        <div id="end-text" class="text-lg text-gray-300 mb-8 max-w-2xl leading-relaxed"></div>
+        <div id="verification-box" class="hidden bg-slate-800 border-2 border-green-500 p-6 rounded-lg mb-8 shadow-lg shadow-green-500/20">
+            <p class="text-sm text-gray-400 mb-2 font-bold uppercase">Official Court Verification Code</p>
+            <p class="text-xs text-gray-500 mb-4">Send this EXACT code to your Professor to prove your victory.</p>
+            <code id="verification-code" class="text-2xl text-green-400 font-mono tracking-wider select-all"></code>
+        </div>
+        <button onclick="location.reload()" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded shadow-lg game-font transition-transform transform hover:scale-105">PLAY AGAIN</button>
+    </div>
+
+    <!-- Evidence Modal -->
+    <div id="evidence-modal" class="hidden fixed inset-0 evidence-modal z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-600 rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900 rounded-t-lg">
+                <h3 id="modal-title" class="text-xl font-bold text-blue-400">Evidence Found</h3>
+                <button onclick="closeModal('evidence-modal')" class="text-gray-400 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            <div id="modal-content" class="p-6 flex-grow overflow-y-auto"></div>
+            <div class="p-4 border-t border-slate-700 bg-slate-900 rounded-b-lg text-right">
+                <button onclick="closeModal('evidence-modal')" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded shadow">Store in Notebook</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Penalty Modal -->
+    <div id="penalty-modal" class="hidden fixed inset-0 bg-red-900/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 border-4 border-red-600 p-8 rounded-lg shadow-2xl max-w-lg w-full text-center transform scale-105">
+            <h2 class="text-3xl font-bold text-red-500 mb-4 game-font">OBJECTION OVERRULED!</h2>
+            <p class="text-lg text-gray-300 mb-8">Your argument was mathematically flawed. The Judge issues a penalty to your credibility.</p>
+            <button onclick="closeModal('penalty-modal')" class="px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded shadow-lg">CONTINUE</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GAME STATE ---
+        let lives = 3;
+        const totalEvidence = 3;
+        let collectedEvidence = new Set();
+        let returnsData = []; // Will hold 15 years of GARCH data
+        let dialogueIndex = 0;
+        let currentDialogue = null;
+        
+        // Typing effect state
+        let isTyping = false;
+        let currentFullText = "";
+        let typeInterval;
+        const typingSpeed = 10; // Extremely fast typing
+
+        // Trial Data
+        const portfolioValue = 10000000;
+        let last22 = [];
+        let mean22 = 0;
+        let var22 = 0;
+        let std22 = 0;
+        let last252 = [];
+        let unconditionalVar = 0;
+        let trueQuantile01 = 0;
+        let impliedLoss01 = 0;
+
+        const evidenceImages = {
+            contract: "https://www.dropbox.com/scl/fi/vkmxe97ioxnasz2dk96r7/Contracts.png?rlkey=1omawg5b6ydctsk3hho2j1sjr&raw=1",
+            screen: "https://www.dropbox.com/scl/fi/jk8iikkt7caa8gyhxijlu/Screen.png?rlkey=s2mobqm429q2dkxherdahc1fg&raw=1",
+            report: "https://www.dropbox.com/scl/fi/sxzef89oaxhaaxvs8f044/Risk_report.png?rlkey=odp9bwu5f8wtwnux2fn2bg9j2&raw=1"
+        };
+
+        const characterSprites = {
+            Judge: {
+                neutral: "https://avataaars.io/?avatarStyle=Transparent&topType=LongHairNotTooLong&accessoriesType=Prescription02&hairColor=SilverGray&facialHairType=Blank&clotheType=BlazerShirt&clotheColor=Gray02&skinColor=Pale&eyeType=Default&eyebrowType=DefaultNatural&mouthType=Default",
+                stern: "https://avataaars.io/?avatarStyle=Transparent&topType=LongHairNotTooLong&accessoriesType=Prescription02&hairColor=SilverGray&facialHairType=Blank&clotheType=BlazerShirt&clotheColor=Gray02&skinColor=Pale&eyeType=Squint&eyebrowType=RaisedExcited&mouthType=Serious",
+                impressed: "https://avataaars.io/?avatarStyle=Transparent&topType=LongHairNotTooLong&accessoriesType=Prescription02&hairColor=SilverGray&facialHairType=Blank&clotheType=BlazerShirt&clotheColor=Gray02&skinColor=Pale&eyeType=Default&eyebrowType=RaisedExcited&mouthType=Smile"
+            },
+            Cashman: {
+                smug: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairDreads01&accessoriesType=Blank&hairColor=Black&facialHairType=BeardLight&facialHairColor=Black&clotheType=ShirtVNeck&clotheColor=Red&skinColor=Pale&eyeType=Default&eyebrowType=DefaultNatural&mouthType=Smile",
+                defensive: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairDreads01&accessoriesType=Blank&hairColor=Black&facialHairType=BeardLight&facialHairColor=Black&clotheType=ShirtVNeck&clotheColor=Red&skinColor=Pale&eyeType=Side&eyebrowType=RaisedExcited&mouthType=Default",
+                nervous: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairDreads01&accessoriesType=Blank&hairColor=Black&facialHairType=BeardLight&facialHairColor=Black&clotheType=ShirtVNeck&clotheColor=Red&skinColor=Pale&eyeType=Surprised&eyebrowType=SadConcerned&mouthType=Disbelief",
+                sweating: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairDreads01&accessoriesType=Blank&hairColor=Black&facialHairType=BeardLight&facialHairColor=Black&clotheType=ShirtVNeck&clotheColor=Red&skinColor=Pale&eyeType=Surprised&eyebrowType=SadConcerned&mouthType=ScreamOpen",
+                panicking: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairDreads01&accessoriesType=Blank&hairColor=Black&facialHairType=BeardLight&facialHairColor=Black&clotheType=ShirtVNeck&clotheColor=Red&skinColor=Pale&eyeType=Cry&eyebrowType=SadConcerned&mouthType=ScreamOpen",
+                panic: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairDreads01&accessoriesType=Blank&hairColor=Black&facialHairType=BeardLight&facialHairColor=Black&clotheType=ShirtVNeck&clotheColor=Red&skinColor=Pale&eyeType=Cry&eyebrowType=SadConcerned&mouthType=ScreamOpen"
+            },
+            Counselor: {
+                focused: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairShortWaved&accessoriesType=Blank&hairColor=BrownDark&facialHairType=Blank&clotheType=BlazerShirt&clotheColor=Black&skinColor=Light&eyeType=Default&eyebrowType=DefaultNatural&mouthType=Serious",
+                confident: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairShortWaved&accessoriesType=Blank&hairColor=BrownDark&facialHairType=Blank&clotheType=BlazerShirt&clotheColor=Black&skinColor=Light&eyeType=Happy&eyebrowType=RaisedExcited&mouthType=Smile",
+                assertive: "https://avataaars.io/?avatarStyle=Transparent&topType=ShortHairShortWaved&accessoriesType=Blank&hairColor=BrownDark&facialHairType=Blank&clotheType=BlazerShirt&clotheColor=Black&skinColor=Light&eyeType=Squint&eyebrowType=RaisedExcited&mouthType=Serious"
+            }
+        };
+
+        // Audio controls
+        function playAudio(id) {
+            document.querySelectorAll('audio').forEach(a => a.pause());
+            const audio = document.getElementById(id);
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log("Audio play prevented:", e));
+            }
+        }
+
+        // --- MATH GENERATION ---
+        function generateGarchData() {
+            returnsData = [];
+            last252 = [];
+            last22 = [];
+            const N = 252 * 15; // 3780 days (15 years)
+            const omega = 0.00002;
+            const alpha = 0.03;
+            const beta = 0.96; // highly persistent
+            let sigma2 = omega / (1 - alpha - beta); // unconditional variance
+
+            for (let t = 0; t < N; t++) {
+                // Box-Muller transform for N(0,1)
+                let u1 = Math.random();
+                if (u1 === 0) u1 = 0.0001; // prevent log(0)
+                let u2 = Math.random();
+                let z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+                // Simulate the massive crash in the last 7 days!
+                if (t >= N - 7) {
+                    // Force massive negative returns (e.g. at least 2 std devs down)
+                    z = -Math.abs(z) - 2.0; 
+                }
+
+                let r = Math.sqrt(sigma2) * z;
+                returnsData.push(r);
+
+                // Update variance
+                sigma2 = omega + alpha * Math.pow(r, 2) + beta * sigma2;
+            }
+
+            // Pre-calculate truth for the minigames based on the final 252 and final 22 days
+            last252 = returnsData.slice(-252);
+            last22 = returnsData.slice(-22);
+            const fullMean = returnsData.reduce((sum, val) => sum + val, 0) / returnsData.length;
+            unconditionalVar = returnsData.reduce((sum, val) => sum + Math.pow(val - fullMean, 2), 0) / (returnsData.length - 1);
+            mean22 = last22.reduce((sum, val) => sum + val, 0) / 22;
+            var22 = last22.reduce((sum, val) => sum + Math.pow(val - mean22, 2), 0) / 21; // sample variance
+            std22 = Math.sqrt(var22);
+
+            // One-percent quantile of the next return under a Normal assumption
+            trueQuantile01 = mean22 - (2.3263 * std22);
+            impliedLoss01 = -portfolioValue * trueQuantile01;
+        }
+
+        // --- CORE FUNCTIONS ---
+        function startGame() {
+            generateGarchData();
+            document.getElementById('screen-menu').classList.add('hidden');
+            document.getElementById('screen-phase1').classList.remove('hidden');
+            playAudio('audio-investigation');
+        }
+
+        function collectEvidence(type) {
+            if (collectedEvidence.has(type)) return;
+
+            let title = "";
+            let content = "";
+
+            if (type === 'contract') {
+                title = "The Investment Mandate";
+                content = `
+                    <img src="${evidenceImages.contract}" class="w-full mb-4 rounded border border-gray-600">
+                    <p class="text-gray-300">You review the legal mandate. Section 4.A clearly stipulates:</p>
+                    <blockquote class="bg-slate-700 p-3 my-2 border-l-4 border-blue-500 text-white font-mono text-sm">
+                        "The fund manager is strictly prohibited from holding positions if the 1-day 99% Value at Risk (VaR) exceeds 100,000 EUR."
+                    </blockquote>
+                `;
+            } else if (type === 'screen') {
+                title = "Return Time Series Data";
+                // Only provide the raw numbers joined by newlines!
+                const rawDataString = returnsData.map(r => r.toFixed(6)).join('\n');
+                content = `
+                    <img src="${evidenceImages.screen}" class="w-full mb-4 rounded border border-gray-600">
+                    <p class="text-gray-300 mb-2">You downloaded the 15-year daily return series (3,780 observations). You noticed intense volatility clustering ending in a recent crash.</p>
+                    <p class="text-xs text-yellow-400 mb-1">Raw returns (copy to your software):</p>
+                    <textarea class="data-box w-full h-48 bg-gray-900 text-green-400 p-2 rounded text-xs" readonly>${rawDataString}</textarea>
+                `;
+            } else if (type === 'report') {
+                title = "Manager's Risk Report";
+                content = `
+                    <img src="${evidenceImages.report}" class="w-full mb-4 rounded border border-gray-600">
+                    <p class="text-gray-300 mb-3">A discarded internal memo. Cashman explicitly justifies his risk levels by calculating the unconditional variance over the entire history of the firm.</p>
+                    <p class="text-sm text-blue-300">Cashman's reported unconditional variance on the full return series: <strong>${unconditionalVar.toFixed(6)}</strong></p>
+                `;
+            }
+
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-content').innerHTML = content;
+            document.getElementById('evidence-modal').classList.remove('hidden');
+
+            collectedEvidence.add(type);
+            document.getElementById('evidence-counter').innerText = `${collectedEvidence.size} / 3`;
+            
+            if (collectedEvidence.size === 3) {
+                document.getElementById('evidence-counter').classList.replace('text-red-400', 'text-green-400');
+                document.getElementById('btn-to-trial').classList.remove('hidden');
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // --- PHASE 2: TRIAL SYSTEM ---
+        const dialogues = [
+            { type: 'text', char: 'Judge', emotion: 'stern', text: "The court is now in session for the case of Global Endowment Fund vs. Apex Predator Capital. The plaintiff claims Mr. Cashman breached the portfolio's VaR limits." },
+            { type: 'text', char: 'Judge', emotion: 'neutral', text: "Mr. Cashman, you may take the stand and present your defense." },
+            { type: 'text', char: 'Cashman', emotion: 'smug', text: "Gladly, Your Honor. This whole lawsuit is a joke. I am perfectly within my rights." },
+            
+            // Cross 1
+            { 
+                type: 'objection', char: 'Cashman', emotion: 'smug', audio: 'audio-argue',
+                text: "Listen closely to my testimony. Which of my statements is fundamentally flawed?",
+                statements: [
+                    "I've been successfully managing this fund for over a decade.",
+                    "Last week's crash was a Black Swan, a totally unforeseeable event.",
+                    "Financial returns are a random walk so they are completely unpredictable.", // Correct to object
+                    "Therefore, you cannot blame me for failing to predict a sudden drop!"
+                ],
+                correctIndex: 2
+            },
+            { type: 'text', char: 'Counselor', emotion: 'assertive', text: "OBJECTION! That is a gross oversimplification, Mr. Cashman! While the direction of tomorrow's return might be unpredictable, the magnitude of the risk certainly is not!" },
+            { type: 'text', char: 'Cashman', emotion: 'defensive', text: "Oh, really? An academic in the courtroom! Fine, let's talk math." },
+            
+            // Cross 2
+            { 
+                type: 'objection', char: 'Cashman', emotion: 'defensive', audio: 'audio-argue',
+                text: "Since you claim risk is predictable, I ran the numbers. Which statement is the lie?",
+                statements: [
+                    "I fitted an AR(1) model to the daily returns of the asset.",
+                    "The autoregressive coefficient is statistically insignificant.",
+                    "The p-value is massive! I have the computer logs to prove it.",
+                    "This proves there is absolutely no autocorrelation in the data and nothing to predict!" // Correct to object
+                ],
+                correctIndex: 3
+            },
+            { type: 'text', char: 'Counselor', emotion: 'assertive', text: "OBJECTION! You are deliberately looking at the wrong variable to hide the risk!" },
+            {
+                type: 'multiple_choice', char: 'Counselor', emotion: 'focused',
+                text: "Why is Cashman's AR(1) argument invalid?",
+                options: [
+                    "He needs an AR(2) model to capture financial cycles.",
+                    "The parameter is significant, he just used the wrong confidence interval.",
+                    "Simple returns lack autocorrelation, but there is strong autocorrelation in the squared returns.", // Correct
+                    "AR(1) models are only valid for monthly data, not daily.",
+                    "Autocorrelation only applies to the mean but risk is measured by the median."
+                ],
+                correctIndex: 2
+            },
+            { type: 'text', char: 'Cashman', emotion: 'nervous', text: "Autocorrelation in the squared returns?! Nobody in the real world cares about squared returns! What does that even mean?" },
+            {
+                type: 'multiple_choice', char: 'Counselor', emotion: 'confident',
+                text: "Choose the correct definition for the court.",
+                options: [
+                    "It means the market always generates positive returns over time, on average.",
+					"It demonstrates 'Volatility Clustering'. Large changes tend to be followed by large changes.", // Correct
+                    "It eliminates the measurement error in the asset prices.",
+                    "It proves that the manager was artificially inflating his performance fees.",
+                    "It represents the compound growth rate of the fund."
+                ],
+                correctIndex: 1
+            },
+            
+            // Cross 3
+            { type: 'text', char: 'Cashman', emotion: 'defensive', text: "OBJECTION! So what if there are 'clusters'? It changes absolutely nothing!" },
+            { 
+                type: 'objection', char: 'Cashman', emotion: 'nervous',
+                text: "My risk is perfectly controlled. Which statement can you disprove?",
+                statements: [
+                    "The mandate said keep the VaR under 100,000 EUR.",
+                    "To be as thorough as possible, I calculated the variance over the entire 20-year history!",
+                    "Over 20 years, the variance is tiny! So the risk of last week was tiny!", // Correct to object
+                    "My calculations prove my risk was strictly within the limits! Black swans occur on financial markets!"
+                ],
+                correctIndex: 2
+            },
+            { type: 'text', char: 'Counselor', emotion: 'assertive', text: "OBJECTION! By using a 20-year period, you intentionally drowned out the recent market turbulence!" },
+            {
+                type: 'multiple_choice', char: 'Counselor', emotion: 'focused',
+                text: "What is the fatal flaw in Cashman's variance calculation?",
+                options: [
+                    "He divided by N instead of N-1, biasing the variance downward.",
+                    "He calculated the variance of the prices instead of the logarithmic returns.",
+                    "20 years of data overestimates the true variance of the portfolio.",
+                    "He used an unconditional variance. Clustering requires conditional variance.", // Correct
+                    "Variance is not an appropriate measure. He should have used the median."
+                ],
+                correctIndex: 3
+            },
+            
+            // Calculation 1
+            { type: 'text', char: 'Judge', emotion: 'stern', text: "Order! Counselor, if the defendant's unconditional variance is inappropriate, provide proof. I will provide the last 252 daily returns. Use only the final 22 trading days to compute the conditional sample variance." },
+            {
+                type: 'calculation', char: 'Judge', emotion: 'neutral', audio: 'audio-calc',
+                text: "Use your software to calculate the SAMPLE VARIANCE of the final 22 days.",
+                hint: "Enter the value of the sample variance over the final 22 days in decimal format (e.g., 0.000123).",
+                target: () => var22
+            },
+            { type: 'text', char: 'Cashman', emotion: 'sweating', audio: 'audio-argue', text: "Argh! Fine! The recent variance is higher than my unconditional variance of {{UNCOND_VAR}}! But it doesn't matter!" },
+            
+            // Cross 4
+            { 
+                type: 'objection', char: 'Cashman', emotion: 'panicking',
+                text: "I am still innocent! Which statement do you challenge?",
+                statements: [
+                    "I admit the rolling variance is high right now.",
+                    "But I use the unconditional VaR for my reporting!",
+                    "Unconditional VaR is just an empirical quantile of past data.",
+                    "Even if the conditional variance is different today, the VaR value doesn't change. So I didn't breach the contract!" // Correct
+                ],
+                correctIndex: 3
+            },
+            { type: 'text', char: 'Counselor', emotion: 'assertive', text: "OBJECTION! Unconditional VaR is a dinosaur! It reacts too slowly to sudden shifts in market regimes. Instead, let us compute the 1% quantile of tomorrow's return using the updated conditional variance." },
+            { type: 'text', char: 'Judge', emotion: 'stern', text: "Proceed. Provide the court with the 1% quantile of the next daily return under a Normal distribution." },
+            
+            // Calculation 2
+            {
+                type: 'calculation', char: 'Judge', emotion: 'neutral', audio: 'audio-calc',
+                text: "Calculate the 1% quantile of the next daily return.",
+                hint: "Cashman's unconditional variance on the full sample is {{UNCOND_VAR}} which is far below the recent rolling variance. Under a Normal distribution, compute the 1% quantile using the last 22 days (use the mean and the standard deviation). Enter the return in decimal form.",
+                target: () => trueQuantile01
+            },
+            { type: 'text', char: 'Counselor', emotion: 'confident', text: "As you can see, Your Honor, the 1% quantile of the next return is deeply negative. Applied to a 10,000,000 EUR portfolio, that implies an exact 1% quantile loss of {{IMPLIED_LOSS}} EUR. Mr. Cashman was flying blind. And let me add one final nail to the coffin of the defense..." },
+            
+            // Final Blow
+            {
+                type: 'multiple_choice', char: 'Counselor', emotion: 'assertive', audio: 'audio-stress',
+                text: "What is the caveat of the Normal distribution assumption we just used?",
+                options: [
+                    "It overestimates the risk meaning that Cashman might actually be safe.",
+                    "Normal distribution assumes symmetrical returns but financial markets are always positively skewed.",
+                    "The Normal VaR is a conservative lower bound. Financial returns exhibit fat tails, meaning extreme losses are MORE likely.", // Correct
+                    "The VaR should be computed using the CAPM rather than the Normal distribution to have a less consertive lower bound.",
+                    "It fails to account for the risk-free rate, which was negative last week."
+                ],
+                correctIndex: 2
+            },
+            
+            // Ending
+            { type: 'text', char: 'Cashman', emotion: 'panic', text: "NOOO! My management fees! My yacht! (Breaks down completely)" },
+            { type: 'text', char: 'Judge', emotion: 'impressed', text: "The math does not lie. The defendant willfully used long-term unconditional metrics to hide current market volatility and bypass the risk mandate." },
+            { type: 'text', char: 'Judge', emotion: 'impressed', text: "I rule in favor of the plaintiff. The defendant is ordered to reimburse the Global Endowment Fund! Court is adjourned!" }
+        ];
+
+        function startTrial() {
+            document.getElementById('screen-phase1').classList.add('hidden');
+            document.getElementById('screen-phase2').classList.remove('hidden');
+            playAudio('audio-trial');
+            nextDialogue();
+        }
+
+        function handleDialogueClick() {
+            if (isTyping) {
+                // Skip typing animation
+                clearInterval(typeInterval);
+                document.getElementById('dialogue-text').innerHTML = currentFullText;
+                isTyping = false;
+                if (currentDialogue) {
+                    updateCharacterStage(currentDialogue.char, currentDialogue.emotion);
+                }
+            } else {
+                // Only advance if interaction area is empty (no pending questions)
+                if (document.getElementById('interaction-area').innerHTML === '') {
+                    dialogueIndex++;
+                    nextDialogue();
+                }
+            }
+        }
+
+        function injectRuntimeValues(text) {
+            if (!text) return text;
+            return text
+                .replaceAll('{{UNCOND_VAR}}', unconditionalVar.toFixed(6))
+                .replaceAll('{{IMPLIED_LOSS}}', impliedLoss01.toFixed(2));
+        }
+
+        function getSprite(charName, emotion) {
+            const sprites = characterSprites[charName];
+            if (!sprites) return null;
+            return sprites[emotion] || sprites.neutral || sprites.focused || sprites.smug || Object.values(sprites)[0];
+        }
+
+        function updateCharacterStage(charName, emotion) {
+            const spriteEl = document.getElementById('character-sprite');
+            const spriteSrc = getSprite(charName, emotion || 'neutral');
+
+            if (!spriteSrc) {
+                spriteEl.classList.add('hidden');
+                return;
+            }
+
+            spriteEl.src = spriteSrc;
+            spriteEl.className = 'character-sprite';
+            if (emotion === 'panic') spriteEl.classList.add('emotion-panic');
+            else if (emotion === 'panicking') spriteEl.classList.add('emotion-panic-lite');
+            else if (emotion === 'sweating' || emotion === 'nervous') spriteEl.classList.add('emotion-nervous');
+            else if (emotion === 'smug' || emotion === 'confident' || emotion === 'impressed') spriteEl.classList.add('emotion-confident');
+            spriteEl.classList.remove('hidden');
+        }
+
+        function typeDialogue(text, charName) {
+            text = injectRuntimeValues(text);
+            document.getElementById('dialogue-text').innerHTML = "";
+            document.getElementById('character-name').innerText = charName;
+            
+            // Character specific styling
+            const nameEl = document.getElementById('character-name');
+            nameEl.className = 'character-name'; // reset
+            if (charName === 'Judge') nameEl.classList.add('bg-gray-700');
+            else if (charName === 'Cashman') nameEl.classList.add('bg-red-700');
+            else nameEl.classList.add('bg-blue-600');
+
+            isTyping = true;
+            currentFullText = text;
+            let i = 0;
+            clearInterval(typeInterval);
+            
+            typeInterval = setInterval(() => {
+                document.getElementById('dialogue-text').innerHTML += text.charAt(i);
+                i++;
+                if (i >= text.length) {
+                    clearInterval(typeInterval);
+                    isTyping = false;
+                }
+            }, typingSpeed);
+        }
+
+        function renderOptions(options, correctIndex, type) {
+            const area = document.getElementById('interaction-area');
+            area.innerHTML = '';
+            
+            options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'neutral-btn w-full text-left p-3 mb-2 rounded shadow game-font text-xs md:text-sm leading-relaxed';
+                btn.innerText = opt;
+                btn.onclick = (e) => {
+                    e.stopPropagation(); // Prevent dialog click
+                    if (index === correctIndex) {
+                        area.innerHTML = ''; // clear choices
+                        dialogueIndex++;
+                        playAudio('audio-trial'); // Resume normal trial music
+                        nextDialogue();
+                    } else {
+                        loseLife();
+                    }
+                };
+                area.appendChild(btn);
+            });
+        }
+
+        function renderCalculation(hint, targetFunc) {
+            const area = document.getElementById('interaction-area');
+            area.innerHTML = `
+                <div class="bg-slate-800 p-4 rounded border border-blue-500 shadow-lg" onclick="event.stopPropagation()">
+                    <p class="text-blue-300 text-sm mb-3 italic">${hint}</p>
+                    <div class="flex">
+                        <input type="number" id="calc-input" class="flex-grow bg-slate-900 border border-slate-600 text-white p-3 rounded-l font-mono" placeholder="Enter value..." step="any">
+                        <button id="calc-submit" class="bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-r">SUBMIT</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('calc-submit').onclick = (e) => {
+                e.stopPropagation();
+                const val = parseFloat(document.getElementById('calc-input').value);
+                if (isNaN(val)) return;
+                
+                const target = targetFunc();
+                // 5% margin of error
+                const error = Math.abs((val - target) / target);
+                
+                if (error <= 0.05) {
+                    area.innerHTML = '';
+                    dialogueIndex++;
+                    playAudio('audio-trial');
+                    nextDialogue();
+                } else {
+                    loseLife();
+                }
+            };
+        }
+
+        function nextDialogue() {
+            if (dialogueIndex >= dialogues.length) {
+                winGame();
+                return;
+            }
+
+            const node = dialogues[dialogueIndex];
+            currentDialogue = node;
+            updateCharacterStage(node.char, node.emotion || 'neutral');
+            typeDialogue(node.text, node.char);
+            document.getElementById('interaction-area').innerHTML = ''; // Clear previous UI
+
+            if (node.audio) playAudio(node.audio);
+
+            if (node.type === 'objection') {
+                renderOptions(node.statements, node.correctIndex, 'objection');
+            } else if (node.type === 'multiple_choice') {
+                renderOptions(node.options, node.correctIndex, 'mcq');
+            } else if (node.type === 'calculation') {
+                // Show the 252-day court record for the variance exercise
+                let raw252 = last252.map(v => v.toFixed(6)).join('\n');
+                let extendedHint = injectRuntimeValues(node.hint);
+                if(node.text.includes("SAMPLE VARIANCE")) {
+                    extendedHint += `<br><br>Last 252 Returns (use only the final 22):<br><textarea readonly class="w-full h-48 bg-gray-900 text-green-400 p-1 mt-1 text-xs font-mono">${raw252}</textarea>`;
+                }
+                renderCalculation(extendedHint, node.target);
+            }
+        }
+
+        function loseLife() {
+            lives--;
+            updateLifeBar();
+            document.getElementById('penalty-modal').classList.remove('hidden');
+            
+            if (lives <= 0) {
+                // Wait briefly for modal, then show lose screen
+                setTimeout(() => {
+                    closeModal('penalty-modal');
+                    loseGame();
+                }, 1500);
+            }
+        }
+
+        function updateLifeBar() {
+            const tokens = document.querySelectorAll('.life-token');
+            for (let i = 0; i < tokens.length; i++) {
+                if (i >= lives) {
+                    tokens[i].classList.add('lost');
+                } else {
+                    tokens[i].classList.remove('lost');
+                }
+            }
+        }
+
+        function loseGame() {
+            document.getElementById('screen-phase2').classList.add('hidden');
+            const endScreen = document.getElementById('screen-end');
+            endScreen.classList.remove('hidden');
+            document.querySelectorAll('audio').forEach(a => a.pause());
+            
+            document.getElementById('end-title').innerText = "CASE DISMISSED";
+            document.getElementById('end-title').classList.add('text-red-500');
+            document.getElementById('end-text').innerHTML = `
+                <p class="mb-2">Your credibility was destroyed in court. Cashman walks free with millions in performance fees.</p>
+                <p class="text-sm text-gray-400">Review your econometrics and try again.</p>
+            `;
+            document.getElementById('verification-box').classList.add('hidden');
+        }
+
+        function winGame() {
+            document.getElementById('screen-phase2').classList.add('hidden');
+            const endScreen = document.getElementById('screen-end');
+            endScreen.classList.remove('hidden');
+            
+            playAudio('audio-win');
+            
+            document.getElementById('end-title').classList.replace('text-red-500', 'text-green-400');
+            document.getElementById('end-title').innerText = "VERDICT REACHED: GUILTY!"; // Cashman is guilty, player wins
+
+            document.getElementById('end-text').innerHTML = `
+                <p class="mb-2">Excellent work, Auditor.</p>
+                <p class="text-sm text-gray-300 mb-3">You successfully proved that Richard Cashman ignored volatility clustering by hiding behind unconditional long-term averages. You showed the importance of conditional variance and exposed the conservative nature of Normal distributions via fat tails.</p>
+                <div class="text-left text-sm text-gray-300 bg-slate-800/80 border border-slate-700 rounded p-4">
+                    <p class="font-bold text-blue-300 mb-2">Concepts reviewed during the game</p>
+                    <p class="mb-2"><strong>Random walk in returns:</strong> daily returns can be hard to predict in the mean but that does not make risk unpredictable.</p>
+                    <p class="mb-2"><strong>Volatility clustering:</strong> large moves tend to be followed by large moves which shows up in autocorrelation of squared returns.</p>
+                    <p class="mb-2"><strong>Conditional vs. unconditional variance:</strong> recent risk should be measured with a local window, not diluted with very old calm periods.</p>
+                    <p class="mb-2"><strong>Sample variance on a rolling window:</strong> the relevant estimate here came from the final 22 returns even though you observed a longer 252-day extract.</p>
+                    <p><strong>1% quantile and tail risk:</strong> under Normality, the 1% quantile is Mean - 2.33 x StdDev, but real financial returns often have fatter tails than the Normal benchmark.</p>
+                </div>
+            `;
+
+            // Generate Verification Code Deteministically
+            const date = new Date();
+            const dateStr = date.toISOString().split('T')[0];
+            const timeStr = date.toTimeString().split(' ')[0];
+            const salt = "Master1FinanceRisk";
+            const rawString = dateStr + timeStr + salt;
+            
+            let hash = 0;
+            for (let i = 0; i < rawString.length; i++) {
+                hash = ((hash << 5) - hash) + rawString.charCodeAt(i);
+                hash |= 0; // Convert to 32bit integer
+            }
+            const code = Math.abs(hash).toString(16).toUpperCase();
+
+            document.getElementById('verification-code').innerText = `[${dateStr}]-${code}`;
+            document.getElementById('verification-box').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
