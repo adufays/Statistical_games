@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Exercise 1: Nine Hundred Years</title>
+
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EXERCISE 1  ·  VERSION 2
+  EDHEC · Statistical Models · Session 1
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+
+  WHAT CHANGED IN VERSION 2
+  -------------------------
+  1. The Python editor is much larger. The v1 rule '#code textarea' never
+     matched anything (the panel carried no id), so the box fell back to the
+     browser default of two lines. It now has an id, a 320px minimum height,
+     and it grows by itself as the student types.
+  2. Answers are checked with a relative tolerance of 2% by default, so a
+     defensible variant of the estimator passes. In Trial II the route
+     N = 2X - 1  ->  N = 233, years = 892.3  is now accepted.
+     The checks that carry the lesson (N_hat = 2*xbar - 1 in Trial VI) stay
+     strict, and are flagged with 'strict:true'.
+  3. After two failed attempts on the same question, a SHOW THE ANSWER button
+     appears, so that nobody is stuck. Code questions get their solution typed
+     into the editor and run; multiple-choice questions reveal the correct
+     option; the written question reveals the model answer.
+  4. Codec layout, in the manner of Metal Gear Solid: the two portraits sit to
+     the left and to the right of the dialogue box. Both characters stay on
+     screen; the one who is speaking is lit, framed in amber, and flaps.
+  5. Plainer English throughout, following the house style of the course
+     exercise sheets.
+  6. Every code snippet ends with ready-made print statements, so the student
+     sees what Python actually produced. The student still writes at most two
+     lines: the prints are given, not asked for.
+  7. When the code is correct the panel and its output STAY on screen behind a
+     CONTINUE button, instead of being wiped the moment the check passes.
+  8. The typewriter is slower: CONFIG.TYPE_CHARS characters every
+     CONFIG.TYPE_MS ms (2 per 21 ms, against 2 per 16 ms before). Both are in
+     CONFIG, so the pace can be tuned in one place.
+  9. A PREVIOUS button in the toolbar steps backwards, as many times as wanted.
+     Every step is rebuilt from the STEPS data, so going back is always safe;
+     a 'seq' counter cancels the timers of the step being left.
+ 10. The faces react: amused when the answer is right, cross and downcast when
+     it is wrong, wide-eyed on the steps flagged 'wow' (the nan, the squared
+     tanks, the interval against the truth, the two standard deviations that
+     agree). A step may also set a resting expression with 'mood' for the
+     Master and 'studentMood' for the apprentice.
+ 11. Trial III now asks where BOTH the 2 and the -1 of N_hat = 2X - 1 come
+     from, and answers it with E(X) = (N+1)/2 solved for N. The old wording
+     asked only about the 2, which did not match the estimator in use.
+ 12. NO SOUND AT ALL. Tone.js, the Sound module, the toolbar switch and every
+     call site are gone; the sound is done in class instead.
+ 13. Trial VII: the approximation is announced as an approximation, and x_bar
+     is called the estimator, not the average.
+ 14. Trial VIII asks for the empirical variance FIRST, then its square root,
+     then the standard deviation of the average. The student therefore sees
+     833.47 and 28.87 side by side, and the squared-tanks remark lands on its
+     own instead of being announced as a joke.
+ 15. Trial IX is split in two: which distribution N_hat follows (Normal,
+     because a linear transformation of a Normal variable is Normal), and
+     only then its standard deviation. Everything after it moves up one
+     number, so the trials run I to XIII with no gap.
+ 16. The number line is 182 units tall instead of 150, so the red TRUE N = 100
+     label below the axis is no longer cut off.
+ 17. The written 'judgement' question is cut: the exercise no longer sends the
+     student back to the doomsday argument at the end. The 'reflect' step type
+     survives in the engine for the other exercises of the course.
+ 18. N-hat and x-bar are drawn by CSS (.hat and .bar), because VT323 has no
+     combining circumflex and rendered "N&#770;" as a stray "N^" in the HUD,
+     in every .kbd formula and in the notebook. Plain-text places that cannot
+     hold a span - the notebook notes, the question line, the SVG label of the
+     number line - use the Python names N_hat and xbar instead.
+ 19. The armoury says out loud that a new sample would move the centre of the
+     interval too, and that the centre is pinned at 89 on purpose so that only
+     the width is in play.
+  VERIFIED NUMBERS USED IN THIS EXERCISE
+  --------------------------------------
+  Act I  : X = 117 (billions)   N = 2X = 234    years = (234-117)/0.13 = 900
+           variant N = 2X-1 = 233 -> years = 892.3  (accepted, within 2%)
+           one-sided 95% bound  (117/0.05 - 117)/0.13 = 17,100 years
+           np.var(np.array([117.0]), ddof=1) -> nan  (+ RuntimeWarning)
+
+  Act III: serials (n=20) = 5,7,8,9,10,29,35,39,42,43,44,46,49,53,59,72,78,82,91,99
+           xbar     = 45          N_hat    = 2*45-1 = 89
+           s^2      = 833.4737    s        = 28.8699   (true sd of U[1,100] = 28.8661)
+           sd(xbar) = 6.4555      sd(Nhat) = 12.9110   (theory 12.9093)
+           95% interval = [63.69 , 114.31]   half-width 25.31
+           TRUE N   = 100   -> inside the interval, outside the point estimate
+           np.std(est20, ddof=1) with default_rng(7), 10,000 missions = 12.8981
+           (theory 12.9093; seed chosen so the displayed value is representative)
+
+  COVERAGE NOTE: the plug-in 95% interval at n=20 covers 93.4% of the time
+  (it was 86.8% at n=5). Close enough to 95% that no Student-t confession is
+  needed in session 1 — which is why the sample is 20 tanks and not 5.
+
+  I.I.D. NOTE: captures are treated as independent draws (with replacement),
+  which is what the simulation does and what session 1 teaches. No finite
+  population correction. The displayed sample happens to contain no repeats.
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#hud.glitching{animation:glitch .12s steps(2) 8}
+@keyframes glitch{
+  0%{transform:translate(0,0)}25%{transform:translate(-3px,1px) skewX(-2deg); filter:hue-rotate(90deg)}
+  50%{transform:translate(3px,-1px) skewX(2deg)}75%{transform:translate(-2px,0); filter:invert(1)}100%{transform:none}
+}
+#hud .broken{color:var(--red)!important; font-weight:700; text-shadow:1px 0 rgba(255,0,0,.6),-1px 0 rgba(0,255,255,.6)}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---- N̂ and x̄ -----------------------------------------------------------
+   The combining marks U+0302 and U+0304 are missing from VT323 and from the
+   pixel font, so the browser drops them next to the letter and "N with a hat"
+   comes out as "N^". The accent is therefore drawn by CSS, which works in
+   every font: <span class="hat">N</span> and <span class="bar">x</span>.
+   Plain-text places that cannot carry a span (the notebook, the question
+   line, SVG labels) use the Python names N_hat and xbar instead.          */
+.hat,.bar{position:relative; display:inline-block; padding-top:.34em; line-height:1}
+.hat::after{content:'^'; position:absolute; left:0; width:100%; top:-.05em;
+  text-align:center; font-size:.92em; line-height:1; font-family:inherit}
+.bar::after{content:''; position:absolute; left:6%; right:6%; top:.18em;
+  border-top:.09em solid currentColor}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt.given{background:#7a5200; border-color:#ffcf6b #3a2600 #3a2600 #ffcf6b}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+
+/* ---------- code panel ---------- */
+#code textarea{display:block; width:100%; min-height:320px; background:#06110a; color:var(--green);
+  font-family:var(--mono); font-size:20px; line-height:1.4; border:0; padding:10px 12px;
+  resize:vertical; outline:none; overflow:hidden; tab-size:4}
+#code .preview{background:#0c0c18; color:#8b8bb5; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:8px 12px; border-bottom:1px solid #2a2a44; white-space:pre-wrap}
+#code #out{background:#06110a; color:#bdbdbd; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:9px 11px; min-height:80px; white-space:pre-wrap; word-break:break-word; border-top:1px solid #1a2a1a}
+#out .ok{color:var(--green)} #out .err{color:#ff6b5e} #out .warn{color:var(--amber)}
+.codebar{display:flex; gap:8px; align-items:center; padding:7px; background:var(--panel); flex-wrap:wrap}
+.pyflag{margin-left:auto; font:700 10px Tahoma,sans-serif; color:#444}
+textarea#reflect{width:100%; min-height:130px; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:11px; font:15px/1.55 var(--body); resize:vertical}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+
+/* number line widget */
+#nl{width:100%; height:auto; display:block; margin:6px 0 2px}
+.nl-bar{transition:all .85s cubic-bezier(.2,.8,.3,1)}
+.nl-truth{opacity:0; transition:opacity .25s}
+.nl-truth.in{opacity:1; animation:slam .45s}
+@keyframes slam{0%{transform:translateY(-38px)}70%{transform:translateY(4px)}100%{transform:translateY(0)}}
+
+/* slider widget */
+.slrow{display:flex; align-items:center; gap:12px; padding:9px 4px; color:var(--cream); font-family:var(--mono); font-size:19px}
+.slrow input[type=range]{flex:1; accent-color:var(--amber)}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  #code textarea{min-height:250px; font-size:18px}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EXERCISE I</div>
+    <div style="display:flex;gap:6px">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>NINE HUNDRED YEARS</h1>
+      <h2>Exercise I &nbsp;·&nbsp; Statistical Models</h2>
+      <p>You have applied to the Academy of Doubt. Master Scepticus teaches statistics.
+      He does not accept a number that comes without its error bar.</p>
+      <p>He will make one alarming claim about the future of humanity. Then he will help you
+      take it apart. You need the average, the empirical variance, and a bit of nerve.</p>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p class="note" id="pystatus" style="margin-top:14px">Preparing the terminal…</p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin" disabled>BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:320px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CURRENT ESTIMATE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>n</span><b id="hud-n">—</b></div>
+            <div class="hudrow"><span><span class="hat">N</span></span><b id="hud-nhat">—</b></div>
+            <div class="hudrow"><span>interval</span><b id="hud-int">—</b></div>
+          </div>
+        </div>
+        <div id="doom">HUMANITY: ~900 YEARS</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Level I &nbsp;·&nbsp; The Model Behind the Number</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">FINISHED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, the dash included. There is nothing else to report.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG — replace the three background URLs with your own art.
+   Dropbox: use the share link and change the ending to  ?dl=1
+   (or leave them; each falls back to a gradient if it fails to load)
+   ================================================================ */
+const CONFIG = {
+  BACKGROUNDS: {
+    doomsday: "https://placehold.co/1200x420/12122a/3a3a66?text=+",
+    briefing: "https://placehold.co/1200x420/2a2418/574a2e?text=+",
+    tanks:    "https://placehold.co/1200x420/1d2a1d/3d5a3d?text=+"
+  },
+  FALLBACK: {
+    doomsday: "linear-gradient(180deg,#0a0a1e,#241a3a 60%,#4a2c5e)",
+    briefing: "linear-gradient(180deg,#1a1408,#3a2e18 60%,#5c4a26)",
+    tanks:    "linear-gradient(180deg,#0e1a0e,#26361f 60%,#44562e)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted.       */
+  RTOL: 0.02,
+  /* failed attempts on one question before SHOW THE ANSWER appears */
+  FAILS_BEFORE_SOLUTION: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS
+     milliseconds. Raise TYPE_MS to slow the dialogue down further. */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   AVATARS — inline SVG. The mouth is three sibling groups
+   (.mouth-a closed, .mouth-b ajar, .mouth-c open); the flap swaps
+   them by toggling a class on the wrapper. No network, no flicker.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- robe -->
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <!-- neck -->
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <!-- head -->
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <!-- hair -->
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <!-- beard -->
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <!-- brows -->
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <!-- nose -->
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- mouth (above the beard) -->
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <!-- monocle -->
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   PYTHON — Pyodide + NumPy, with a pattern-matching fallback
+   ================================================================ */
+const Py = (()=>{
+  let py=null, state='loading', out=[];
+  const BOOT = [
+    "import numpy as np, warnings",
+    "_ACAD_WARN = []",
+    "def _acad_show(message, category, filename, lineno, file=None, line=None):",
+    "    _ACAD_WARN.append(category.__name__ + ': ' + str(message))",
+    "warnings.showwarning = _acad_show",
+    "warnings.simplefilter('always')"
+  ].join("\n");
+
+  async function boot(log){
+    if(typeof loadPyodide === 'undefined'){ state='failed'; return state; }
+    try{
+      log && log("LOADING PYTHON RUNTIME .......");
+      py = await loadPyodide();
+      log && log("LOADING NUMPY ................");
+      await py.loadPackage("numpy");
+      py.setStdout({ batched:(s)=>out.push(s) });
+      py.setStderr({ batched:(s)=>out.push(s) });
+      py.runPython(BOOT);
+      state='ready';
+    }catch(e){ state='failed'; }
+    return state;
+  }
+
+  /* run: returns {ok, stdout, warns, error} */
+  function run(src){
+    out = [];
+    if(state!=='ready') return {ok:false, stdout:'', warns:[], error:'Python runtime unavailable.'};
+    try{
+      py.runPython("_ACAD_WARN.clear()");
+      py.runPython(src);
+      let w=[];
+      try{ w = py.runPython("list(_ACAD_WARN)").toJs(); }catch(e){ w=[]; }
+      return {ok:true, stdout:out.join(''), warns:Array.from(w), error:null};
+    }catch(e){
+      const m = String(e.message||e);
+      const lines = m.trim().split("\n");
+      // keep the last few lines: that is the actual Python error
+      return {ok:false, stdout:out.join(''), warns:[], error:lines.slice(-3).join("\n")};
+    }
+  }
+
+  /* read a numeric global; returns null if missing/not numeric */
+  function num(name){
+    if(state!=='ready') return null;
+    try{ const v = py.runPython(`float(${name})`); return (typeof v==='number')?v:null; }
+    catch(e){ return null; }
+  }
+  function isnan(name){
+    if(state!=='ready') return false;
+    try{ return !!py.runPython(`bool(np.isnan(np.float64(${name})))`); }catch(e){ return false; }
+  }
+  return { boot, run, num, isnan, get state(){return state;} };
+})();
+
+/* ================================================================
+   CONTENT — the exercise, as data.  n = 20 tanks throughout Act III.
+
+   Each numerical check accepts an answer within CONFIG.RTOL (2%) of
+   the target, or within its own 'tol', whichever is larger. A check
+   marked 'strict:true' uses 'tol' alone: those are the checks in
+   which the exact form of the estimator is the point of the question.
+   ================================================================ */
+const SERIALS = [5,7,8,9,10,29,35,39,42,43,44,46,49,53,59,72,78,82,91,99];
+
+const STEPS = [
+
+/* ---------- COLD OPEN ---------- */
+{ id:'open', type:'info', bg:'doomsday', who:'master', mood:'angry', title:'THE ACADEMY · ANTECHAMBER',
+  text:`Humanity has about <strong>nine hundred years</strong> left.
+  <span class="fx">He says it the way other people talk about the weather.</span>
+  I am not a prophet. I used one number, two lines of arithmetic, and one assumption so mild
+  that you will accept it before you notice it.
+  By the end of this hour you will either defend that sentence or destroy it. Both are fine.
+  Accepting it quietly is not.`,
+  studentMood:'surprised',
+  cont:'I am listening' },
+
+/* ---------- TRIAL 1 ---------- */
+{ id:'t1', type:'choice', bg:'doomsday', who:'master', title:'TRIAL I · WHAT KIND OF THING ARE YOU ?',
+  text:`About 117 billion human beings have been born since our species began. Put them all in
+  a queue, in the order of birth : number 1 at the start, and you at number 117 billion.
+  Call your position in the queue <span class="kbd">X</span>. You know nothing that makes your
+  position special. You did not choose your century.
+  <strong>Before we compute anything : what kind of object is X ?</strong>`,
+  q:'Choose the distribution of your birth rank.',
+  options:[
+    {id:'a', label:'A Bernoulli distribution'},
+    {id:'b', label:'A Normal distribution'},
+    {id:'c', label:'A Uniform distribution'},
+    {id:'d', label:'A variance'}
+  ],
+  correct:'c',
+  right:`Uniform. Every position in the queue is as likely as every other one, because you have
+  no reason to prefer one of them. Write it down :
+  <span class="kbd">X ~ U[1, N]</span>, in which N is the total number of humans who will ever
+  be born.
+  Note what you have just done. You did not <em>measure</em> this distribution. You
+  <strong>chose</strong> it, out of ignorance. That is an acceptable reason, as long as you
+  remember that you did it.`,
+  wrong:{
+    a:`A Bernoulli distribution has two outcomes, 0 and 1. Your birth rank has 117 billion of
+       them. Keep Bernoulli in mind : you will need it in ten minutes.`,
+    b:`The Normal distribution is continuous and concentrated in the middle. Is a human born in
+       the middle of history more likely than one born at the start ? You have no reason to
+       think so. The Uniform distribution encodes that absence of reason.`,
+    d:`No. A variance is a number computed <em>from</em> a distribution, not a distribution.
+       A distribution says which values are possible and how likely each one is. The
+       expectation and the variance are two summaries of it.`
+  },
+  note:'X ~ U[1, N]' },
+
+/* ---------- TRIAL 2 ---------- */
+{ id:'t2', type:'code', bg:'doomsday', who:'master', title:'TRIAL II · COMPUTE DOOM',
+  text:`You have <span class="kbd">X ~ U[1, N]</span> and one observation : x = 117 billion.
+  For a Uniform distribution on 1…N the expectation sits in the middle, i.e.,
+  <span class="kbd">E(X) = (N + 1)/2</span>.
+  You have one draw only, so you will use it as if it were the expectation, and solve for N.
+  <strong>Compute N, then the number of years left</strong>, at a birth rate of 0.13 billion
+  per year. Work in billions.
+  <span class="fx">Solving 117 = (N + 1)/2 gives N = 2X − 1. Keeping the −1 or dropping it
+  changes one human out of 234 billion, so both answers are accepted here.</span>`,
+  preamble:`import numpy as np\nX = 117.0\nbirths_per_year = 0.13`,
+  shown:`X = 117.0                # your birth rank, in billions\nbirths_per_year = 0.13   # world births per year, in billions`,
+  starter:`N = ???        # total humans who will ever be born, in billions\nyears = ???    # years remaining, at the current birth rate\n\nprint('N : ' + f'{N:0.1f}' + ' billions')\nprint('Years remaining : ' + f'{years:0.1f}')`,
+  solution:`N = 2 * X\nyears = (N - X) / births_per_year\n\nprint('N : ' + f'{N:0.1f}' + ' billions')\nprint('Years remaining : ' + f'{years:0.1f}')`,
+  checks:[{name:'N', value:234, tol:0.6}, {name:'years', value:900, tol:3}],
+  hint:'N is 2X − 1, or simply 2X. The humans still to come are N − X, and each year brings births_per_year of them.',
+  right:`About 234 billion of us in total, i.e., 117 billion still to come.
+  <strong>Nine hundred years.</strong>
+  Rome is older than that. You have just computed the end of the species with two lines of
+  arithmetic and the expectation of a Uniform distribution.
+  <span class="fx">Remember that −1 that we just dropped. In fifteen minutes it will matter,
+  because the numbers will be small.</span>`,
+  wow:true,
+  wrongHint:`Not yet. Read the output, correct your two lines and run again. You may run as
+  often as you like, and it costs you nothing.`,
+  note:'E(X) = (N+1)/2',
+  hud:{n:1, nhat:'234 bn', int:'—'} },
+
+/* ---------- TRIAL 3 ---------- */
+{ id:'t3', type:'choice', bg:'doomsday', who:'master', title:'TRIAL III · WHERE DOES THE FORMULA COME FROM ?',
+  text:`Be precise about what you just used. The estimator is
+  <span class="kbd"><span class="hat">N</span> = 2X − 1</span>, and we dropped the −1 only because 117 billion is
+  large.
+  <strong>Where do the 2 and the −1 come from ?</strong> Why not three times your rank, or your
+  rank plus a hundred billion ?`,
+  q:'Choose the reason the estimator is 2X − 1.',
+  options:[
+    {id:'a', label:'Because populations always double.'},
+    {id:'b', label:'Because E(X) = (N + 1)/2, so N = 2E(X) − 1, and the expectation is linear : E(2X − 1) = 2E(X) − 1 = N.'},
+    {id:'c', label:'Because 117 billion is a large number.'},
+    {id:'d', label:'Because the Uniform distribution is symmetric.'}
+  ],
+  correct:'b',
+  right:`Good. The estimator is not a fact about humanity. It is one line of algebra on the
+  expectation of a Uniform distribution, and then one property :
+  <span class="kbd">E(aX + b) = aE(X) + b</span>, with a = 2 and b = −1. This holds for every
+  distribution, with no condition attached.
+  Linearity of the expectation is the most reliable tool in this room, and that is what makes it
+  dangerous. It never warns you that the assumption feeding it is absurd.
+  <span class="fx">Keep an eye on that b = −1. It moves the estimate. In Trial X you will see
+  that it does not move the uncertainty by one millimetre.</span>`,
+  wrong:{
+    a:`Populations do many things. None of them is a theorem.`,
+    c:`Size is not an argument. A large number can be wrong just as easily as a small one, and
+       it sounds more convincing while it is being wrong. Size is only the reason we allowed
+       ourselves to drop the −1, not the reason the formula is what it is.`,
+    d:`The Uniform distribution <em>is</em> symmetric, and that is true. But symmetry alone does
+       not tell you where the centre is, and it certainly does not produce the −1. Solving
+       E(X) = (N + 1)/2 for N does.`
+  },
+  note:'E(X) = (N+1)/2 -> N_hat = 2X − 1  ·  E(aX + b) = aE(X) + b' },
+
+/* ---------- TRIAL 4 — the nan ---------- */
+{ id:'t4', type:'code', bg:'doomsday', who:'master', mood:'angry', title:'TRIAL IV · THE HINGE',
+  text:`An estimate without its uncertainty is a <em>rumour</em>. So give me the uncertainty.
+  Here is our complete dataset.
+  <strong>Compute the empirical variance of 'ranks'.</strong>`,
+  preamble:`import numpy as np\nranks = np.array([117.0])`,
+  shown:`ranks = np.array([117.0])   # our entire dataset: one observation, in billions`,
+  starter:`spread = ???   # the empirical variance of our data\n\nprint('Empirical variance : ' + str(spread))`,
+  solution:`spread = np.var(ranks, ddof=1)\n\nprint('Empirical variance : ' + str(spread))`,
+  checks:[{name:'spread', nan:true}],
+  hint:'The empirical variance uses the n−1 convention, i.e., np.var(..., ddof=1).',
+  right:`<span class="fx">NumPy refuses to answer.</span>
+  Look at what happened. It divided by n − 1, i.e., by <strong>zero</strong> here, and rather
+  than lie to you it returned <span class="kbd">nan</span>. A machine that says nothing when it
+  knows nothing. I have met philosophers with less discipline.
+  There is no second observation, so there is no spread, so there is no error bar, so there is
+  no forecast. Nine hundred years, plus or minus <em>nothing we can compute</em>.
+  Now say exactly what you did, because "average" is not the word.
+  <strong>You assumed that you were the expectation.</strong> You took E(X), a fixed property of
+  a distribution that you invented, and you set it equal to yourself. The sample average is how
+  we <em>estimate</em> an expectation, and an average of one observation is the weakest estimate
+  that exists.`,
+  wrongHint:`Not yet. The empirical variance is np.var, and the n−1 convention is a keyword
+  argument. Run it and see what the machine says.`,
+  glitch:true,
+  wow:true,
+  note:'n = 1 → empirical variance = nan',
+  hud:{n:1, nhat:'234 bn', int:'± nan'} },
+
+/* ---------- TRIAL 5 — Berlin Wall ---------- */
+{ id:'t5', type:'choice', bg:'doomsday', who:'master', title:'TRIAL V · BUT IT WORKS ?',
+  text:`Now I will be fair to the argument. Practise that on the arguments you dislike.
+  In 1969 the astrophysicist J. Richard Gott stood at the Berlin Wall. It was eight years old.
+  From that single fact he predicted that it would stand between 2.7 and 24 more years.
+  <strong>It fell twenty years later.</strong> He published the method in <em>Nature</em> and
+  applied it to Broadway shows, in which it worked embarrassingly well.
+  So the method predicted the Wall correctly, from one observation.
+  What does that establish ?`,
+  q:'Choose what the success of Gott establishes.',
+  options:[
+    {id:'a', label:'The method is validated, so the doomsday forecast stands.'},
+    {id:'b', label:'Almost nothing. One success is a single Bernoulli trial, and a coin that lands on heads once is not a coin you understand.'},
+    {id:'c', label:'It proves that the lifetime of the Wall followed a Uniform distribution.'},
+    {id:'d', label:'It proves that the method fails.'}
+  ],
+  correct:'b',
+  right:`Define <span class="kbd">S = 1</span> if the interval of the method contains the truth,
+  and S = 0 otherwise. S follows a <strong>Bernoulli distribution</strong> with probability
+  parameter p, and Gott claims that p = 0.95.
+  He has shown you <em>one draw of S</em>. To learn p, you have to average many draws. And that law needs something that one observation can never give.
+  So let us go and collect observations. 1944 has some.`,
+  wrong:{
+    a:`One success validates a method as much as one heads validates a claim about a coin. You
+       would not accept this argument from a stranger selling you a system.`,
+    c:`One outcome cannot reveal a distribution. That is very nearly the whole lesson of this hour.`,
+    d:`Too harsh, and just as unfounded. One draw cannot condemn the method either. It carries
+       almost no information about p, in <em>either</em> direction.`
+  },
+  studentMood:'surprised',
+  note:'S ~ Bernoulli(p) — one draw says little about p' },
+
+/* ---------- INFO: briefing ---------- */
+{ id:'brief', type:'info', bg:'briefing', who:'master', title:'INTELLIGENCE BRIEFING · 1944',
+  text:`Allied analysts recovered German tanks and read the serial numbers stamped on their
+  gearboxes. The structure is the one you already know : the serials run 1…N, and any tank was
+  as likely to be captured as any other one, i.e., <span class="kbd">X ~ U[1, N]</span> again,
+  in which N is the number of tanks built.
+  One captured tank, serial 30, gives <span class="hat">N</span> = 2 × 30 − 1 = <strong>59</strong>. This is the
+  doomsday argument with tanks instead of humans : same distribution, same estimator, same
+  sample size of one, same missing error bar. The difference is that this time
+  <strong>we can go and capture more tanks.</strong>
+  One warning before we do. The law of large numbers needs observations that are
+  <em>independent and identically distributed</em>. Twenty tanks taken from one factory on one
+  afternoon are twenty looks at the same factory, not twenty looks at the German war economy.
+  Independence is a claim about the way you collected the data, and no amount of data repairs it.`,
+  studentMood:'raised',
+  cont:'Open the evidence file' },
+
+/* ---------- TRIAL 6 — twenty tanks ---------- */
+{ id:'t6', type:'code', bg:'tanks', who:'master', title:'TRIAL VI · TWENTY TANKS',
+  text:`Twenty captured tanks, and twenty serial numbers. They are already loaded into the
+  variable <span class="kbd">serials</span>.
+  <strong>Compute the average of the serials, then the estimate of N.</strong>`,
+  preamble:`import numpy as np\nserials = np.array([${SERIALS.join(', ')}])`,
+  shown:`serials = np.array([${SERIALS.join(', ')}])`,
+  starter:`xbar  = ???    # the sample average\nN_hat = ???    # the estimate of N\n\nprint('Average of the serials : ' + f'{xbar:0.3f}')\nprint('Estimate of N : ' + f'{N_hat:0.3f}')`,
+  solution:`xbar  = np.mean(serials)\nN_hat = 2 * xbar - 1\n\nprint('Average of the serials : ' + f'{xbar:0.3f}')\nprint('Estimate of N : ' + f'{N_hat:0.3f}')`,
+  checks:[{name:'xbar', value:45, tol:0.05},
+          {name:'N_hat', value:89, tol:0.4, strict:true}],
+  hint:'np.mean for the average. Then apply the estimator : twice the average, minus one.',
+  right:`<span class="kbd"><span class="bar">x</span> = 45</span> is <strong>not</strong> E(X). E(X) is a property
+  of the distribution and you will never see it. <span class="bar">x</span> is a property of your twenty tanks, and
+  it will change as soon as you capture twenty more.
+  The recipe — take the average, double it, subtract one — is the <strong>estimator</strong>.
+  The 89 is the <strong>estimate</strong>. Confuse the two and you will spend your career
+  defending numbers instead of methods.
+  Here the −1 is no longer a footnote. Ninety against eighty-nine matters when you are counting
+  tanks.
+  <span class="fx">And look at the sample itself : five low numbers close together, then a gap
+  from 10 to 29. This is what randomness looks like. It is not tidy.</span>`,
+  wrongHint:`Read the output. np.mean gives the average, and the estimator is 2 × the average − 1.
+  The −1 is not optional here.`,
+  note:'xbar estimates E(X)  ·  N_hat = 2*xbar - 1',
+  hud:{n:20, nhat:'89', int:'± ?'} },
+
+/* ---------- TRIAL 7 — the loan ---------- */
+{ id:'t7', type:'info', bg:'tanks', who:'master', mood:'raised', title:'TRIAL VII · A LOAN',
+  text:`I am now going to <em>give</em> you a result instead of making you prove it, and it is
+  an <strong>approximation</strong>. I want you to notice that I am making one.
+  When you average n independent draws, the estimator <span class="bar">x</span> behaves approximately like a
+  Normal distribution, centred on the true expectation, with a variance equal to the variance of
+  one draw divided by n :
+  <span class="kbd"><span class="bar">x</span> ≈ Normal( E(X) , Var(X)/n )</span>
+  The variance is divided by n, so the standard deviation is divided by <strong>√n</strong>.
+  Keep that √n. It explains why twenty tanks are much better than one, and why two thousand
+  tanks are not nearly as much better as you would hope.
+  Why is this true ? <em>Not this term.</em> We will prove it in session three, and it has a name.
+  Today it is a loan, and I am telling you that it is a loan.`,
+  cont:'Accept the loan',
+  note:'xbar ~ Normal(E(X), Var(X)/n)  [ON LOAN UNTIL SESSION 3]' },
+
+/* ---------- TRIAL 8 — spread ---------- */
+{ id:'t8', type:'code', bg:'tanks', who:'master', title:'TRIAL VIII · SPREAD',
+  text:`Var(X) is a property of the distribution, and it is unknown. So replace it by what your
+  twenty tanks measured.
+  <strong>Compute the empirical variance of the serials. Then take its square root, which is
+  the empirical standard deviation. Then the standard deviation of the average.</strong>`,
+  preamble:`import numpy as np\nserials = np.array([${SERIALS.join(', ')}])`,
+  shown:`serials = np.array([${SERIALS.join(', ')}])   # still loaded`,
+  starter:`var_s   = ???   # the empirical variance of the serials\ns       = ???   # its square root, i.e., the empirical standard deviation\nsd_xbar = ???   # the standard deviation of the average of the twenty\n\nprint('Empirical variance : ' + f'{var_s:0.4f}')\nprint('Empirical standard deviation : ' + f'{s:0.4f}')\nprint('Standard deviation of the average : ' + f'{sd_xbar:0.4f}')`,
+  solution:`var_s   = np.var(serials, ddof=1)\ns       = np.sqrt(var_s)\nsd_xbar = s / np.sqrt(20)\n\nprint('Empirical variance : ' + f'{var_s:0.4f}')\nprint('Empirical standard deviation : ' + f'{s:0.4f}')\nprint('Standard deviation of the average : ' + f'{sd_xbar:0.4f}')`,
+  checks:[{name:'var_s', value:833.4737, tol:1},
+          {name:'s', value:28.8699, tol:0.05},
+          {name:'sd_xbar', value:6.4555, tol:0.02}],
+  hint:'np.var(serials, ddof=1) for the variance, np.sqrt for its square root. Then divide by the square root of the sample size, i.e., np.sqrt(20).',
+  right:`Look at your first number. The empirical variance is <strong>833.5</strong>.
+  Eight hundred and thirty-three point five <em>what</em> ? <strong>Squared tanks.</strong>
+  Nobody has ever been run over by a squared tank. A variance is measured in the square of the
+  unit of the data, which is why it is useless for talking to an officer, and why we take the
+  square root and report 28.87, which is in tanks.
+  <span class="kbd">ddof=1</span> divides by n − 1 instead of n. Take it on trust today. It is
+  the same n − 1 that refused to divide for you in Act I.
+  Now the third line, which is the important one. One serial number scatters by about
+  <strong>28.9</strong>. The <em>average</em> of twenty scatters by only <strong>6.46</strong>.
+  Averaging did not change the tanks. It changed how much the number you report jumps around,
+  and that is what the rest of this exercise is about.`,
+  wrongHint:`np.var and np.std need ddof=1 for the n−1 convention. The second line is the square
+  root of the first one, and the third divides it by np.sqrt(20).`,
+  wow:true,
+  note:'variance = 833.47 (squared tanks)  ·  s = 28.87  ·  sd(xbar) = s/√n = 6.46' },
+
+/* ---------- TRIAL 9a — the distribution of the estimator ---------- */
+{ id:'t9a', type:'choice', bg:'tanks', who:'master', title:'TRIAL IX · THE SHAPE OF THE ESTIMATOR',
+  text:`Two questions about your estimator, and the first one is about its shape.
+  I have just lent you <span class="kbd"><span class="bar">x</span> ≈ Normal( E(X) , Var(X)/n )</span>, and your
+  estimator is <span class="kbd"><span class="hat">N</span> = 2<span class="bar">x</span> − 1</span>, i.e., a linear transformation
+  of <span class="bar">x</span>.
+  <strong>Which distribution does <span class="hat">N</span> follow ?</strong>`,
+  q:'Choose the distribution of the estimator N_hat.',
+  options:[
+    {id:'a', label:'A Normal distribution, because a linear transformation of a Normal variable is Normal.'},
+    {id:'b', label:'A Uniform distribution, like the serial numbers it is built from.'},
+    {id:'c', label:'A Bernoulli distribution, because the estimator is either right or wrong.'},
+    {id:'d', label:'None. <span class="hat">N</span> is a number, and a number has no distribution.'}
+  ],
+  correct:'a',
+  right:`Normal. Multiplying by 2 and subtracting 1 stretches and slides the distribution, and it
+  does nothing else : a linear transformation of a Normal variable is Normal.
+  So you already know two of the three things about your estimator :
+  <span class="kbd"><span class="hat">N</span> ≈ Normal( N , ? )</span>
+  It is Normal, and it is centred on the true N, because the estimator is unbiased. Only the
+  spread is missing, and that is the next question.`,
+  wrong:{
+    b:`The <em>serial numbers</em> follow a Uniform distribution. Their <em>average</em> does not,
+       and that is the whole point of the result I lent you in Trial VII : averaging makes a
+       Normal distribution appear, whatever the draws looked like.`,
+    c:`A Bernoulli distribution has two outcomes, 0 and 1. <span class="hat">N</span> took the value 89, and it can
+       take any value nearby. You are thinking of the Bernoulli variable of Trial V, which said
+       whether an interval contained the truth.`,
+    d:`89 is a number, and it is the <em>estimate</em>. <span class="hat">N</span> is the <em>estimator</em>, i.e.,
+       the recipe applied to a sample, and the sample is random. Capture twenty other tanks and
+       you get another value. That is exactly what having a distribution means.`
+  },
+  note:'a linear transformation of a Normal variable is Normal' },
+
+/* ---------- TRIAL 9b — Var(aX+b) ---------- */
+{ id:'t9', type:'choice', bg:'tanks', who:'master', title:'TRIAL X · DOUBLE IT',
+  text:`Now the spread. You know that
+  <span class="kbd"><span class="hat">N</span> = 2<span class="bar">x</span> − 1</span>, and you have just computed
+  <span class="kbd">sd(<span class="bar">x</span>) = 6.46</span>.
+  <strong>What is sd(<span class="hat">N</span>) ?</strong>`,
+  q:'Choose the standard deviation of the estimator.',
+  options:[
+    {id:'a', label:'6.46 — multiplying by 2 and subtracting 1 cancel out'},
+    {id:'b', label:'11.91 — that is 2 × 6.46 − 1'},
+    {id:'c', label:'12.91 — that is 2 × 6.46'},
+    {id:'d', label:'25.82 — that is 4 × 6.46'}
+  ],
+  correct:'c',
+  right:`<span class="kbd">Var(aX + b) = a²Var(X)</span>. <strong>The b disappears.</strong>
+  Shifting every value by the same amount moves the whole distribution sideways. It does not
+  stretch it, so it cannot change the spread. Only the multiplier survives, and it survives
+  <em>squared</em>. This is why the standard deviation is multiplied by 2 and not by 4.
+  The hole is now filled :
+  <span class="kbd"><span class="hat">N</span> ≈ Normal( N , 12.91² )</span>
+  Normal, centred on the true N, and with a spread that you computed from twenty serial numbers
+  and nothing else. That is a complete description of how wrong you are likely to be.`,
+  wrong:{
+    a:`They do not cancel. Multiplying by 2 stretches the distribution, and subtracting 1 only
+       slides it. One of the two changes the spread, the other one does not.`,
+    b:`That is what happens when a formula is applied to the wrong object. You subtract the 1 from
+       the <em>estimate</em>. You never subtract it from the <em>uncertainty</em>.`,
+    d:`You applied the square to the standard deviation instead of the variance.
+       Var(2<span class="bar">x</span>) = 4·Var(<span class="bar">x</span>), so sd(2<span class="bar">x</span>) = √4 · sd(<span class="bar">x</span>) = 2·sd(<span class="bar">x</span>).`
+  },
+  note:'Var(aX + b) = a²Var(X) — the b disappears',
+  hud:{n:20, nhat:'89', int:'± 12.91 (1 sd)'} },
+
+/* ---------- TRIAL 10 — the interval ---------- */
+{ id:'t10', type:'code', bg:'tanks', who:'master', title:'TRIAL XI · THE INTERVAL',
+  text:`For a Normal variable, 95% of the draws fall within <strong>1.96</strong> standard
+  deviations of the centre.
+  <strong>Compute the 95% fluctuation interval for N.</strong> You have
+  <span class="kbd">N_hat = 89</span> and <span class="kbd">sd_N = 12.911</span>.`,
+  preamble:`import numpy as np\nN_hat = 89.0\nsd_N = 12.9110`,
+  shown:`N_hat = 89.0\nsd_N  = 12.9110`,
+  starter:`low  = ???   # lower bound of the 95% fluctuation interval for N\nhigh = ???   # upper bound\n\nprint('95% interval for N : [ ' + f'{low:0.2f}' + ' , ' + f'{high:0.2f}' + ' ]')`,
+  solution:`low  = N_hat - 1.96 * sd_N\nhigh = N_hat + 1.96 * sd_N\n\nprint('95% interval for N : [ ' + f'{low:0.2f}' + ' , ' + f'{high:0.2f}' + ' ]')`,
+  checks:[{name:'low', value:63.69, tol:0.05},{name:'high', value:114.31, tol:0.05}],
+  hint:'The centre, minus and plus 1.96 standard deviations.',
+  right:`Look at what you produced, and then at what you nearly reported.
+  Your point estimate was <strong>89</strong>. The truth was <strong>100</strong>. Eighty-nine
+  was <em>wrong</em>.
+  Your interval was <strong>64 to 114</strong>. The truth was 100. The interval was
+  <em>right</em>, and note how humble it is. Twenty tanks do not tell you "about ninety". They
+  tell you "somewhere between sixty-four and a hundred and fourteen". Any officer who wanted a
+  tidier answer had to go and capture more tanks.
+  That width is not a failure of the method. That width <strong>is</strong> the method. It is the
+  difference between a statistician and a fortune teller, and it costs one extra line of Python.
+  Now compare it with the start of this hour. The doomsday argument gave you 900 years and could
+  not give you the second line. Not because we were lazy, but because n was 1, and the width of
+  that interval is <span class="kbd">nan</span>.`,
+  wrongHint:`The bounds are the centre minus 1.96 × sd_N, and the centre plus 1.96 × sd_N.`,
+  wow:true,
+  widget:'interval',
+  note:'95% interval for N: [63.69 , 114.31]',
+  hud:{n:20, nhat:'89', int:'[63.7 , 114.3]'} },
+
+/* ---------- SLIDER (no question) ---------- */
+{ id:'slider', type:'info', bg:'tanks', who:'master', mood:'raised', title:'THE ARMOURY · CAPTURE MORE TANKS',
+  text:`No question attached to this one. Take the handle, capture more tanks, and watch what
+  your money buys.
+  One warning about what you are looking at. Capturing more tanks would also change the
+  <em>estimate</em>, i.e., the centre of the interval would move, because a new sample gives a
+  new average. Here I hold the centre fixed at 89 on purpose, so that you watch one thing only :
+  <strong>the width</strong>.
+  <span class="fx">He steps back, folds his arms, and lets you play.</span>`,
+  widget:'slider',
+  cont:'Enough',
+  after:`You saw it. Going from twenty tanks to eighty is four times the war effort and only
+  <strong>twice</strong> the precision. The width falls like √n, never like n, whatever your
+  budget would prefer. Halving your error costs four times the data.
+  Now apply it backwards. To halve the uncertainty of the doomsday estimate, you would need
+  <em>four humanities</em>. There is one.` },
+
+/* ---------- TRIAL 11 — LLN ---------- */
+{ id:'t11', type:'choice', bg:'tanks', who:'master', title:'TRIAL XII · WHAT THE LAW DOES NOT SAY',
+  text:`The first three tanks we captured all carried unusually high serial numbers.
+  Which statement does the <strong>law of large numbers</strong> support ?`,
+  q:'Choose the statement that the law of large numbers supports.',
+  options:[
+    {id:'a', label:'The next tanks will tend to carry low serial numbers, to restore the balance.'},
+    {id:'b', label:'As the number of captured tanks grows, <span class="bar">x</span> converges to E(X). The early tanks are not cancelled, they are diluted.'},
+    {id:'c', label:'With enough tanks, <span class="bar">x</span> will end up exactly equal to E(X).'},
+    {id:'d', label:'With enough tanks, we can be confident that the assumption on the serial numbers was correct.'}
+  ],
+  correct:'b',
+  right:`The tanks have no memory and no sense of fairness. Nothing compensates for anything. The
+  early evidence simply <em>stops mattering</em>, which is a slower and much less romantic form
+  of justice than the one gamblers believe in.
+  Now go back to option D : <em>with enough tanks, we can be confident that the assumption on
+  the serial numbers was correct</em>. That one is the expensive mistake, and it is the reason I
+  put it there. More data makes you more <strong>precise</strong>. It does not check your
+  assumption. If the mechanism is wrong, i.e., if we mostly capture tanks from the newest
+  factory, then ten thousand tanks give you a very narrow interval around a confidently wrong
+  number. Precision is not accuracy. The law of large numbers cannot see the difference, and
+  neither can Python.`,
+  wrong:{
+    a:`That is the gambler's fallacy, and it has paid for a great many casinos. The tanks do not
+       know what the earlier tanks did.`,
+    c:`Convergence is not arrival. <span class="bar">x</span> gets arbitrarily close and keeps wobbling. It does not
+       lock onto the value and stop.`,
+    d:`Precision is not accuracy. More data narrows the interval around whatever the mechanism
+       produces, including around a wrong answer.`
+  },
+  note:'LLN: xbar → E(X). Precision ≠ accuracy' },
+
+/* ---------- TRIAL 12 — the sample knew ---------- */
+{ id:'t12', type:'code', bg:'tanks', who:'master', title:'TRIAL XIII · DID THEY KNOW ?',
+  text:`We fought the twenty-tank mission ten thousand times, against a real N of 100. Every
+  estimate is already loaded into <span class="kbd">est20</span>.
+  <strong>Compute the empirical standard deviation of 'est20'.</strong>`,
+  preamble:`import numpy as np\n_rng = np.random.default_rng(7)\n_s = _rng.integers(1, 101, size=(10000, 20))\nest20 = 2*_s.mean(axis=1) - 1`,
+  shown:`est20   # 10,000 estimates of N, each one from a fresh 20-tank mission`,
+  starter:`spread20 = ???   # how much the estimate varies across missions\n\nprint('Standard deviation across the 10,000 missions : ' + f'{spread20:0.4f}')\nprint(' What your 20 tanks predicted : 12.9110')`,
+  solution:`spread20 = np.std(est20, ddof=1)\n\nprint('Standard deviation across the 10,000 missions : ' + f'{spread20:0.4f}')\nprint('What your 20 tanks predicted : 12.9110')`,
+  checks:[{name:'spread20', value:12.9, tol:0.9}],
+  hint:'The same np.std(..., ddof=1) that you used on the serials, applied to est20 this time.',
+  right:`About <strong>12.9</strong>. And what did you compute in Trial X, from twenty serial
+  numbers and no knowledge of the truth ?
+  <strong>12.91.</strong>
+  <span class="fx">He lets that sit for a moment.</span>
+  You did not have ten thousand missions. You had twenty tanks and an empirical variance. From
+  that, and from nothing else, you worked out how wrong you were likely to be, and you were
+  <em>right about it</em>. The empirical variance is how a sample measures its own precision
+  <strong>from the inside</strong>.
+  One more thing deserves your attention. The true standard deviation of a serial number drawn
+  from U[1,100] is 28.8661. Your twenty tanks reported 28.8699. The sample did not know the
+  answer, and it estimated it anyway.
+  That is the whole of today. An estimate tells you what you think. A variance tells you how much
+  to trust yourself. The doomsday argument has an estimate and no variance, which makes it a
+  statement about arithmetic and about nothing else.`,
+  wrongHint:`One line : the empirical standard deviation of est20, with ddof=1.`,
+  wow:true,
+  note:'your 20 tanks said 12.91 · 10,000 missions say 12.90' },
+
+/* ---------- CLOSE ---------- */
+{ id:'close', type:'info', bg:'doomsday', who:'master', title:'THE ACADEMY · DISMISSAL',
+  text:`You did not defeat the doomsday argument with a better argument. You defeated it with a
+  <strong>sample size</strong>, and with one extra line of code that most people never write.
+  Never ask only : <em>is the calculation correct ?</em> Ask :
+  <strong>what must be true for this calculation to answer my question, and how wide is the
+  interval around the answer ?</strong>
+  Your password is below. It opens with the time at which you finished, because I want to know
+  when you stopped being frightened.`,
+  cont:'Collect the password',
+  final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudN:$('#hud-n'), hudNhat:$('#hud-nhat'), hudInt:$('#hud-int'), hud:$('#hud'),
+  doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+/* the expression a character wears until something changes it */
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  const n = node(who);
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const node = who==='student' ? el.student : el.master;
+  stopFlap();
+  let f=0;
+  flap = { node, id:setInterval(()=>{
+    node.classList.remove('talk-1','talk-2');
+    node.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(node, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  node.innerHTML = html;
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0, count=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  node.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  el.note.innerHTML = notes.map(n=>'▸ '+n).join('<br>');
+}
+
+/* ---- HUD ---- */
+function setHUD(h){
+  if(!h) return;
+  if(h.n!==undefined)    el.hudN.textContent    = h.n;
+  if(h.nhat!==undefined) el.hudNhat.textContent = h.nhat;
+  if(h.int!==undefined){
+    el.hudInt.textContent = h.int;
+    el.hudInt.classList.toggle('broken', String(h.int).indexOf('nan')>=0);
+  }
+}
+/* the HUD as it stood at step i: the latest one declared at or before it */
+function hudAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].hud) return STEPS[k].hud; }
+  return {n:'—', nhat:'—', int:'—'};
+}
+function glitchHUD(){
+  el.hud.classList.add('glitching');
+  setTimeout(()=>el.hud.classList.remove('glitching'), 1100);
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.doomsday;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS
+   ================================================================ */
+function numberLineSVG(){
+  /* H leaves room under the axis for the red TRUE N label at y+66 */
+  const W=700,H=182,x0=45,x1=655,lo=0,hi=200,y=92;
+  const px = v => x0 + (v-lo)/(hi-lo)*(x1-x0);
+  let ticks='';
+  for(let v=0;v<=200;v+=25){
+    ticks += `<line x1="${px(v)}" y1="${y-6}" x2="${px(v)}" y2="${y+6}" stroke="#8a8ab0" stroke-width="2"/>
+              <text x="${px(v)}" y="${y+26}" fill="#9a9ac0" font-size="14" text-anchor="middle" font-family="VT323,monospace">${v}</text>`;
+  }
+  return `<svg id="nl" viewBox="0 0 ${W} ${H}">
+    <rect width="${W}" height="${H}" fill="#0c0c18"/>
+    <line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="#8a8ab0" stroke-width="2"/>
+    ${ticks}
+    <rect class="nl-bar" id="nlbar" x="${px(89)}" y="${y-20}" width="0" height="40" fill="rgba(255,176,0,.28)" stroke="#ffb000" stroke-width="2"/>
+    <g id="nlpin" opacity="0">
+      <line x1="${px(89)}" y1="${y-34}" x2="${px(89)}" y2="${y+34}" stroke="#ffb000" stroke-width="3"/>
+      <text x="${px(89)}" y="${y-42}" fill="#ffb000" font-size="17" text-anchor="middle" font-family="VT323,monospace">N_hat = 89</text>
+    </g>
+    <g class="nl-truth" id="nltruth">
+      <line x1="${px(100)}" y1="${y-46}" x2="${px(100)}" y2="${y+46}" stroke="#ff4a3d" stroke-width="4"/>
+      <text x="${px(100)}" y="${y+66}" fill="#ff6b5e" font-size="18" text-anchor="middle" font-family="VT323,monospace">TRUE N = 100</text>
+    </g>
+    <text id="nllab" x="${x0}" y="24" fill="#7a7aa8" font-size="16" font-family="VT323,monospace"></text>
+  </svg>`;
+}
+function playInterval(host){
+  host.innerHTML = `<div class="win95"><div class="titlebar"><span>EVIDENCE · THE INTERVAL</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:#0c0c18">${numberLineSVG()}</div></div>`;
+  const x0=45,x1=655,px=v=>x0+v/200*(x1-x0);
+  const pin=host.querySelector('#nlpin'), bar=host.querySelector('#nlbar'),
+        truth=host.querySelector('#nltruth'), lab=host.querySelector('#nllab');
+  setTimeout(()=>{ pin.setAttribute('opacity','1'); lab.textContent='the point estimate'; }, 350);
+  setTimeout(()=>{ bar.setAttribute('x', px(63.69)); bar.setAttribute('width', px(114.31)-px(63.69));
+                   lab.textContent='the 95% interval:  [ 63.69 , 114.31 ]'; }, 1300);
+  setTimeout(()=>{ truth.classList.add('in'); lab.textContent='the truth'; }, 2900);
+}
+function playSlider(host){
+  host.innerHTML = `<div class="win95"><div class="titlebar"><span>ARMOURY · SAMPLE SIZE</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:6px;background:#0c0c18">
+      ${numberLineSVG()}
+      <div class="slrow"><span style="min-width:130px">tanks captured</span>
+        <input type="range" id="sl" min="1" max="100" value="20">
+        <b id="sln" style="min-width:44px;text-align:right;color:#ffb000">20</b></div>
+      <div class="slrow" style="border-top:1px solid #2a2a44"><span style="min-width:130px">interval width</span>
+        <b id="slw" style="color:#2fe07a">± 25.3</b>
+        <span style="margin-left:auto;color:#7a7aa8;font-size:16px">width ∝ 1/√n</span></div>
+    </div></div>`;
+  const x0=45,x1=655,px=v=>x0+Math.max(0,Math.min(200,v))/200*(x1-x0);
+  const bar=host.querySelector('#nlbar'), pin=host.querySelector('#nlpin'),
+        truth=host.querySelector('#nltruth'), lab=host.querySelector('#nllab'),
+        sl=host.querySelector('#sl'), sn=host.querySelector('#sln'), sw=host.querySelector('#slw');
+  pin.setAttribute('opacity','1'); truth.classList.add('in');
+  lab.textContent = 'drag the handle';
+  bar.style.transition='all .12s linear';
+  const draw=()=>{
+    const n=+sl.value;
+    const half = 1.96 * 2 * 28.8699/Math.sqrt(n);      // 1.96 * sd(N_hat) at this n
+    const lo=89-half, hi=89+half;
+    bar.setAttribute('x', px(lo)); bar.setAttribute('width', px(hi)-px(lo));
+    sn.textContent=n; sw.textContent='± '+half.toFixed(1);
+  };
+  sl.addEventListener('input', draw); draw();
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.glitch) glitchHUD();
+    buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'code':    return zoneCode(s);
+    case 'reflect': return zoneReflect(s);
+  }
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget==='slider'){ const h=document.createElement('div'); el.zone.appendChild(h); playSlider(h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{
+    if(s.after){
+      el.zone.innerHTML='';
+      typeInto(el.dlg, s.after, 'master', ()=> contButton('Continue', next));
+    } else if(s.final){ finish(); }
+    else next();
+  });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='4px'; el.zone.appendChild(helpRow);
+  let fails=0;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+
+  const mySeq = seq;
+  function advance(givenAway){
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);
+    helpRow.innerHTML='';
+    addNote(s.note);
+    // the label is kept as HTML, so that a hat or a bar survives the echo
+    const label = s.options.find(o=>o.id===s.correct).label;
+    // the apprentice says the answer, then the master replies
+    setSpeaker('student');
+    const line = givenAway ? `<em>“…the answer was : ${label}.”</em>` : `<em>“${label}”</em>`;
+    typeInto(el.dlg, line, 'student', ()=>{
+      setTimeout(()=>{
+        if(mySeq!==seq) return;
+        setSpeaker('master');
+        if(s.wow) reactTo('wow');
+        typeInto(el.dlg, s.right, 'master', ()=>{ contButton('Continue', next); });
+      }, 260);
+    });
+    el.zone.innerHTML='';
+  }
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE ANSWER';
+    b.onclick=()=>{
+      const good = box.querySelector(`[data-oid="${s.correct}"]`);
+      if(good) good.classList.add('given');
+      setTimeout(()=>{ if(mySeq===seq) advance(true); }, 500);
+    };
+    helpRow.appendChild(b);
+  }
+
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      advance(false);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      const w = (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.';
+      clearVerdict();
+      verdict('no', w);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+        offerSolution();
+        verdict('give','Two attempts. You may take the answer and keep going — the reasoning matters more than the guess.');
+      }
+      el.zone.appendChild(helpRow);
+    }
+  }
+}
+
+/* ---- code ---- */
+/* how far an answer may be from the target: the larger of its own
+   absolute tolerance and CONFIG.RTOL in relative terms. A check marked
+   'strict' keeps its absolute tolerance only.                         */
+function tolerance(c){
+  const abs = c.tol || 0;
+  if(c.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(c.value));
+}
+
+function zoneCode(s){
+  const wrap=document.createElement('div');
+  wrap.className='win95'; wrap.id='code';
+  wrap.innerHTML = `
+    <div class="titlebar"><span>C:\\ACADEMY\\PYTHON.EXE</span><span class="boxes">▬ □ ✕</span></div>
+    <div class="preview">${escapeHtml(s.shown||'')}</div>
+    <textarea spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    <div class="codebar">
+      <button class="btn primary" data-run>RUN ▶</button>
+      <button class="btn" data-hint>HINT</button>
+      <span class="pyflag"></span>
+    </div>
+    <div id="out">ready.</div>`;
+  el.zone.appendChild(wrap);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='8px'; el.zone.appendChild(helpRow);
+
+  const ta=wrap.querySelector('textarea'), out=wrap.querySelector('#out');
+  ta.value = s.starter;
+  autosize(ta);
+  ta.addEventListener('input', ()=>autosize(ta));
+  wrap.querySelector('.pyflag').textContent =
+    (Py.state==='ready') ? 'PYTHON 3 · NUMPY' : 'FALLBACK MODE';
+
+  let fails=0, solved=false;
+  const mySeq = seq;
+
+  wrap.querySelector('[data-hint]').onclick = ()=>{
+    out.innerHTML = `<span class="warn">hint: ${escapeHtml(s.hint)}</span>`;
+  };
+  wrap.querySelector('[data-run]').onclick = ()=>run();
+  ta.addEventListener('keydown', e=>{
+    if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); }
+    if(e.key==='Tab'){ e.preventDefault();
+      const p=ta.selectionStart; ta.value=ta.value.slice(0,p)+'    '+ta.value.slice(ta.selectionEnd);
+      ta.selectionStart=ta.selectionEnd=p+4; autosize(ta); }
+  });
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE SOLUTION';
+    b.onclick=()=>{
+      ta.value = s.solution; autosize(ta);
+      clearVerdict();
+      verdict('give','Here is the solution. Read it, then RUN is pressed for you.');
+      out.innerHTML = `<span class="warn">solution loaded — running it…</span>`;
+      setTimeout(()=>{ if(mySeq===seq) run(true); }, 900);
+    };
+    helpRow.appendChild(b);
+  }
+  function noteFailure(){
+    fails++;
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+  }
+
+  function run(given){
+    const src = ta.value;
+    if(src.indexOf('???')>=0){
+      out.innerHTML = `<span class="err">SyntaxError: you have not replaced every ???</span>`;
+      return;
+    }
+    if(Py.state!=='ready') return runFallback(src, given);
+
+    // clear the target names so that a stale value cannot pass the check
+    const names = s.checks.map(c=>c.name);
+    Py.run(`for _n in ${JSON.stringify(names)}:\n    globals().pop(_n, None)`);
+    Py.run(s.preamble);
+    const r = Py.run(src);
+
+    let lines=[];
+    if(r.stdout) lines.push(escapeHtml(r.stdout.replace(/\n+$/,'')));
+    r.warns.forEach(w=>lines.push(`<span class="warn">${escapeHtml(w)}</span>`));
+    if(!r.ok){
+      lines.push(`<span class="err">${escapeHtml(r.error)}</span>`);
+      out.innerHTML = lines.join('\n');
+      if(!solved){ reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+      return;
+    }
+
+    let allOK = true;
+    const verd=[];
+    s.checks.forEach(c=>{
+      if(c.nan){
+        const isn = Py.isnan(c.name);
+        verd.push(`${c.name} = <span class="${isn?'ok':'err'}">${isn?'nan':String(Py.num(c.name))}</span>`);
+        if(!isn) allOK=false;
+      } else {
+        const v = Py.num(c.name);
+        if(v===null){ verd.push(`<span class="err">NameError: '${c.name}' is not defined</span>`); allOK=false; return; }
+        const good = Math.abs(v-c.value) <= tolerance(c);
+        verd.push(`${c.name} = <span class="${good?'ok':'err'}">${fmt(v)}</span>`);
+        if(!good) allOK=false;
+      }
+    });
+    lines.push(`<span style="color:#5a6a8a">--- checked ---</span>`);
+    out.innerHTML = lines.concat(verd).join('\n');
+    if(solved) return;                      // already passed: keep the panel as it is
+    if(allOK) pass();
+    else { reactTo('wrong'); clearVerdict(); verdict('no', s.wrongHint); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  function runFallback(src, given){
+    // no Pyodide: accept if every required name is assigned something plausible
+    const ok = given || (s.checks.every(c=> new RegExp('\\b'+c.name+'\\s*=\\s*\\S').test(src))
+               && /np\.(mean|std|var|sqrt|abs)|1\.96|\*\s*2|2\s*\*/.test(src));
+    out.innerHTML = ok
+      ? `<span class="warn">Python is unavailable, so your code was checked by inspection only.</span>`
+      : `<span class="err">That does not look complete. Assign every variable using numpy.</span>`;
+    if(solved) return;
+    if(ok) pass(); else { reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  /* The code panel and its output stay on screen. The student reads what
+     Python printed, and only then asks for the next step.               */
+  function pass(){
+    if(solved) return;
+    solved = true;
+    reactTo('right');
+    addNote(s.note);
+    clearVerdict(); helpRow.innerHTML='';
+    verdict('ok','Correct. Read the output above, then continue.');
+    const row=document.createElement('div'); el.zone.appendChild(row);
+    const b=document.createElement('button');
+    b.className='btn primary'; b.textContent='CONTINUE ▶';
+    b.onclick=()=>{ if(mySeq!==seq) return; el.zone.innerHTML=''; reveal(); };
+    row.appendChild(b);
+    b.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
+  function reveal(){
+    if(s.wow) reactTo('wow');
+    if(s.widget==='interval'){
+      const h=document.createElement('div'); el.zone.appendChild(h); playInterval(h);
+      setTimeout(()=>{ if(mySeq!==seq) return;
+        typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, 3600);
+    } else {
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }
+  }
+}
+/* the editor grows with its content, so that no line is ever hidden */
+function autosize(ta){
+  ta.style.height='auto';
+  const min = parseInt(getComputedStyle(ta).minHeight,10) || 0;
+  ta.style.height = Math.max(min, ta.scrollHeight + 4) + 'px';
+}
+function fmt(v){
+  if(!isFinite(v)) return String(v);
+  return (Math.abs(v-Math.round(v))<1e-9) ? String(Math.round(v)) : v.toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ---- reflection ----
+   No step of exercise 1 uses this type any more: the written question that
+   sent the student back to the doomsday argument was cut. It is kept because
+   the engine is shared with the other exercises of the course.            */
+function zoneReflect(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const ta=document.createElement('textarea'); ta.id='reflect';
+  ta.placeholder='Two sentences.'; el.zone.appendChild(ta);
+  const row=document.createElement('div'); row.style.marginTop='8px'; row.style.display='flex'; row.style.gap='8px';
+  el.zone.appendChild(row);
+  const b=document.createElement('button'); b.className='btn primary'; b.textContent='SUBMIT';
+  row.appendChild(b);
+  let fails=0;
+
+  function advance(givenAway){
+    reactTo('right'); el.zone.innerHTML='';
+    const tail = `<span class="fx">A model answer, for your notes : ${s.model}</span>`;
+    const head = givenAway
+      ? `Here is the answer I was waiting for. Copy it into your notes and compare it with what you wrote.`
+      : s.right;
+    typeInto(el.dlg, head + tail, 'master', ()=>contButton('Continue', next));
+  }
+  function offerSolution(){
+    if(row.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW A MODEL ANSWER';
+    g.onclick=()=>{ advance(true); };
+    row.appendChild(g);
+  }
+
+  b.onclick=()=>{
+    const t = ta.value.toLowerCase();
+    if(t.trim().length < 40){
+      clearVerdict();
+      verdict('no','Two sentences, please. The Master is not impressed by brevity alone.');
+      reactTo('wrong'); fails++;
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution(); return;
+    }
+    const hits = s.groups.filter(g=>g.some(k=>t.indexOf(k)>=0)).length;
+    if(hits >= s.minGroups){ advance(false); }
+    else {
+      reactTo('wrong'); fails++;
+      clearVerdict();
+      verdict('no', s.wrongHint);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+    }
+  };
+}
+
+function makePassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const sq = (m*m) % 1000000;
+  const code = (7919*sq + 104729*m + 31337) % 1000000;
+  return {
+    time: `${hh}h ${mm}min ${ss}s`,
+    code: hh + mm + ss + '-' + String(code).padStart(6,'0')
+  };
+}
+
+function finish(){
+  const pw = makePassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = pw.time;
+  $('#pw-code').textContent = pw.code;
+  $('#endblurb').innerHTML =
+    `A calculation can be exact while its conclusion stays fragile. You named the population, the
+     distribution, the estimator and the interval, and you saw the moment at which the assumptions
+     stopped being credible.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU BUILT</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'HUMANITY: UNDETERMINED — n = 1';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  const txt = $('#pw-code').textContent;
+  const done = ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallbackCopy);
+  } else fallbackCopy();
+  function fallbackCopy(){
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ $('#copymsg').textContent='select and copy manually'; }
+    t.remove();
+  }
+};
+$('#btn-again').onclick = ()=>{ idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  el.doom.classList.remove('struck'); el.doom.textContent='HUMANITY: ~900 YEARS';
+  setHUD({n:'—',nhat:'—',int:'—'}); show('scr-game'); render(); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE  (also cover for the Pyodide download)
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v2.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "DETECTING CO-PROCESSOR ...... PRESENT",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "CERTAINTY MODULE ............ NOT FOUND",
+  ""
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${l}</span>`:l).join('<br>'); }
+
+(async function start(){
+  show('scr-boot');
+  for(const l of BOOT_LINES){ bootLog(l); await sleep(120); }
+  const st = await Py.boot(bootLog);
+  bootLog("");
+  if(st==='ready'){ bootLog("> PYTHON READY. NUMPY LOADED."); }
+  else { bootLog("> PYTHON UNAVAILABLE — running in fallback mode."); }
+  bootLog("> PRESS ANY KEY");
+  const go = ()=>{ document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  $('#pystatus').textContent = st==='ready'
+    ? 'Terminal ready — Python 3 with NumPy.'
+    : 'Python could not be loaded. The exercise will check your code by inspection instead.';
+  $('#btn-begin').disabled = false;
+})();
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+$('#btn-begin').onclick = async ()=>{
+  const v = $('#playername').value.trim();
+  playerName = v || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+  show('scr-game');
+  setHUD({n:'—',nhat:'—',int:'—'});
+  idx=0; render();
+};
+</script>
+</body>
+</html>

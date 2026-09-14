@@ -1,0 +1,2154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Exercise 2: The Octopus and the Silent Alarm</title>
+
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EXERCISE 2
+  "The Octopus and the Silent Alarm"
+  EDHEC · Statistical Models · Session 2
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine, same characters and same password scheme as exercise 1.
+
+  SESSION 2 CURRICULUM
+  --------------------
+  Bernoulli distribution, Binomial distribution, expectation, variance,
+  probability parameter, frequency, Null hypothesis, p-value, exact
+  Binomial test.  Phase 1: Paul the Octopus.  Phase 2: the frequency of
+  Value at Risk violations (the unconditional coverage question of the
+  Kupiec test, asked with an exact Binomial test instead of a likelihood
+  ratio).
+
+  PYTHON PACKAGES
+  ---------------
+  numpy only, so that the boot stays light for a room full of students.
+  'stats' is a small exact Binomial implementation installed as
+  scipy.stats, so the students type the real API:
+      stats.binom.pmf / .cdf / .sf        stats.binomtest(...).pvalue
+  Set CONFIG.LOAD_SCIPY = true to download the real SciPy instead (about
+  25 MB); the shim then steps aside. Both give the same numbers, and the
+  values below were checked against an independent implementation.
+
+  'data' is a dict of NumPy arrays rather than a pandas DataFrame, so
+  that no 12 MB wheel is needed. Every line the students write is the
+  line they would write on a DataFrame:
+      data['violation_compass'] = (data['loss'] > data['VaR_compass']).astype(int)
+      data['violation_compass'].mean()     .var(ddof=1)
+  head(data) replaces data.head().
+
+  VERIFIED NUMBERS
+  ----------------
+  Paul, Y ~ Binomial(8, 0.5)
+     E(X)=0.5   V(X)=0.25          E(Y)=4       V(Y)=2
+     P(Y=8) = 0.5**8              = 0.00390625
+     one-sided p-value P(Y>=8)    = 0.00390625   -> reject at 95%
+     q = 1/256 = 0.00390625        1/q = 256      256-1 = 255 unsuccessful
+     P(at least one perfect among 256) = 1-(1-q)**256 = 0.632840
+
+  Value at Risk, Y ~ Binomial(500, 0.05)
+     E(Y) = 25.000     V(Y) = 23.750     P(Y=25) = 0.081588
+     model         viol.  freq.   one-sided        two-sided   verdict
+     PAPER SHIELD   36    0.072   0.019643 upper   0.030455    reject
+     COMPASS        25    0.050   —                1.000000    do not reject
+     BUNKER         15    0.030   0.019858 lower   0.039501    reject
+     STORM          25    0.050   —                1.000000    do not reject
+     The exact two-sided p-value uses probability ordering: it sums the
+     probabilities of all counts whose probability under H0 is no larger
+     than that of the observed count. For PAPER SHIELD these counts form
+     the two disjoint tails Y <= 14 and Y >= 36, so their probabilities
+     can be computed separately and added.
+
+  THE DATASET
+  -----------
+  Simulated in the preamble by _build_data(), and the violation counts are
+  exact by construction, not by luck:
+    - 475 calm days and one storm of 25 consecutive days (201..225);
+      every storm loss is above every calm loss.
+    - COMPASS, PAPER SHIELD and BUNKER re-estimate their volatility, so
+      their forecast is level + wiggle on calm days and jumps above the
+      storm. Their calm level is set halfway between two order statistics
+      of (loss - wiggle), which fixes the count at exactly 25, 36 and 15.
+    - STORM never re-estimates: one flat forecast, just above the largest
+      calm loss. It is therefore violated on every storm day and on no
+      other day, i.e., 25 violations, all consecutive.
+  COMPASS and STORM end with the same count and the same p-value, which is
+  the point of the last question.
+
+  PASSWORD  (identical to exercise 1, so one spreadsheet formula checks both)
+  --------------------------------------------------------------------------
+    password = hhmmss-cccccc
+    m      = hh*3600 + mm*60 + ss
+    cccccc = MOD( 7919*MOD(m*m,1000000) + 104729*m + 31337 , 1000000 )
+
+  Excel, with the submitted password as text in A2 (e.g. 134640-629737):
+    B2 =VALUE(LEFT(A2,2))*3600+VALUE(MID(A2,3,2))*60+VALUE(MID(A2,5,2))
+    C2 =TEXT(MOD(7919*MOD(B2*B2,1000000)+104729*B2+31337,1000000),"000000")
+    D2 =IF(EXACT(C2,MID(A2,8,6)),"OK","FORGED")
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#hud.glitching{animation:glitch .12s steps(2) 8}
+@keyframes glitch{
+  0%{transform:translate(0,0)}25%{transform:translate(-3px,1px) skewX(-2deg); filter:hue-rotate(90deg)}
+  50%{transform:translate(3px,-1px) skewX(2deg)}75%{transform:translate(-2px,0); filter:invert(1)}100%{transform:none}
+}
+#hud .broken{color:var(--red)!important; font-weight:700; text-shadow:1px 0 rgba(255,0,0,.6),-1px 0 rgba(0,255,255,.6)}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---- N̂ and x̄ -----------------------------------------------------------
+   The combining marks U+0302 and U+0304 are missing from VT323 and from the
+   pixel font, so the browser drops them next to the letter and "N with a hat"
+   comes out as "N^". The accent is therefore drawn by CSS, which works in
+   every font: <span class="hat">N</span> and <span class="bar">x</span>.
+   Plain-text places that cannot carry a span (the notebook, the question
+   line, SVG labels) use the Python names N_hat and xbar instead.          */
+.hat,.bar{position:relative; display:inline-block; padding-top:.34em; line-height:1}
+.hat::after{content:'^'; position:absolute; left:0; width:100%; top:-.05em;
+  text-align:center; font-size:.92em; line-height:1; font-family:inherit}
+.bar::after{content:''; position:absolute; left:6%; right:6%; top:.18em;
+  border-top:.09em solid currentColor}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt.given{background:#7a5200; border-color:#ffcf6b #3a2600 #3a2600 #ffcf6b}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+
+/* ---------- code panel ---------- */
+#code textarea{display:block; width:100%; min-height:320px; background:#06110a; color:var(--green);
+  font-family:var(--mono); font-size:20px; line-height:1.4; border:0; padding:10px 12px;
+  resize:vertical; outline:none; overflow:hidden; tab-size:4}
+#code .preview{background:#0c0c18; color:#8b8bb5; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:8px 12px; border-bottom:1px solid #2a2a44; white-space:pre-wrap}
+#code #out{background:#06110a; color:#bdbdbd; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:9px 11px; min-height:80px; white-space:pre-wrap; word-break:break-word; border-top:1px solid #1a2a1a}
+#out .ok{color:var(--green)} #out .err{color:#ff6b5e} #out .warn{color:var(--amber)}
+.codebar{display:flex; gap:8px; align-items:center; padding:7px; background:var(--panel); flex-wrap:wrap}
+.pyflag{margin-left:auto; font:700 10px Tahoma,sans-serif; color:#444}
+textarea#reflect{width:100%; min-height:130px; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:11px; font:15px/1.55 var(--body); resize:vertical}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  #code textarea{min-height:250px; font-size:18px}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EXERCISE II</div>
+    <div style="display:flex;gap:6px">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE OCTOPUS AND<br>THE SILENT ALARM</h1>
+      <h2>Exercise II &nbsp;·&nbsp; Statistical Models</h2>
+      <p>Master Scepticus has two files on his desk. One is about an octopus that predicted
+      eight football matches correctly. The other is about four banks that measure their own
+      risk.</p>
+      <p>The two files contain the same mathematics, i.e., the Bernoulli distribution, the
+      Binomial distribution and one exact test. You need a p-value and a suspicious mind.</p>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p class="note" id="pystatus" style="margin-top:14px">Preparing the terminal…</p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin" disabled>BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:320px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>subject</span><b id="hud-subject">—</b></div>
+            <div class="hudrow"><span>Y</span><b id="hud-y">—</b></div>
+            <div class="hudrow"><span>p-value</span><b id="hud-p">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Level I &nbsp;·&nbsp; The Model Behind the Number</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">FINISHED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, the dash included. The time at which you finished is already
+      inside it, so there is nothing else to report.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG — replace the three background URLs with your own art.
+   Dropbox: use the share link and change the ending to  ?dl=1
+   (or leave them; each falls back to a gradient if it fails to load)
+   ================================================================ */
+const CONFIG = {
+  BACKGROUNDS: {
+    aquarium: "https://placehold.co/1200x420/0d2230/1d4356?text=+",
+    archive:  "https://placehold.co/1200x420/241a2e/45325a?text=+",
+    trading:  "https://placehold.co/1200x420/101a14/22402c?text=+"
+  },
+  FALLBACK: {
+    aquarium: "linear-gradient(180deg,#04141f,#0d3348 60%,#176079)",
+    archive:  "linear-gradient(180deg,#150f1e,#2e2140 60%,#4a3466)",
+    trading:  "linear-gradient(180deg,#06120b,#123020 60%,#1d5236)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted.       */
+  RTOL: 0.02,
+  /* failed attempts on one question before SHOW THE ANSWER appears */
+  FAILS_BEFORE_SOLUTION: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS
+     milliseconds. Raise TYPE_MS to slow the dialogue down further. */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2,
+  /* false: 'stats' is the small exact Binomial implementation below, so
+     only NumPy is downloaded and the boot stays quick in a classroom.
+     true : download the real SciPy (about 25 MB) and use it instead.
+     The students type the same code either way.                     */
+  LOAD_SCIPY: false
+};
+
+/* ================================================================
+   AVATARS — inline SVG. The mouth is three sibling groups
+   (.mouth-a closed, .mouth-b ajar, .mouth-c open); the flap swaps
+   them by toggling a class on the wrapper. No network, no flicker.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- robe -->
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <!-- neck -->
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <!-- head -->
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <!-- hair -->
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <!-- beard -->
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <!-- brows -->
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <!-- nose -->
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- mouth (above the beard) -->
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <!-- monocle -->
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   PYTHON — Pyodide + NumPy, with a pattern-matching fallback.
+
+   The boot code also installs two things the exercise needs:
+
+   1. 'stats'. If SciPy is not loaded (the default, so that a room of
+      students does not download 25 MB each), an exact Binomial
+      implementation is registered as scipy.stats, so that
+      'from scipy import stats' works and the students write the real
+      API: stats.binom.pmf / .cdf / .sf and stats.binomtest(...).pvalue.
+      pmf is built by the stable recurrence
+          f(0) = (1-p)^n ,  f(k) = f(k-1) * (n-k+1)/k * p/(1-p)
+      and the two-sided binomtest uses probability ordering, as SciPy does.
+
+   2. _build_data(), the simulated trading book. See the header of this
+      file: the violation counts are exact by construction.
+   ================================================================ */
+const Py = (()=>{
+  let py=null, state='loading', out=[], engine='none';
+
+  const BOOT = `
+import numpy as np, warnings, sys, types, math
+
+_ACAD_WARN = []
+def _acad_show(message, category, filename, lineno, file=None, line=None):
+    _ACAD_WARN.append(category.__name__ + ': ' + str(message))
+warnings.showwarning = _acad_show
+warnings.simplefilter('always')
+
+
+class _AcadBinom(object):
+    """The Binomial probability mass function and its two tails."""
+    def _table(self, n, p):
+        n = int(n); p = float(p)
+        f = [0.0]*(n+1)
+        if p <= 0.0:
+            f[0] = 1.0
+            return f
+        if p >= 1.0:
+            f[n] = 1.0
+            return f
+        q = 1.0 - p
+        f[0] = q**n
+        for k in range(1, n+1):
+            f[k] = f[k-1] * (n-k+1) / k * (p/q)
+        return f
+    def pmf(self, k, n, p):
+        k = int(k)
+        if k < 0 or k > int(n):
+            return 0.0
+        return self._table(n, p)[k]
+    def cdf(self, k, n, p):
+        k = int(math.floor(k))
+        if k < 0:
+            return 0.0
+        if k >= int(n):
+            return 1.0
+        f = self._table(n, p)
+        return float(sum(f[0:k+1]))
+    def sf(self, k, n, p):
+        return 1.0 - self.cdf(k, n, p)
+
+_ACAD_BINOM = _AcadBinom()
+
+class _AcadTestResult(object):
+    def __init__(self, pvalue, k, n, p):
+        self.pvalue = pvalue
+        self.k = k
+        self.n = n
+        self.p = p
+    def __repr__(self):
+        return 'BinomTestResult(k=' + str(self.k) + ', n=' + str(self.n) + ', pvalue=' + repr(self.pvalue) + ')'
+
+def _acad_binomtest(k, n, p=0.5, alternative='two-sided'):
+    k = int(k); n = int(n); p = float(p)
+    if alternative == 'greater':
+        pv = _ACAD_BINOM.sf(k-1, n, p)
+    elif alternative == 'less':
+        pv = _ACAD_BINOM.cdf(k, n, p)
+    else:
+        f = _ACAD_BINOM._table(n, p)
+        cut = f[k]*(1.0 + 1e-7)
+        pv = float(sum(x for x in f if x <= cut))
+    if pv > 1.0:
+        pv = 1.0
+    return _AcadTestResult(pv, k, n, p)
+
+def _acad_install_stats():
+    st = types.ModuleType('scipy.stats')
+    st.binom = _ACAD_BINOM
+    st.binomtest = _acad_binomtest
+    sp = types.ModuleType('scipy')
+    sp.stats = st
+    sys.modules['scipy'] = sp
+    sys.modules['scipy.stats'] = st
+    return st
+
+try:
+    from scipy import stats as _acad_scipy_stats
+    stats = _acad_scipy_stats
+    _ACAD_STATS = 'scipy'
+except Exception:
+    stats = _acad_install_stats()
+    _ACAD_STATS = 'builtin'
+
+
+def _build_data():
+    """500 trading days: 475 calm ones and a storm of 25 consecutive days.
+
+    COMPASS, PAPER SHIELD and BUNKER re-estimate their volatility, so their
+    forecast follows the storm. STORM keeps one flat number. Each calm level
+    sits halfway between two order statistics of (loss - wiggle), which makes
+    the violation counts exactly 25, 36, 15 and 25.
+    """
+    rng = np.random.default_rng(20260209)
+    N = 500
+    day = np.arange(1, N+1)
+    storm = np.zeros(N, dtype=bool)
+    storm[200:225] = True
+
+    loss = np.empty(N)
+    loss[~storm] = 0.35 + 3.10*rng.random(475)**2.4
+    loss[storm] = 4.60 + 2.90*rng.random(25)
+
+    wiggle = 0.18*np.sin(day/23.0) + 0.06*np.cos(day/7.0)
+    adj = np.sort(loss[~storm] - wiggle[~storm])[::-1]
+    above_storm = float(loss[storm].max()) + 0.40
+
+    def _react(k):
+        v = 0.5*(adj[k-1] + adj[k]) + wiggle
+        v[storm] = above_storm
+        return v
+
+    return {'day': day,
+            'loss': loss,
+            'VaR_compass': _react(25),
+            'VaR_paper_shield': _react(36),
+            'VaR_bunker': _react(15),
+            'VaR_storm': np.full(N, float(loss[~storm].max()) + 0.15)}
+
+_ACAD_COLS = [('day','day'), ('loss','loss'), ('VaR_compass','compass'),
+              ('VaR_paper_shield','paper'), ('VaR_bunker','bunker'), ('VaR_storm','storm')]
+
+def head(d, n=5):
+    """Prints the first rows, the way data.head() would."""
+    line = ''
+    for key, short in _ACAD_COLS:
+        line = line + short.rjust(9)
+    print(line)
+    for t in range(int(n)):
+        row = ''
+        for key, short in _ACAD_COLS:
+            v = d[key][t]
+            if key == 'day':
+                row = row + str(int(v)).rjust(9)
+            else:
+                row = row + ('{:.2f}'.format(float(v))).rjust(9)
+        print(row)
+`;
+
+  async function boot(log){
+    if(typeof loadPyodide === 'undefined'){ state='failed'; return state; }
+    try{
+      log && log("LOADING PYTHON RUNTIME .......");
+      py = await loadPyodide();
+      log && log("LOADING NUMPY ................");
+      await py.loadPackage("numpy");
+      if(CONFIG.LOAD_SCIPY){
+        log && log("LOADING SCIPY ................");
+        try{ await py.loadPackage("scipy"); }catch(e){ log && log("  scipy unavailable, using the built-in Binomial"); }
+      }
+      py.setStdout({ batched:(s)=>out.push(s) });
+      py.setStderr({ batched:(s)=>out.push(s) });
+      py.runPython(BOOT);
+      try{ engine = py.runPython("_ACAD_STATS"); }catch(e){ engine='builtin'; }
+      state='ready';
+    }catch(e){ state='failed'; }
+    return state;
+  }
+
+  /* run: returns {ok, stdout, warns, error} */
+  function run(src){
+    out = [];
+    if(state!=='ready') return {ok:false, stdout:'', warns:[], error:'Python runtime unavailable.'};
+    try{
+      py.runPython("_ACAD_WARN.clear()");
+      py.runPython(src);
+      let w=[];
+      try{ w = py.runPython("list(_ACAD_WARN)").toJs(); }catch(e){ w=[]; }
+      return {ok:true, stdout:out.join(''), warns:Array.from(w), error:null};
+    }catch(e){
+      const m = String(e.message||e);
+      const lines = m.trim().split("\n");
+      // keep the last few lines: that is the actual Python error
+      return {ok:false, stdout:out.join(''), warns:[], error:lines.slice(-3).join("\n")};
+    }
+  }
+
+  /* read a numeric global, or any numeric expression; null if it fails */
+  function num(expr){
+    if(state!=='ready') return null;
+    try{ const v = py.runPython(`float(${expr})`); return (typeof v==='number')?v:null; }
+    catch(e){ return null; }
+  }
+  function isnan(expr){
+    if(state!=='ready') return false;
+    try{ return !!py.runPython(`bool(np.isnan(np.float64(${expr})))`); }catch(e){ return false; }
+  }
+  /* read a list of numbers, for the widgets that draw the real data */
+  function list(expr){
+    if(state!=='ready') return null;
+    try{
+      const v = py.runPython(`[float(_x) for _x in (${expr})]`);
+      const a = v.toJs ? Array.from(v.toJs()) : Array.from(v);
+      if(v.destroy) v.destroy();
+      return a;
+    }catch(e){ return null; }
+  }
+  return { boot, run, num, isnan, list, get state(){return state;}, get engine(){return engine;} };
+})();
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Each numerical check accepts an answer within CONFIG.RTOL (2%) of the
+   target, or within its own 'tol', whichever is larger. A check marked
+   'strict:true' uses 'tol' alone: those are the counts, which must be
+   exact. A check may carry an 'expr' when the value is not a plain
+   variable, e.g. the sum of a column.
+   ================================================================ */
+const STEPS = [
+
+/* ================= FIRST PHASE — PAUL THE OCTOPUS ================= */
+
+{ id:'open', type:'info', bg:'aquarium', who:'master', mood:'raised', studentMood:'surprised',
+  title:'THE ACADEMY · CASE FILE II',
+  text:`<strong>Did you know that science proved that an octopus can predict football results? </strong>
+  <span class="fx">He puts the file down and waits for you to object.</span>
+  Paul the Octopus chose between two boxes of food to select the winner of a football match.
+  During the 2010 World Cup he predicted <strong>eight matches out of eight</strong>.
+  Eight predictions, eight successes. His only mistake was not charging management fees.
+  We assume that a random animal chooses each box with the same probability, and that the
+  choices are independent. Under that assumption, we will test the record of Paul.`,
+  widget:'predictions',
+  banner:'PAUL: 8 / 8 CORRECT',
+  cont:'Open the case' },
+
+{ id:'q1a', type:'choice', bg:'aquarium', who:'master', title:'QUESTION I · THE RANDOM VARIABLE',
+  text:`We define the random variable <span class="kbd">X_i</span> as follows :
+  <span class="kbd">X_i = 1 if prediction i is correct, X_i = 0 otherwise.</span>
+  Assume that Paul selects one of the two boxes randomly.
+  <strong>Identify the distribution of X_i and its probability parameter p.</strong>`,
+  q:'Choose the distribution of one prediction.',
+  options:[
+    {id:'a', label:'A Normal distribution with expectation 0.5.'},
+    {id:'b', label:'A Bernoulli distribution with probability parameter p = 0.5.'},
+    {id:'c', label:'A Binomial distribution with parameters N = 8 and p = 0.5.'},
+    {id:'d', label:'A Uniform distribution between 0 and 8.'}
+  ],
+  correct:'b',
+  right:`X_i takes two values, 0 and 1, so X_i follows a <strong>Bernoulli distribution</strong>.
+  Under the random-choice assumption the two boxes have the same probability, i.e., p = 0.5.
+  Everything today is built on this one variable. A football prediction, a coin, a customer who
+  subscribes or does not, a day on which a bank loses more than it forecast : they are all the
+  same object, and it has two outcomes.`,
+  wrong:{
+    a:`The Normal distribution is continuous. A prediction is either correct or not, so there are
+       two outcomes and nothing in between.`,
+    c:`The Binomial distribution counts successes over several trials. X_i is <em>one</em>
+       prediction. Keep that answer for the next question, in which we count all eight.`,
+    d:`X_i never takes the value 3, or 7.5. It takes 0 or 1.`
+  },
+  note:'X_i ~ Bernoulli(p), p = 0.5' },
+
+{ id:'q1b', type:'code', bg:'aquarium', who:'master', title:'QUESTION I · EXPECTATION AND VARIANCE',
+  text:`<strong>Compute E(X_i) and V(X_i) under the random-choice assumption.</strong>`,
+  preamble:`p = 0.5`,
+  shown:`p = 0.5   # a random animal chooses the correct box with this probability`,
+  starter:`expectation_X = ???   # E(X_i)\nvariance_X = ???      # V(X_i)\n\nprint('Expectation : ' + f'{expectation_X:0.3f}')\nprint('Variance : ' + f'{variance_X:0.3f}')`,
+  solution:`expectation_X = p\nvariance_X = p * (1-p)\n\nprint('Expectation : ' + f'{expectation_X:0.3f}')\nprint('Variance : ' + f'{variance_X:0.3f}')`,
+  checks:[{name:'expectation_X', value:0.5, tol:0.002},
+          {name:'variance_X', value:0.25, tol:0.002}],
+  hint:'For a Bernoulli distribution, E(X) = p and V(X) = p(1-p).',
+  right:`For a Bernoulli distribution with probability parameter p :
+  <span class="kbd">E(X_i) = p</span> and <span class="kbd">V(X_i) = p(1 − p)</span>.
+  Note where the variance is largest. At p = 0.5 it reaches its maximum, i.e., 0.25. An animal
+  choosing at random is the most unpredictable animal there is. That is exactly what makes eight
+  correct predictions in a row worth a calculation.`,
+  wrongHint:`Not yet. E(X) is p itself, and V(X) is p times (1 − p).`,
+  note:'E(X) = p = 0.5  ·  V(X) = p(1-p) = 0.25' },
+
+{ id:'q2a', type:'choice', bg:'aquarium', who:'master', title:'QUESTION II · COUNTING THE SUCCESSES',
+  text:`We define <span class="kbd">Y</span> as the number of correct predictions among the eight
+  matches.
+  <strong>Identify the distribution of Y under the random-choice assumption.</strong>`,
+  q:'Choose the distribution of the number of correct predictions.',
+  options:[
+    {id:'a', label:'A Bernoulli distribution with probability parameter p = 0.5.'},
+    {id:'b', label:'A Binomial distribution with parameters N = 8 and p = 0.5.'},
+    {id:'c', label:'A Binomial distribution with parameters N = 2 and p = 8.'},
+    {id:'d', label:'A Normal distribution with expectation 8.'}
+  ],
+  correct:'b',
+  right:`Each prediction follows a Bernoulli distribution. The eight predictions are assumed
+  independent and to share the same probability parameter. A sum of independent Bernoulli
+  variables with the same p follows a <strong>Binomial distribution</strong> :
+  <span class="kbd">Y = X_1 + … + X_8 ~ Binomial(8, 0.5)</span>
+  Remember the two assumptions in that sentence, i.e., independence and a common p. We will
+  break them both before the hour is over.`,
+  wrong:{
+    a:`A Bernoulli variable takes the values 0 and 1. Y can take the value 5.`,
+    c:`Read the parameters again. N is the number of trials, i.e., 8, and p is a probability,
+       so it cannot be 8.`,
+    d:`Y counts, so it takes whole values between 0 and 8. The Normal distribution is
+       continuous and unbounded.`
+  },
+  note:'Y = sum of X_i ~ Binomial(N=8, p=0.5)' },
+
+{ id:'q2b', type:'code', bg:'aquarium', who:'master', title:'QUESTION II · EXPECTATION AND VARIANCE',
+  text:`<strong>Compute E(Y) and V(Y).</strong>`,
+  preamble:`N = 8\np = 0.5`,
+  shown:`N = 8\np = 0.5`,
+  starter:`expectation_Y = ???   # E(Y)\nvariance_Y = ???      # V(Y)\n\nprint('Expectation : ' + f'{expectation_Y:0.3f}')\nprint('Variance : ' + f'{variance_Y:0.3f}')`,
+  solution:`expectation_Y = N * p\nvariance_Y = N * p * (1-p)\n\nprint('Expectation : ' + f'{expectation_Y:0.3f}')\nprint('Variance : ' + f'{variance_Y:0.3f}')`,
+  checks:[{name:'expectation_Y', value:4, tol:0.02},
+          {name:'variance_Y', value:2, tol:0.02}],
+  hint:'For a Binomial distribution, E(Y) = Np and V(Y) = Np(1-p).',
+  right:`<span class="kbd">E(Y) = Np = 4</span> and <span class="kbd">V(Y) = Np(1 − p) = 2</span>.
+  Four correct predictions out of eight is what we expect from an animal that knows nothing about
+  football. Paul produced eight.  Four is not the answer to the question, though. The question is how <em>surprising</em> eight is when we expect four on average. <span class="fx">If its surname had been Atreides, we would have called it prescience. Since he
+  was Paul the Octopus, we compute a p-value to assess how surprising this is.</span>`,
+  wrongHint:`Multiply the Bernoulli results by N : E(Y) = N × p, and V(Y) = N × p × (1 − p).`,
+  note:'E(Y) = Np = 4  ·  V(Y) = Np(1-p) = 2' },
+
+{ id:'q3', type:'code', bg:'aquarium', who:'master', title:'QUESTION III · A PERFECT RECORD',
+  text:`<strong>Compute the probability that a random animal predicts the eight results
+  correctly.</strong>`,
+  preamble:`from scipy import stats`,
+  shown:`from scipy import stats`,
+  starter:`probability_perfect = ???   # P(Y = 8)\n\nprint('Probability : ' + f'{probability_perfect:0.6f}')`,
+  solution:`probability_perfect = stats.binom.pmf(8, n=8, p=0.5)\n\nprint('Probability : ' + f'{probability_perfect:0.6f}')`,
+  checks:[{name:'probability_perfect', value:0.00390625, tol:0.000002}],
+  hint:'stats.binom.pmf(k, n=..., p=...) gives P(Y = k). The expression 0.5**8 gives the same number.',
+  right:`<span class="kbd">P(Y = 8) = (0.5)⁸ = 1/256 ≈ 0.0039</span>, i.e., about 0.39%.
+  The Binomial formula and plain arithmetic agree here, and it is worth seeing why. Paul must be
+  correct eight times in a row, and under independence you multiply :
+  0.5 × 0.5 × … × 0.5, eight times.
+  So a perfect record is unlikely <em>for one given animal</em>. Hold on to those four words. They
+  will be worth 255 animals in a moment.`,
+  wrongHint:`P(Y = 8) is stats.binom.pmf(8, n=8, p=0.5), i.e., 0.5 to the power 8.`,
+  note:'P(Y = 8) = 0.5**8 = 0.003906' },
+
+{ id:'q4', type:'code', bg:'aquarium', who:'master', title:'QUESTION IV · THE TEST',
+  text:`We test whether Paul predicts football results better than a random animal :
+  <span class="kbd">H0 : p = 0.5   versus   HA : p > 0.5</span>
+  <strong>Compute the p-value using the Binomial distribution.</strong>`,
+  preamble:`from scipy import stats\nN_success = 8\nN = 8\np_NULL = 0.5`,
+  shown:`N_success = 8\nN = 8\np_NULL = 0.5`,
+  starter:`p_val = ???   # the p-value of the test above\n\nprint('P-value : ' + f'{p_val:0.6f}')`,
+  solution:`p_val = 1 - stats.binom.cdf(N_success-1, n=N, p=p_NULL)\n\nprint('P-value : ' + f'{p_val:0.6f}')`,
+  checks:[{name:'p_val', value:0.00390625, tol:0.000002}],
+  hint:`The upper tail is 1 - stats.binom.cdf(N_success - 1, n=N, p=p_NULL). The exact test stats.binomtest(N_success, n=N, p=p_NULL, alternative="greater").pvalue gives the same number.`,
+  right:`The p-value is 0.0039, i.e., lower than 0.05. We <strong>reject the Null hypothesis</strong>
+  that p = 0.5 at a 95% confidence level and at even larger levels such as 99%. The record of Paul is significantly different from what
+  we usually observe with one random animal.
+  Now read that sentence again and notice everything it does <em>not</em> say. It does not say that
+  Paul understands football. It does not say the record cannot happen by chance : 0.0039 is small,
+  it is not zero. And it says nothing about the assumptions we never tested, i.e., a preference for
+  one flag, dependence between the predictions, or the possibility that many animals were tried.`,
+  wrongHint:`The alternative is p > 0.5, so you need the upper tail, i.e., P(Y >= 8). With the
+  cumulative distribution function that is 1 - stats.binom.cdf(N_success - 1, n=N, p=p_NULL).`,
+  wow:true,
+  banner:'PAUL: p-value 0.0039',
+  hud:{subject:'PAUL', y:'8 / 8', p:'0.0039 · REJECT'},
+  note:'H0: p=0.5 vs HA: p>0.5  ·  p-value = 0.003906' },
+
+{ id:'q5', type:'code', bg:'archive', who:'master', mood:'amused', title:'QUESTION V · THE OTHER ANIMALS',
+  text:`Let <span class="kbd">q</span> be the probability that one random animal predicts the eight
+  results correctly. Assume that A independent animals each make eight random predictions, and let
+  Y_A be the number of animals with a perfect record. Then
+  <span class="kbd">Y_A ~ Binomial(A, q)</span> and <span class="kbd">E(Y_A) = A q</span>.
+  <strong>Compute the number of animals A such that the expected number of perfect records is
+  equal to one.</strong>`,
+  preamble:`q = (1/2)**8`,
+  shown:`q = (1/2)**8   # the probability that one random animal is correct eight times`,
+  starter:`average_animals = ???                # A, so that E(Y_A) = 1\naverage_unsuccessful_animals = average_animals-1   # the ones nobody reports \n\nprint('Average number of animals : ' + f'{average_animals:0.1f}')\nprint('Average number of unsuccessful animals : ' + f'{average_unsuccessful_animals:0.1f}')`,
+  solution:`average_animals = 1/q\naverage_unsuccessful_animals = average_animals - 1\n\nprint('Average number of animals : ' + f'{average_animals:0.1f}')\nprint('Average number of unsuccessful animals : ' + f'{average_unsuccessful_animals:0.1f}')`,
+  checks:[{name:'average_animals', value:256, tol:0.5},
+          {name:'average_unsuccessful_animals', value:255, tol:0.5}],
+  hint:'Set E(Y_A) = A*q equal to one and solve for A, i.e., A = 1/q. The unsuccessful animals are the others.',
+  right:`Among 256 independent random animals, the expected number with eight correct predictions
+  is one. So for every perfect animal there are, on average, <strong>255 animals</strong> that
+  predicted nothing of interest.
+  <span class="fx">We remember Paul. We do not remember Kevin the sardine, who predicted zero
+  matches correctly.</span>
+  Be careful with what this number is. It is an expectation computed over many groups of animals.
+  It does not state that 256 animals were tested in 2010, and it does not state that every group
+  of 256 contains a winner.`,
+  wrongHint:`E(Y_A) = A × q. You want that to equal one, so A = 1/q. Then subtract the one perfect
+  animal.`,
+  widget:'animals',
+  note:'q = 1/256  ·  1/q = 256 animals  ·  255 unreported' },
+
+{ id:'q5b', type:'code', bg:'archive', who:'master', title:'QUESTION V · AN EXPECTATION IS NOT A GUARANTEE',
+  text:`A student states that the probability of observing at least one perfect record among 256
+  random animals is approximately 63.3%.
+  <strong>Use the Binomial distribution to assess whether that statement is correct.</strong>`,
+  preamble:`from scipy import stats\nq = (1/2)**8`,
+  shown:`q = (1/2)**8`,
+  starter:`probability_one_or_more = ???   # P(at least one perfect record among 256 animals)\n\nprint('Probability : ' + f'{probability_one_or_more:0.4f}')`,
+  solution:`probability_one_or_more = 1 - (1-q)**256\n\nprint('Probability : ' + f'{probability_one_or_more:0.4f}')`,
+  checks:[{name:'probability_one_or_more', value:0.632840, tol:0.002}],
+  hint:'Use the complement : at least one is one minus the probability that none of them is perfect, i.e., 1-(1-q)**256. The same number comes from 1 - stats.binom.pmf(0, n=256, p=q).',
+  right:`The student is right, i.e., about <strong>63.3%</strong>.
+  <span class="kbd">P(Y ≥ 1) = 1 − P(Y = 0) = 1 − (1 − q)²⁵⁶ ≈ 0.633</span>
+  Put the two numbers side by side. The <em>expected</em> number of perfect animals is exactly one,
+  and the probability of seeing at least one is only 63%. An expectation is not a guarantee, and it
+  is not a promise about any single group.`,
+  wrongHint:`Do not compute the probability of exactly one. Compute one minus the probability of
+  none, i.e., 1-(1-q)**256.`,
+  note:'P(at least one perfect among 256) = 0.633' },
+
+{ id:'q6', type:'choice', bg:'archive', who:'master', mood:'angry', title:'QUESTION VI · WHO CHOSE THE ANIMAL ?',
+  text:`Consider two situations.
+  <strong>One.</strong> Paul is selected before the tournament and is the only animal making
+  predictions.
+  <strong>Two.</strong> Many animals make predictions, and only the animal with the best result is
+  presented to you.
+  <strong>Is the interpretation of the p-value the same in the two situations ?</strong>`,
+  q:'Choose the effect of the selection on the interpretation.',
+  options:[
+    {id:'a', label:'Yes. Eight correct predictions always have the same interpretation.'},
+    {id:'b', label:'No. Selecting the best animal among many animals changes the interpretation of the result.'},
+    {id:'c', label:'No. A Binomial distribution cannot be used for animals.'},
+    {id:'d', label:'Yes. A p-value lower than 0.05 proves that the animal is psychic.'}
+  ],
+  correct:'b',
+  right:`The probability of a perfect record for one given animal is still 1/256. What changes is
+  how surprised you should be when someone shows you the winner.
+  This is <strong>multiple testing</strong>. We test the same Null hypothesis on many animals and
+  report the most significant result. Even if every animal chooses at random, the probability of
+  rejecting at least one true Null hypothesis grows with the number of tests, i.e., 63% for 256
+  animals, as you have just computed.
+  It is also <strong>survival bias</strong>. The successful animal is visible. The unsuccessful
+  ones are not reported, so they never enter your calculation.
+  <span class="fx">One successful forecasting animal can be the visible part of 255 unsuccessful
+  forecasting animals.</span>`,
+  wrong:{
+    a:`The number is the same. Its interpretation is not. A p-value answers "how surprising is this
+       result under the Null hypothesis ?", and the answer depends on how many attempts were made
+       before this one was shown to you.`,
+    c:`The Binomial distribution counts successes among independent trials with a common
+       probability parameter. It does not ask what species produced them.`,
+    d:`A p-value never proves a mechanism. It measures how unusual the data are under one
+       assumption, and nothing else.`
+  },
+  studentMood:'raised',
+  note:'multiple testing and survival bias change the interpretation' },
+
+{ id:'bridge', type:'info', bg:'trading', who:'master', mood:'raised', title:'THE ACADEMY · SECOND FILE',
+  text:`<span class="fx">He closes the file on the octopus and opens a much thicker one.</span>
+  We used eight zeros and ones to investigate an octopus. Banks use the same mathematics to
+  investigate the models that tell them how much risk they are carrying.
+  A one-day 95% <strong>Value at Risk</strong> is a threshold that the daily loss should exceed with
+  a probability equal to 5%. A day on which the loss exceeds the threshold is called a
+  <strong>violation</strong>.
+  Replace "correct prediction" by "violation", and every formula of the first phase still holds.`,
+  banner:'FILE II: FOUR RISK MODELS',
+  hud:{subject:'—', y:'—', p:'—'},
+  cont:'Open the trading book' },
+
+/* ================= SECOND PHASE — VALUE AT RISK ================= */
+
+{ id:'q7', type:'choice', bg:'trading', who:'master', title:'QUESTION VII · WHAT THE NUMBER MEANS',
+  text:`A model reports a one-day 95% Value at Risk equal to 4.8 million euros.
+  <strong>Identify the correct interpretation.</strong>`,
+  q:'Choose the correct interpretation of the Value at Risk.',
+  options:[
+    {id:'a', label:'The financial loss cannot exceed 4.8 million euros.'},
+    {id:'b', label:'The expected financial loss is equal to 4.8 million euros.'},
+    {id:'c', label:'The financial loss has a probability equal to 5% of exceeding 4.8 million euros.'},
+    {id:'d', label:'Exactly five of the next 100 losses will exceed 4.8 million euros.'}
+  ],
+  correct:'c',
+  right:`A Value at Risk is a <strong>quantile</strong> of the loss distribution, i.e.,
+  <span class="kbd">P(L > VaR) = 0.05</span> when the model is correctly calibrated.
+  It is not the largest possible loss and it is not the expected loss. And note answer D, which is
+  the mistake that this whole exercise is built to correct : a probability equal to 5% does not
+  promise exactly five violations in every hundred days. It promises a <em>frequency</em>, and a
+  frequency fluctuates.`,
+  wrong:{
+    a:`Nothing in a quantile forbids a larger loss. On the contrary, the definition says a larger
+       loss arrives on 5% of the days.`,
+    b:`The expected loss is the average of the whole distribution. The Value at Risk sits far out in
+       its right tail.`,
+    d:`This is the answer we are here to destroy. Five per cent is a probability, not a quota. The
+       number of violations is random, and the next two questions describe exactly how random.`
+  },
+  note:'VaR is a quantile: P(L > VaR) = 0.05' },
+
+{ id:'q8a', type:'code', bg:'trading', who:'master', title:'QUESTION VIII · BUILDING THE VIOLATIONS',
+  text:`The trading book contains 500 daily losses and the one-day 95% Value at Risk forecasts of
+  four models, in millions of euros. It is a simulated portfolio, and the forecasts are given : you
+  do not estimate them here.
+  <strong>Create a new variable called 'violation_compass' that is equal to 1 if the loss is higher
+  than the forecast of Model COMPASS, and 0 otherwise.</strong>`,
+  preamble:`import numpy as np\nfrom scipy import stats\ndata = _build_data()`,
+  shown:`data = _build_data()   # 500 trading days, already loaded\n# columns: 'day', 'loss', 'VaR_compass', 'VaR_paper_shield', 'VaR_bunker', 'VaR_storm'`,
+  starter:`data['violation_compass'] = ???   # 1 when the loss exceeds the forecast of COMPASS\n\nhead(data)\nprint('Number of violations : ' + str(int(data['violation_compass'].sum())))`,
+  solution:`data['violation_compass'] = (data['loss'] > data['VaR_compass']).astype(int)\n\nhead(data)\nprint('Number of violations : ' + str(int(data['violation_compass'].sum())))`,
+  checks:[{name:'violations', expr:"data['violation_compass'].sum()", value:25, tol:0.5, strict:true}],
+  hint:`Compare the two columns and convert the answer to whole numbers: (data['loss'] > data['VaR_compass']).astype(int).`,
+  right:`Twenty-five violations in 500 days. The comparison produced True and False, and
+  <span class="kbd">.astype(int)</span> turned them into ones and zeros, i.e., into the same
+  Bernoulli variable you built for the octopus.
+  Each day t gives you one realization of <span class="kbd">X_t</span>, which equals 1 when the loss
+  exceeds the forecast. Eight football matches have become five hundred trading days, and nothing
+  else has changed.`,
+  wrongHint:`A violation is a loss higher than the forecast, i.e., data['loss'] > data['VaR_compass'].
+  Add .astype(int) to turn True and False into 1 and 0.`,
+  banner:'COMPASS: 25 VIOLATIONS / 500',
+  hud:{subject:'COMPASS', y:'25 / 500', p:'—'},
+  note:"violation = 1 when loss > VaR  ·  COMPASS has 25" },
+
+{ id:'q8b', type:'code', bg:'trading', who:'master', title:'QUESTION VIII · DESCRIBING THEM',
+  text:`<strong>Compute the average and the empirical variance of the 'violation_compass'
+  variable.</strong>`,
+  preamble:`import numpy as np\ndata = _build_data()\ndata['violation_compass'] = (data['loss'] > data['VaR_compass']).astype(int)`,
+  shown:`data['violation_compass']   # the variable you have just built, still loaded`,
+  starter:`average_violation = ???    # the observed frequency\nvariance_violation = ???   # the empirical variance\n\nprint('Average : ' + f'{average_violation:0.3f}')\nprint('Empirical variance : ' + f'{variance_violation:0.3f}')`,
+  solution:`average_violation = data['violation_compass'].mean()\nvariance_violation = data['violation_compass'].var(ddof=1)\n\nprint('Average : ' + f'{average_violation:0.3f}')\nprint('Empirical variance : ' + f'{variance_violation:0.3f}')`,
+  checks:[{name:'average_violation', value:0.05, tol:0.0005},
+          {name:'variance_violation', value:0.047595, tol:0.0006}],
+  hint:'.mean() for the average, and .var(ddof=1) for the empirical variance.',
+  right:`The average of a sequence of zeros and ones is the <strong>observed frequency</strong>,
+  i.e., 25/500 = 0.05. Model COMPASS violates its own threshold on exactly 5% of the days, which is
+  exactly what it promised.
+  So COMPASS is a good model. <span class="fx">He says this in a tone that suggests otherwise.</span>
+  Keep the number. In four questions it will come back wearing a different hat.`,
+  wrongHint:`The average is .mean(). The empirical variance uses the n−1 convention, i.e.,
+  .var(ddof=1).`,
+  note:'COMPASS frequency = 0.050  ·  empirical variance = 0.048' },
+
+{ id:'q9a', type:'choice', bg:'trading', who:'master', title:'QUESTION IX · THE COUNT',
+  text:`We define <span class="kbd">Y</span> as the number of violations during the 500 days. Assume
+  that the model is correctly calibrated and that the daily violations are independent.
+  <strong>Identify the distribution of Y.</strong>`,
+  q:'Choose the distribution of the number of violations.',
+  options:[
+    {id:'a', label:'A Bernoulli distribution with probability parameter p = 0.05.'},
+    {id:'b', label:'A Binomial distribution with parameters N = 500 and p = 0.05.'},
+    {id:'c', label:'A Binomial distribution with parameters N = 100 and p = 0.95.'},
+    {id:'d', label:'A Normal distribution with expectation 0.05.'}
+  ],
+  correct:'b',
+  right:`Each day gives a Bernoulli variable with probability parameter p = 0.05 under the Null
+  hypothesis, and the sum of 500 of them is
+  <span class="kbd">Y = X_1 + … + X_500 ~ Binomial(500, 0.05)</span>
+  It is the octopus again, with N = 500 instead of 8 and p = 0.05 instead of 0.5. One distribution,
+  two applications, and the second one decides how much capital a bank must hold.`,
+  wrong:{
+    a:`One <em>day</em> is a Bernoulli variable. The count over 500 days is their sum.`,
+    c:`N is the number of days, i.e., 500, and p is the probability of a violation, i.e., 0.05.
+       You have written the number of days as 100 and used the probability of <em>no</em> violation.`,
+    d:`0.05 is the probability parameter, not the expected count. And Y counts, so it takes whole
+       values.`
+  },
+  note:'Y ~ Binomial(N=500, p=0.05)' },
+
+{ id:'q9b', type:'code', bg:'trading', who:'master', title:'QUESTION IX · WHAT TO EXPECT',
+  text:`<strong>Compute E(Y) and V(Y) </strong> (i.e., the expectation and the variance of the binomial distribution). The last line is given : it computes the probability
+  of observing exactly 25 violations.`,
+  preamble:`from scipy import stats\nN = 500\np = 0.05`,
+  shown:`N = 500\np = 0.05`,
+  starter:`expectation_Y = ???   # E(Y)\nvariance_Y = ???      # V(Y)\n\nprobability_25 = stats.binom.pmf(25, n=N, p=p)   # given\n\nprint('Expectation : ' + f'{expectation_Y:0.3f}')\nprint('Variance : ' + f'{variance_Y:0.3f}')\nprint('P(Y = 25) : ' + f'{probability_25:0.3f}')`,
+  solution:`expectation_Y = N * p\nvariance_Y = N * p * (1-p)\n\nprobability_25 = stats.binom.pmf(25, n=N, p=p)   # given\n\nprint('Expectation : ' + f'{expectation_Y:0.3f}')\nprint('Variance : ' + f'{variance_Y:0.3f}')\nprint('P(Y = 25) : ' + f'{probability_25:0.3f}')`,
+  checks:[{name:'expectation_Y', value:25, tol:0.05},
+          {name:'variance_Y', value:23.75, tol:0.05}],
+  hint:'The same two formulas as for the octopus : E(Y) = Np and V(Y) = Np(1-p).',
+  right:`Twenty-five expected violations, and a variance of 23.75.
+  Now look at the third number, the one I gave you. The probability of observing
+  <em>exactly</em> 25 violations is <strong>0.082</strong>. Only eight correctly calibrated models
+  out of a hundred land on the expected count. The other ninety-two do not, and they are not broken.
+  This is why a backtest cannot ask "did we get 25 ?". It has to ask a different question, i.e.,
+  <strong>is this count too far from 25 to be an accident ?</strong> That question has a name, and
+  you already computed one for an octopus.`,
+  wrongHint:`E(Y) = N × p, and V(Y) = N × p × (1 − p).`,
+  wow:true,
+  note:'E(Y) = 25  ·  V(Y) = 23.75  ·  P(Y = 25) = 0.082' },
+
+{ id:'q10', type:'code', bg:'trading', who:'master', mood:'angry', title:'QUESTION X · TOO MANY VIOLATIONS',
+  text:`<strong>Model PAPER SHIELD</strong> has 36 violations among the 500 days. We test whether it
+  underestimates financial risk :
+  <span class="kbd">H0 : p = 0.05   versus   HA : p > 0.05</span>
+  <strong>Compute the observed frequency and the p-value.</strong>`,
+  preamble:`from scipy import stats\nN_violation = 36\nN = 500\np_NULL = 0.05`,
+  shown:`N_violation = 36\nN = 500\np_NULL = 0.05`,
+  starter:`frequency = ???   # the observed frequency of violations\np_val = ???       # the p-value of the test above\n\nprint('Frequency : ' + f'{frequency:0.3f}')\nprint('P-value : ' + f'{p_val:0.4f}')`,
+  solution:`frequency = N_violation / N\np_val = 1 - stats.binom.cdf(N_violation-1, n=N, p=p_NULL)\n\nprint('Frequency : ' + f'{frequency:0.3f}')\nprint('P-value : ' + f'{p_val:0.4f}')`,
+  checks:[{name:'frequency', value:0.072, tol:0.0005},
+          {name:'p_val', value:0.019643, tol:0.0004}],
+  hint:`The alternative is p > 0.05, so you need the upper tail P(Y >= 36), i.e., 1 - stats.binom.cdf(N_violation - 1, n=N, p=p_NULL). The exact test stats.binomtest(N_violation, n=N, p=p_NULL, alternative="greater").pvalue gives the same number.`,
+  right:`The observed frequency is <strong>7.2%</strong> against a promised 5%, and the p-value is
+  <strong>0.0196</strong>. It is lower than 0.05, so we reject the Null hypothesis at a 95%
+  confidence level.
+  Model PAPER SHIELD underestimates financial risk. Eleven violations more than expected does not
+  look dramatic on a page. It is the difference between a threshold that is exceeded once a month
+  and one that is exceeded every three weeks, on the days when the bank can least afford it.`,
+  wrongHint:`The upper tail is P(Y >= 36), which is 1 - stats.binom.cdf(N_violation - 1, n=N,
+  p=p_NULL). Watch the −1 : it keeps the value 36 inside the tail.`,
+  widget:'binom36',
+  banner:'PAPER SHIELD: REJECTED',
+  hud:{subject:'PAPER SHIELD', y:'36 / 500', p:'0.0196 · REJECT'},
+  note:'PAPER SHIELD: 36 violations, freq 0.072, p = 0.0196, rejected' },
+
+{ id:'q11', type:'code', bg:'trading', who:'master', title:'QUESTION XI · TOO FEW VIOLATIONS',
+  text:`<strong>Model BUNKER</strong> has 15 violations among the 500 days. We test whether it
+  overestimates financial risk :
+  <span class="kbd">H0 : p = 0.05   versus   HA : p &lt; 0.05</span>
+  <strong>Compute the observed frequency and the p-value.</strong>`,
+  preamble:`from scipy import stats\nN_violation = 15\nN = 500\np_NULL = 0.05`,
+  shown:`N_violation = 15\nN = 500\np_NULL = 0.05`,
+  starter:`frequency = ???   # the observed frequency of violations\np_val = ???       # the p-value of the test above\n\nprint('Frequency : ' + f'{frequency:0.3f}')\nprint('P-value : ' + f'{p_val:0.4f}')`,
+  solution:`frequency = N_violation / N\np_val = stats.binom.cdf(N_violation, n=N, p=p_NULL)\n\nprint('Frequency : ' + f'{frequency:0.3f}')\nprint('P-value : ' + f'{p_val:0.4f}')`,
+  checks:[{name:'frequency', value:0.03, tol:0.0005},
+          {name:'p_val', value:0.019858, tol:0.0004}],
+  hint:`The alternative is p < 0.05, so you need the lower tail P(Y <= 15), i.e., stats.binom.cdf(N_violation, n=N, p=p_NULL). Here there is no −1, because 15 belongs to the lower tail already.`,
+  right:`<strong>The financial risk model with the fewest violations is rejected.</strong>
+  <span class="fx">He enjoys this one.</span>
+  The frequency is 3% against a promised 5%, and the p-value is <strong>0.0199</strong>. We reject
+  the Null hypothesis. Model BUNKER is too cautious : it reports Value at Risk forecasts that are
+  too high.
+  A student always asks why that is a problem, and it is a fair question. Capital held against a
+  risk that is not there is capital that earns nothing. A model that says "danger" every day is as
+  useless as one that never does, and it is expensive.
+  Note the small change in the code. For the upper tail you wrote N_violation − 1, and here you did
+  not. The −1 keeps the observed value inside the tail you are measuring.`,
+  wrongHint:`The lower tail is P(Y <= 15), i.e., stats.binom.cdf(N_violation, n=N, p=p_NULL),
+  with no −1 this time.`,
+  widget:'binom15',
+  wow:true,
+  banner:'BUNKER: REJECTED',
+  hud:{subject:'BUNKER', y:'15 / 500', p:'0.0199 · REJECT'},
+  note:'BUNKER: 15 violations, freq 0.030, p = 0.0199, rejected' },
+
+{ id:'q12', type:'code', bg:'trading', who:'master', title:'QUESTION XII · BOTH DIRECTIONS AT ONCE',
+  text:`So far we chose the direction after seeing the data, which is a habit worth losing. We now
+  test whether the probability parameter differs from 5% in <em>either</em> direction :
+  <span class="kbd">H0 : p = 0.05   versus   HA : p ≠ 0.05</span>
+  Under the Null hypothesis, the expected count is 25. PAPER SHIELD has 36 violations, i.e., 11
+  more than expected. For this Binomial distribution, counts at least as unlikely as 36 are in the
+  two disjoint tails <span class="kbd">Y ≤ 14</span> and <span class="kbd">Y ≥ 36</span>. The exact
+  two-sided p-value is the sum of the probabilities in those tails.
+  <strong>Compute the expected count, the deviation, both tails, and their sum.</strong>`,
+  preamble:`from scipy import stats\nN = 500\np_NULL = 0.05\nN_violation = 36`,
+  shown:`N = 500\np_NULL = 0.05\nN_violation = 36`,
+  starter:`N_expected = ???                         # expected count under H0\ndeviation = ???                          # distance from the expected count\np_lower = ???                            # P(Y <= 14)\np_upper = ???                            # P(Y >= 36)\np_val = p_lower + p_upper                # exact two-sided p-value\n\nprint('Expected count : ' + f'{N_expected:0.0f}')\nprint('Deviation : ' + f'{deviation:0.0f}')\nprint('Lower tail : ' + f'{p_lower:0.4f}')\nprint('Upper tail : ' + f'{p_upper:0.4f}')\nprint('Two-sided p-value : ' + f'{p_val:0.4f}')`,
+  solution:`N_expected = N * p_NULL\ndeviation = N_violation - N_expected\np_lower = stats.binom.cdf(N_expected-deviation, n=N, p=p_NULL)\np_upper = 1 - stats.binom.cdf(N_violation-1, n=N, p=p_NULL)\np_val = p_lower + p_upper\n\nprint('Expected count : ' + f'{N_expected:0.0f}')\nprint('Deviation : ' + f'{deviation:0.0f}')\nprint('Lower tail : ' + f'{p_lower:0.4f}')\nprint('Upper tail : ' + f'{p_upper:0.4f}')\nprint('Two-sided p-value : ' + f'{p_val:0.4f}')`,
+  checks:[{name:'N_expected', value:25, tol:0.05},
+          {name:'deviation', value:11, tol:0.05},
+          {name:'p_lower', value:0.010812, tol:0.0004},
+          {name:'p_upper', value:0.019643, tol:0.0004},
+          {name:'p_val', value:0.030455, tol:0.0008}],
+  hint:`First compute N_expected = N*p_NULL and deviation = N_violation-N_expected. The equally
+  distant lower endpoint is N_expected-deviation, i.e., 14. Then compute P(Y <= 14), P(Y >= 36),
+  and add the two probabilities.`,
+  right:`The expected count is 25 and the observed count is 11 above it. The lower tail
+  <span class="kbd">P(Y ≤ 14)</span> is 0.0108 and the upper tail
+  <span class="kbd">P(Y ≥ 36)</span> is 0.0196. Their sum is <strong>0.0305</strong>.
+  This is the exact two-sided p-value returned by
+  <span class="kbd">stats.binomtest(36, n=500, p=0.05).pvalue</span>. It is below 0.05, so PAPER
+  SHIELD is rejected without choosing the direction after seeing the data.`,
+  wrongHint:`The expected count is N*p_NULL = 25 and the deviation is 36-25 = 11. Reflect that
+  distance below 25 to obtain 14. The tails are stats.binom.cdf(14, n=N, p=p_NULL) and
+  1-stats.binom.cdf(35, n=N, p=p_NULL); the exact p-value is their sum.`,
+  hud:{subject:'PAPER SHIELD', y:'36 / 500', p:'0.0305 · REJECT'},
+  note:'exact two-sided: P(Y <= 14) + P(Y >= 36) = 0.0305' },
+
+{ id:'q13', type:'code', bg:'trading', who:'master', mood:'raised', title:'QUESTION XIII · THE SILENT ALARM',
+  text:`One model is left. <strong>Model STORM</strong> also has 25 violations among the 500 days,
+  exactly like COMPASS. But its 25 violations arrive on 25 <em>consecutive</em> days.
+  <strong>Compute the two-sided p-value for Model STORM.</strong>`,
+  preamble:`from scipy import stats\nN = 500\np_NULL = 0.05\nN_violation = 25`,
+  shown:`N_violation = 25   # Model STORM\nN = 500\np_NULL = 0.05`,
+  starter:`p_val = ???   # exact two-sided Binomial test\n\nprint('P-value : ' + f'{p_val:0.4f}')`,
+  solution:`p_val = stats.binomtest(N_violation, n=N, p=p_NULL, alternative='two-sided').pvalue\n\nprint('P-value : ' + f'{p_val:0.4f}')`,
+  checks:[{name:'p_val', value:1.0, tol:0.005}],
+  hint:`Use stats.binomtest(N_violation, n=N, p=p_NULL, alternative='two-sided').pvalue. The
+  function identifies and sums all outcomes at least as unlikely under H0 as the observed one.`,
+  right:`<strong>1.000</strong>, i.e., exactly the p-value of COMPASS. The test cannot tell the two
+  models apart, because it only ever saw one number : 25.
+  Look at the two rows above. COMPASS is violated on scattered days. STORM is violated on 25
+  consecutive days, i.e., it kept reporting the same comfortable threshold through an entire month
+  of losses without once raising it. Its frequency is perfect. Its behaviour is indefensible.
+  <span class="fx">The Binomial test can count the violations. It cannot read the calendar.</span>
+  The exact Binomial test assesses the <strong>unconditional frequency</strong> of the violations.
+  It says nothing about their independence, nothing about their order, and nothing about how much
+  money was lost beyond the threshold on those 25 days.`,
+  wrongHint:`Use stats.binomtest with N_violation, n=N, p=p_NULL and alternative='two-sided', then
+  extract its .pvalue.`,
+  widget:'timeline',
+  wow:true,
+  banner:'STORM: NOT REJECTED',
+  hud:{subject:'STORM', y:'25 / 500', p:'1.000 · PASSES'},
+  note:'STORM: 25 consecutive violations, p = 1.000, not rejected' },
+
+{ id:'verdict', type:'multi', bg:'trading', who:'master', mood:'angry', title:'THE VERDICT · WHAT THE TEST DID',
+  text:`Before I let you out, state what you have actually established.
+  <strong>Select every correct statement.</strong>`,
+  q:'Tick every statement that is correct, then submit.',
+  options:[
+    {id:'a', label:'A p-value higher than 0.05 proves that the Value at Risk model is correct.'},
+    {id:'b', label:'The exact Binomial test assesses whether the observed frequency is consistent with the theoretical probability parameter.'},
+    {id:'c', label:'A model can be rejected because it has too many or too few violations.'},
+    {id:'d', label:'Two models with the same number of violations receive the same p-value, even if the violations occur at different dates.'},
+    {id:'e', label:'The exact Binomial test measures the magnitude of the losses beyond the Value at Risk.'}
+  ],
+  correct:['b','c','d'],
+  right:`B, C and D.
+  A is the mistake of the whole afternoon : failing to reject is not proof of correctness. E is
+  what the test never looked at, i.e., the size of the losses beyond the threshold.
+  You turned every football prediction and every trading day into a Bernoulli variable, you summed
+  them into a Binomial distribution, and you tested a theoretical probability parameter with an
+  exact Binomial test. That is the entire session, and it fits on one line of Python.`,
+  wrongHint:`Read them again. One statement claims that a large p-value proves a model correct, and
+  one claims that the test looks at the size of the losses. Neither is something you have done
+  today.`,
+  note:'the test judges frequency, not timing and not magnitude' },
+
+{ id:'close', type:'info', bg:'trading', who:'master', title:'THE ACADEMY · DISMISSAL',
+  text:`Two files, one distribution.
+  For the octopus, the count was surprising and the p-value was small, and it still proved nothing
+  about the octopus, because the animals we never saw were not in the calculation.
+  For the trading book, the frequency test rejected the model with too many violations, rejected the
+  model with too few, and passed a model that stayed silent through a month of losses.
+  So do not report that the risk models are correct. Report that
+  <em>their unconditional frequency of violations is not rejected</em>, and then go and test what
+  this test could not see, i.e., whether one violation makes the next one more likely.
+  <span class="fx">A model can pass the frequency test and still fail to adjust to a change in
+  volatility.</span>`,
+  banner:'FREQUENCY TESTED. CALENDAR NOT.',
+  cont:'Collect the password',
+  final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudSubject:$('#hud-subject'), hudY:$('#hud-y'), hudP:$('#hud-p'), hud:$('#hud'),
+  doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+/* the expression a character wears until something changes it */
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  const n = node(who);
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const node = who==='student' ? el.student : el.master;
+  stopFlap();
+  let f=0;
+  flap = { node, id:setInterval(()=>{
+    node.classList.remove('talk-1','talk-2');
+    node.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(node, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  node.innerHTML = html;
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0, count=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  node.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  el.note.innerHTML = notes.map(n=>'▸ '+n).join('<br>');
+}
+
+/* ---- HUD ---- */
+function setHUD(h){
+  if(!h) return;
+  if(h.subject!==undefined) el.hudSubject.textContent = h.subject;
+  if(h.y!==undefined)       el.hudY.textContent       = h.y;
+  if(h.p!==undefined){
+    el.hudP.textContent = h.p;
+    el.hudP.classList.toggle('broken', String(h.p).indexOf('REJECT')>=0);
+  }
+}
+/* the HUD as it stood at step i: the latest one declared at or before it */
+function hudAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].hud) return STEPS[k].hud; }
+  return {subject:'—', y:'—', p:'—'};
+}
+/* the same for the strip under the HUD */
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+function glitchHUD(){
+  el.hud.classList.add('glitching');
+  setTimeout(()=>el.hud.classList.remove('glitching'), 1100);
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.trading;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS
+
+   Four pictures. The chart of question X and XI is a column chart of a
+   discrete distribution, so: recessive body, one emphasised tail, the
+   observed count marked and directly labelled, a solid hairline axis, no
+   number on every bar, and a viewBox tall enough to hold the axis band
+   and the tail label underneath it. Identity is never carried by colour
+   alone - the tail is labelled and bracketed, and the observed count has
+   its own rule and caption.
+   ================================================================ */
+const CHART = {
+  ink:'#c9c9e4', muted:'#8b8bb5', axis:'#5b5b86', surface:'#0c0c18',
+  body:'#6f7fb5',        /* the distribution, recessive          */
+  tail:'#e0453a',        /* the evidence against H0, emphasised  */
+  mark:'#ffb000'         /* the observed count                   */
+};
+
+/* the Binomial probability mass function, by the stable recurrence */
+function binomPmf(n, p){
+  const q = 1-p, f = new Array(n+1);
+  f[0] = Math.pow(q, n);
+  for(let k=1; k<=n; k++) f[k] = f[k-1]*(n-k+1)/k*(p/q);
+  return f;
+}
+
+/* ---- eight predictions, revealed one by one ---- */
+function playPredictions(host){
+  const W=700, H=132, n=8, slot=76, x0=(W-n*slot)/2 + 8;
+  let boxes='';
+  for(let i=0;i<n;i++){
+    const x = x0 + i*slot;
+    boxes += `<g class="pred" opacity="0">
+      <rect x="${x}" y="34" width="58" height="58" fill="#12321f" stroke="${CHART.mark}" stroke-width="2"/>
+      <path d="M${x+16} 63 l 10 12 l 18 -24" stroke="#2fe07a" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="${x+29}" y="112" fill="${CHART.muted}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${i+1}</text>
+    </g>`;
+  }
+  host.innerHTML = `<div class="win95"><div class="titlebar"><span>EVIDENCE · THE RECORD OF PAUL</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${CHART.surface}">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+        <rect width="${W}" height="${H}" fill="${CHART.surface}"/>
+        <text x="20" y="22" fill="${CHART.muted}" font-size="16" font-family="VT323,monospace">eight matches, eight correct predictions</text>
+        ${boxes}
+      </svg></div></div>`;
+  const g = host.querySelectorAll('.pred');
+  g.forEach((node,i)=>setTimeout(()=>node.setAttribute('opacity','1'), 220 + i*180));
+  return 220 + n*180 + 400;
+}
+
+/* ---- 256 animals, one of them perfect ---- */
+function playAnimals(host){
+  const W=700, H=250, cols=16, rows=16, cell=13, gap=4;
+  const gw = cols*(cell+gap)-gap, x0=(W-gw)/2, y0=44;
+  const lucky = 6*cols + 9;                       // one dot, somewhere in the middle
+  let dots='';
+  for(let i=0;i<cols*rows;i++){
+    const x = x0 + (i%cols)*(cell+gap), y = y0 + Math.floor(i/cols)*(cell+gap);
+    const on = (i===lucky);
+    dots += `<rect class="${on?'lucky':'dud'}" x="${x}" y="${y}" width="${cell}" height="${cell}"
+      fill="${on?CHART.mark:'#252542'}" stroke="${on?'#fff0c2':'#32325a'}" stroke-width="${on?2:1}" opacity="${on?0:1}"/>`;
+  }
+  host.innerHTML = `<div class="win95"><div class="titlebar"><span>ARCHIVE · THE FORECASTING ANIMALS</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${CHART.surface}">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+        <rect width="${W}" height="${H}" fill="${CHART.surface}"/>
+        <text x="${x0}" y="26" fill="${CHART.muted}" font-size="17" font-family="VT323,monospace">256 animals predicting at random</text>
+        ${dots}
+        <text id="anlab" x="${x0}" y="${H-14}" fill="${CHART.mark}" font-size="17" font-family="VT323,monospace" opacity="0">one perfect record  ·  255 nobody reports</text>
+      </svg></div></div>`;
+  const l = host.querySelector('.lucky'), lab = host.querySelector('#anlab');
+  setTimeout(()=>{ if(l) l.setAttribute('opacity','1'); if(lab) lab.setAttribute('opacity','1'); }, 900);
+  return 1600;
+}
+
+/* ---- Binomial(500, 0.05) with one tail emphasised ---- */
+function binomChartSVG(kObs, side){
+  /* Vertical plan, so that nothing collides and the axis band is inside
+     the box: title 20 · marker label 32 · bars 48-176 · ticks 196 ·
+     axis title 216 · legend 240 · height 254. The tail is labelled inside
+     the plot, just above its own bars, where there is nothing else.     */
+  const N=500, P=0.05, kLo=8, kHi=45, nb=kHi-kLo+1;
+  const W=700, H=254, x0=54, x1=684, yTop=48, yBase=176;
+  const f = binomPmf(N, P);
+  let fmax=0; for(let k=kLo;k<=kHi;k++) fmax = Math.max(fmax, f[k]);
+  const slot=(x1-x0)/nb, bw=slot-3;               // a 3px surface gap between bars
+  const bx = k => x0 + (k-kLo)*slot;
+  const by = v => yBase - (v/fmax)*(yBase-yTop);
+  const inTail = k => side==='upper' ? (k>=kObs) : (k<=kObs);
+
+  let bars='', tailP=0, first=null, last=null;
+  for(let k=kLo;k<=kHi;k++){
+    const t=inTail(k), h=Math.max(1, yBase-by(f[k]));
+    if(t){ tailP+=f[k]; if(first===null) first=k; last=k; }
+    bars += `<rect x="${bx(k).toFixed(1)}" y="${(yBase-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}"
+      fill="${t?CHART.tail:CHART.body}" rx="1"><title>Y = ${k} : P = ${f[k].toFixed(4)}</title></rect>`;
+  }
+  // the tail continues past the drawn range, so report the true tail total
+  tailP = side==='upper' ? f.slice(kObs).reduce((a,b)=>a+b,0)
+                         : f.slice(0,kObs+1).reduce((a,b)=>a+b,0);
+  let ticks='';
+  for(let k=10;k<=45;k+=5){
+    ticks += `<text x="${(bx(k)+bw/2).toFixed(1)}" y="196" fill="${CHART.muted}" font-size="15"
+      text-anchor="middle" font-family="VT323,monospace">${k}</text>`;
+  }
+  const bl=bx(side==='upper'?first:kLo), br=bx(side==='upper'?kHi:last)+bw;
+  const mx=bx(kObs)+bw/2;
+  const tailTxt = side==='upper' ? `P(Y &#8805; ${kObs}) = ${tailP.toFixed(4)}`
+                                 : `P(Y &#8804; ${kObs}) = ${tailP.toFixed(4)}`;
+  const bry=yBase-26, lblx=Math.max(x0+70, Math.min(x1-70, (bl+br)/2));
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${CHART.surface}"/>
+    <text x="${x0}" y="20" fill="${CHART.ink}" font-size="17" font-family="VT323,monospace">Y ~ Binomial(500, 0.05)  ·  what a correctly calibrated model produces</text>
+    ${bars}
+    <line x1="${x0}" y1="${yBase}" x2="${x1}" y2="${yBase}" stroke="${CHART.axis}" stroke-width="1"/>
+    ${ticks}
+    <line x1="${mx}" y1="${yBase}" x2="${mx}" y2="${yTop-10}" stroke="${CHART.mark}" stroke-width="2"/>
+    <path d="M${mx-5} ${yTop-10} L${mx+5} ${yTop-10} L${mx} ${yTop-3} Z" fill="${CHART.mark}"/>
+    <text x="${mx + (kObs>26?-9:9)}" y="${yTop-14}" fill="${CHART.mark}" font-size="16"
+      text-anchor="${kObs>26?'end':'start'}" font-family="VT323,monospace">${kObs} observed</text>
+    <line x1="${bl}" y1="${bry}" x2="${br}" y2="${bry}" stroke="${CHART.tail}" stroke-width="1"/>
+    <line x1="${bl}" y1="${bry}" x2="${bl}" y2="${bry+6}" stroke="${CHART.tail}" stroke-width="1"/>
+    <line x1="${br}" y1="${bry}" x2="${br}" y2="${bry+6}" stroke="${CHART.tail}" stroke-width="1"/>
+    <text x="${lblx.toFixed(1)}" y="${bry-8}" fill="${CHART.tail}" font-size="16" text-anchor="middle"
+      font-family="VT323,monospace">${tailTxt}</text>
+    <text x="${W/2}" y="216" fill="${CHART.muted}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace">number of violations in 500 days</text>
+    <rect x="${x0}" y="230" width="11" height="11" fill="${CHART.body}"/>
+    <text x="${x0+17}" y="240" fill="${CHART.muted}" font-size="15" font-family="VT323,monospace">counts a calibrated model produces</text>
+    <rect x="${x0+310}" y="230" width="11" height="11" fill="${CHART.tail}"/>
+    <text x="${x0+327}" y="240" fill="${CHART.muted}" font-size="15" font-family="VT323,monospace">the tail, i.e., the p-value</text>
+  </svg>`;
+}
+function playBinom(host, kObs, side){
+  host.innerHTML = `<div class="win95"><div class="titlebar"><span>EVIDENCE · THE EXACT BINOMIAL TEST</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${CHART.surface}">${binomChartSVG(kObs, side)}</div></div>`;
+  return 900;
+}
+
+/* ---- the two violation calendars ---- */
+function playTimeline(host){
+  const W=700, H=196, x0=96, x1=684, N=500;
+  const px = d => x0 + (d-1)/N*(x1-x0);
+  let compass=null, storm=null;
+  if(Py.state==='ready'){
+    Py.run("_tl = _build_data()");
+    compass = Py.list("(np.flatnonzero(_tl['loss'] > _tl['VaR_compass']) + 1)");
+    storm   = Py.list("(np.flatnonzero(_tl['loss'] > _tl['VaR_storm']) + 1)");
+  }
+  if(!compass || compass.length===0){        // Python unavailable: draw the shape
+    compass = []; for(let i=0;i<25;i++) compass.push(9 + Math.round(i*19.6) + (i*7)%11);
+  }
+  if(!storm || storm.length===0){ storm = []; for(let i=0;i<25;i++) storm.push(201+i); }
+  const row = (days, y, colour) => days.map(d =>
+    `<rect x="${px(d).toFixed(1)}" y="${y}" width="2.4" height="26" fill="${colour}"/>`).join('');
+  host.innerHTML = `<div class="win95"><div class="titlebar"><span>EVIDENCE · WHEN THE VIOLATIONS HAPPENED</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${CHART.surface}">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+      <rect width="${W}" height="${H}" fill="${CHART.surface}"/>
+      <text x="14" y="22" fill="${CHART.ink}" font-size="17" font-family="VT323,monospace">500 trading days  ·  25 violations each</text>
+
+      <text x="14" y="62" fill="${CHART.muted}" font-size="16" font-family="VT323,monospace">COMPASS</text>
+      <rect x="${x0}" y="44" width="${x1-x0}" height="26" fill="#171730"/>
+      ${row(compass, 44, CHART.body)}
+      <text x="${x0}" y="88" fill="${CHART.muted}" font-size="15" font-family="VT323,monospace">scattered over the sample</text>
+
+      <text x="14" y="130" fill="${CHART.muted}" font-size="16" font-family="VT323,monospace">STORM</text>
+      <rect x="${x0}" y="112" width="${x1-x0}" height="26" fill="#171730"/>
+      ${row(storm, 112, CHART.tail)}
+      <text x="${x0}" y="156" fill="${CHART.tail}" font-size="15" font-family="VT323,monospace">25 consecutive days, one silent alarm</text>
+
+      <line x1="${x0}" y1="172" x2="${x1}" y2="172" stroke="${CHART.axis}" stroke-width="1"/>
+      <text x="${x0}" y="190" fill="${CHART.muted}" font-size="15" font-family="VT323,monospace">day 1</text>
+      <text x="${x1}" y="190" fill="${CHART.muted}" font-size="15" text-anchor="end" font-family="VT323,monospace">day 500</text>
+      <text x="${(x0+x1)/2}" y="190" fill="${CHART.muted}" font-size="15" text-anchor="middle" font-family="VT323,monospace">the same p-value, 1.000, for both rows</text>
+    </svg></div></div>`;
+  return 1200;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='predictions') return playPredictions(host);
+  if(name==='animals')     return playAnimals(host);
+  if(name==='binom36')     return playBinom(host, 36, 'upper');
+  if(name==='binom15')     return playBinom(host, 15, 'lower');
+  if(name==='timeline')    return playTimeline(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.glitch) glitchHUD();
+    buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'code':    return zoneCode(s);
+    case 'reflect': return zoneReflect(s);
+  }
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{
+    if(s.after){
+      el.zone.innerHTML='';
+      typeInto(el.dlg, s.after, 'master', ()=> contButton('Continue', next));
+    } else if(s.final){ finish(); }
+    else next();
+  });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='4px'; el.zone.appendChild(helpRow);
+  let fails=0;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+
+  const mySeq = seq;
+  function advance(givenAway){
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);
+    helpRow.innerHTML='';
+    addNote(s.note);
+    // the label is kept as HTML, so that a hat or a bar survives the echo
+    const label = s.options.find(o=>o.id===s.correct).label;
+    // the apprentice says the answer, then the master replies
+    setSpeaker('student');
+    const line = givenAway ? `<em>“…the answer was : ${label}.”</em>` : `<em>“${label}”</em>`;
+    typeInto(el.dlg, line, 'student', ()=>{
+      setTimeout(()=>{
+        if(mySeq!==seq) return;
+        setSpeaker('master');
+        if(s.wow) reactTo('wow');
+        typeInto(el.dlg, s.right, 'master', ()=>{ contButton('Continue', next); });
+      }, 260);
+    });
+    el.zone.innerHTML='';
+  }
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE ANSWER';
+    b.onclick=()=>{
+      const good = box.querySelector(`[data-oid="${s.correct}"]`);
+      if(good) good.classList.add('given');
+      setTimeout(()=>{ if(mySeq===seq) advance(true); }, 500);
+    };
+    helpRow.appendChild(b);
+  }
+
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      advance(false);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      const w = (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.';
+      clearVerdict();
+      verdict('no', w);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+        offerSolution();
+        verdict('give','Two attempts. You may take the answer and keep going — the reasoning matters more than the guess.');
+      }
+      el.zone.appendChild(helpRow);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const row=document.createElement('div'); row.style.cssText='margin-top:6px;display:flex;gap:8px;flex-wrap:wrap';
+  el.zone.appendChild(row);
+  const mySeq = seq;
+  let fails=0;
+
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; row.appendChild(submit);
+
+  function advance(givenAway){
+    inputs().forEach(b=>b.disabled=true);
+    box.querySelectorAll('label').forEach(l=>{
+      if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add(givenAway?'given':'right');
+    });
+    addNote(s.note);
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{
+      if(mySeq!==seq) return;
+      el.zone.innerHTML='';
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }, 700);
+  }
+  function offerSolution(){
+    if(row.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      inputs().forEach(b=>{ b.checked = s.correct.indexOf(b.value)>=0; });
+      advance(true);
+    };
+    row.appendChild(g);
+  }
+
+  submit.onclick=()=>{
+    if(chosen() === wanted){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    clearVerdict();
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer and keep going — what the test can and cannot see matters more than the ticking.');
+    }
+    el.zone.appendChild(row);
+  };
+}
+
+/* ---- code ---- */
+/* how far an answer may be from the target: the larger of its own
+   absolute tolerance and CONFIG.RTOL in relative terms. A check marked
+   'strict' keeps its absolute tolerance only.                         */
+function tolerance(c){
+  const abs = c.tol || 0;
+  if(c.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(c.value));
+}
+
+function zoneCode(s){
+  const wrap=document.createElement('div');
+  wrap.className='win95'; wrap.id='code';
+  wrap.innerHTML = `
+    <div class="titlebar"><span>C:\\ACADEMY\\PYTHON.EXE</span><span class="boxes">▬ □ ✕</span></div>
+    <div class="preview">${escapeHtml(s.shown||'')}</div>
+    <textarea spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    <div class="codebar">
+      <button class="btn primary" data-run>RUN ▶</button>
+      <button class="btn" data-hint>HINT</button>
+      <span class="pyflag"></span>
+    </div>
+    <div id="out">ready.</div>`;
+  el.zone.appendChild(wrap);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='8px'; el.zone.appendChild(helpRow);
+
+  const ta=wrap.querySelector('textarea'), out=wrap.querySelector('#out');
+  ta.value = s.starter;
+  autosize(ta);
+  ta.addEventListener('input', ()=>autosize(ta));
+  wrap.querySelector('.pyflag').textContent =
+    (Py.state==='ready') ? 'PYTHON 3 · NUMPY' : 'FALLBACK MODE';
+
+  let fails=0, solved=false;
+  const mySeq = seq;
+
+  wrap.querySelector('[data-hint]').onclick = ()=>{
+    out.innerHTML = `<span class="warn">hint: ${escapeHtml(s.hint)}</span>`;
+  };
+  wrap.querySelector('[data-run]').onclick = ()=>run();
+  ta.addEventListener('keydown', e=>{
+    if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); }
+    if(e.key==='Tab'){ e.preventDefault();
+      const p=ta.selectionStart; ta.value=ta.value.slice(0,p)+'    '+ta.value.slice(ta.selectionEnd);
+      ta.selectionStart=ta.selectionEnd=p+4; autosize(ta); }
+  });
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE SOLUTION';
+    b.onclick=()=>{
+      ta.value = s.solution; autosize(ta);
+      clearVerdict();
+      verdict('give','Here is the solution. Read it, then RUN is pressed for you.');
+      out.innerHTML = `<span class="warn">solution loaded — running it…</span>`;
+      setTimeout(()=>{ if(mySeq===seq) run(true); }, 900);
+    };
+    helpRow.appendChild(b);
+  }
+  function noteFailure(){
+    fails++;
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+  }
+
+  function run(given){
+    const src = ta.value;
+    if(src.indexOf('???')>=0){
+      out.innerHTML = `<span class="err">SyntaxError: you have not replaced every ???</span>`;
+      return;
+    }
+    if(Py.state!=='ready') return runFallback(src, given);
+
+    // clear the target names so that a stale value cannot pass the check
+    // only plain variable names can go stale; an 'expr' check reads the data
+    const names = s.checks.filter(c=>!c.expr).map(c=>c.name);
+    Py.run(`for _n in ${JSON.stringify(names)}:\n    globals().pop(_n, None)`);
+    Py.run(s.preamble);
+    const r = Py.run(src);
+
+    let lines=[];
+    if(r.stdout) lines.push(escapeHtml(r.stdout.replace(/\n+$/,'')));
+    r.warns.forEach(w=>lines.push(`<span class="warn">${escapeHtml(w)}</span>`));
+    if(!r.ok){
+      lines.push(`<span class="err">${escapeHtml(r.error)}</span>`);
+      out.innerHTML = lines.join('\n');
+      if(!solved){ reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+      return;
+    }
+
+    let allOK = true;
+    const verd=[];
+    s.checks.forEach(c=>{
+      const read = c.expr || c.name;        // a check may read an expression
+      if(c.nan){
+        const isn = Py.isnan(read);
+        verd.push(`${c.name} = <span class="${isn?'ok':'err'}">${isn?'nan':String(Py.num(read))}</span>`);
+        if(!isn) allOK=false;
+      } else {
+        const v = Py.num(read);
+        if(v===null){ verd.push(`<span class="err">${escapeHtml(c.name)} could not be read. Is it defined ?</span>`); allOK=false; return; }
+        const good = Math.abs(v-c.value) <= tolerance(c);
+        verd.push(`${c.name} = <span class="${good?'ok':'err'}">${fmt(v)}</span>`);
+        if(!good) allOK=false;
+      }
+    });
+    lines.push(`<span style="color:#5a6a8a">--- checked ---</span>`);
+    out.innerHTML = lines.concat(verd).join('\n');
+    if(solved) return;                      // already passed: keep the panel as it is
+    if(allOK) pass();
+    else { reactTo('wrong'); clearVerdict(); verdict('no', s.wrongHint); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  function runFallback(src, given){
+    // no Pyodide: accept if every required name is assigned something plausible
+    const ok = given || (s.checks.every(c=> new RegExp('\\b'+c.name+'\\s*=\\s*\\S').test(src))
+               && /stats\.(binom|binomtest)|\.mean\(|\.var\(|\.astype\(|\*\*|1\s*-|\/\s*N/.test(src));
+    out.innerHTML = ok
+      ? `<span class="warn">Python is unavailable, so your code was checked by inspection only.</span>`
+      : `<span class="err">That does not look complete. Assign every variable that the question asks for.</span>`;
+    if(solved) return;
+    if(ok) pass(); else { reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  /* The code panel and its output stay on screen. The student reads what
+     Python printed, and only then asks for the next step.               */
+  function pass(){
+    if(solved) return;
+    solved = true;
+    reactTo('right');
+    addNote(s.note);
+    clearVerdict(); helpRow.innerHTML='';
+    verdict('ok','Correct. Read the output above, then continue.');
+    const row=document.createElement('div'); el.zone.appendChild(row);
+    const b=document.createElement('button');
+    b.className='btn primary'; b.textContent='CONTINUE ▶';
+    b.onclick=()=>{ if(mySeq!==seq) return; el.zone.innerHTML=''; reveal(); };
+    row.appendChild(b);
+    b.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
+  function reveal(){
+    if(s.wow) reactTo('wow');
+    if(s.widget){
+      const h=document.createElement('div'); el.zone.appendChild(h);
+      const wait = mountWidget(s.widget, h);
+      setTimeout(()=>{ if(mySeq!==seq) return;
+        typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+    } else {
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }
+  }
+}
+/* the editor grows with its content, so that no line is ever hidden */
+function autosize(ta){
+  ta.style.height='auto';
+  const min = parseInt(getComputedStyle(ta).minHeight,10) || 0;
+  ta.style.height = Math.max(min, ta.scrollHeight + 4) + 'px';
+}
+function fmt(v){
+  if(!isFinite(v)) return String(v);
+  return (Math.abs(v-Math.round(v))<1e-9) ? String(Math.round(v)) : v.toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ---- reflection ----
+   A free-text step, scored by keyword groups. No step of this exercise uses
+   it; it is kept because the engine is shared with the other exercises of
+   the course.                                                             */
+function zoneReflect(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const ta=document.createElement('textarea'); ta.id='reflect';
+  ta.placeholder='Two sentences.'; el.zone.appendChild(ta);
+  const row=document.createElement('div'); row.style.marginTop='8px'; row.style.display='flex'; row.style.gap='8px';
+  el.zone.appendChild(row);
+  const b=document.createElement('button'); b.className='btn primary'; b.textContent='SUBMIT';
+  row.appendChild(b);
+  let fails=0;
+
+  function advance(givenAway){
+    reactTo('right'); el.zone.innerHTML='';
+    const tail = `<span class="fx">A model answer, for your notes : ${s.model}</span>`;
+    const head = givenAway
+      ? `Here is the answer I was waiting for. Copy it into your notes and compare it with what you wrote.`
+      : s.right;
+    typeInto(el.dlg, head + tail, 'master', ()=>contButton('Continue', next));
+  }
+  function offerSolution(){
+    if(row.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW A MODEL ANSWER';
+    g.onclick=()=>{ advance(true); };
+    row.appendChild(g);
+  }
+
+  b.onclick=()=>{
+    const t = ta.value.toLowerCase();
+    if(t.trim().length < 40){
+      clearVerdict();
+      verdict('no','Two sentences, please. The Master is not impressed by brevity alone.');
+      reactTo('wrong'); fails++;
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution(); return;
+    }
+    const hits = s.groups.filter(g=>g.some(k=>t.indexOf(k)>=0)).length;
+    if(hits >= s.minGroups){ advance(false); }
+    else {
+      reactTo('wrong'); fails++;
+      clearVerdict();
+      verdict('no', s.wrongHint);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+    }
+  };
+}
+
+/* ================================================================
+   PASSWORD  —  nonlinear in the finish time, checkable in Excel
+     m    = h*3600 + min*60 + sec
+     code = ( 7919*(m*m mod 1e6) + 104729*m + 31337 )  mod 1e6
+   ================================================================ */
+function makePassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const sq = (m*m) % 1000000;
+  const code = (7919*sq + 104729*m + 31337) % 1000000;
+  return {
+    time: `${hh}h ${mm}min ${ss}s`,
+    // hhmmss, then the nonlinear transformation of that same time
+    code: hh + mm + ss + '-' + String(code).padStart(6,'0')
+  };
+}
+
+function finish(){
+  const pw = makePassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = pw.time;
+  $('#pw-code').textContent = pw.code;
+  $('#endblurb').innerHTML =
+    `You turned football predictions and trading days into the same Bernoulli variable, counted them
+     with a Binomial distribution, and tested a probability parameter with an exact test. You also
+     saw the two things the test cannot see, i.e., the animals nobody reported and the calendar.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU BUILT</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'FREQUENCY TESTED. CALENDAR NOT.';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  const txt = $('#pw-code').textContent;
+  const done = ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallbackCopy);
+  } else fallbackCopy();
+  function fallbackCopy(){
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ $('#copymsg').textContent='select and copy manually'; }
+    t.remove();
+  }
+};
+$('#btn-again').onclick = ()=>{ idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  el.doom.classList.remove('struck');
+  setHUD({subject:'—',y:'—',p:'—'}); el.doom.textContent='CASE OPEN'; show('scr-game'); render(); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE  (also cover for the Pyodide download)
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v2.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "DETECTING CO-PROCESSOR ...... PRESENT",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "CERTAINTY MODULE ............ NOT FOUND",
+  "OPENING CASE FILE II ........ OCTOPUS / VALUE AT RISK",
+  ""
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${l}</span>`:l).join('<br>'); }
+
+(async function start(){
+  show('scr-boot');
+  for(const l of BOOT_LINES){ bootLog(l); await sleep(120); }
+  const st = await Py.boot(bootLog);
+  bootLog("");
+  if(st==='ready'){
+    bootLog("> PYTHON READY. NUMPY LOADED.");
+    bootLog(Py.engine==='scipy' ? "> STATISTICS: SCIPY." : "> STATISTICS: EXACT BINOMIAL, BUILT IN.");
+  }
+  else { bootLog("> PYTHON UNAVAILABLE — running in fallback mode."); }
+  bootLog("> PRESS ANY KEY");
+  const go = ()=>{ document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  $('#pystatus').textContent = st==='ready'
+    ? ('Terminal ready — Python 3 with NumPy, and ' + (Py.engine==='scipy' ? 'SciPy.' : 'an exact Binomial published as scipy.stats.'))
+    : 'Python could not be loaded. The exercise will check your code by inspection instead.';
+  $('#btn-begin').disabled = false;
+})();
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+$('#btn-begin').onclick = async ()=>{
+  const v = $('#playername').value.trim();
+  playerName = v || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+  show('scr-game');
+  setHUD({subject:'—',y:'—',p:'—'});
+  idx=0; render();
+};
+</script>
+</body>
+</html>
