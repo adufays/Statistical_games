@@ -78,18 +78,6 @@
       other day, i.e., 25 violations, all consecutive.
   COMPASS and STORM end with the same count and the same p-value, which is
   the point of the last question.
-
-  PASSWORD  (identical to exercise 1, so one spreadsheet formula checks both)
-  --------------------------------------------------------------------------
-    password = hhmmss-cccccc
-    m      = hh*3600 + mm*60 + ss
-    cccccc = MOD( 7919*MOD(m*m,1000000) + 104729*m + 31337 , 1000000 )
-
-  Excel, with the submitted password as text in A2 (e.g. 134640-629737):
-    B2 =VALUE(LEFT(A2,2))*3600+VALUE(MID(A2,3,2))*60+VALUE(MID(A2,5,2))
-    C2 =TEXT(MOD(7919*MOD(B2*B2,1000000)+104729*B2+31337,1000000),"000000")
-    D2 =IF(EXACT(C2,MID(A2,8,6)),"OK","FORGED")
-  =====================================================================
 -->
 
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
