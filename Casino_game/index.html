@@ -74,7 +74,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-800 flex items-center justify-center min-h-screen p-4 overflow-hidden">
+<body class="bg-gray-900 text-gray-800 flex items-center justify-center min-h-screen p-4 overflow-x-hidden overflow-y-auto">
 
     <!-- Music Controls -->
     <div class="music-controls">
@@ -575,7 +575,14 @@
             const password = makeCompletionPassword(new Date());
             document.getElementById('completion-finish-time').textContent = password.time;
             document.getElementById('completion-password').textContent = password.code;
-            document.getElementById('completion-password-box').classList.remove('hidden');
+            const passwordBox = document.getElementById('completion-password-box');
+            passwordBox.classList.remove('hidden');
+
+            // The victory recap can be taller than the viewport on smaller screens.
+            // Wait until its parent screen is visible, then bring the password into view.
+            requestAnimationFrame(() => {
+                passwordBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
         }
 
         function copyCompletionPassword() {
