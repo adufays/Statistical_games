@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Casino Investigation: A Binomial Test Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
         body {
@@ -79,13 +78,17 @@
 
     <!-- Music Controls -->
     <div class="music-controls">
-        <button id="music-toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg w-full mb-2">Music Off</button>
+        <button id="music-toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg w-full mb-2">Music: On</button>
     </div>
     
     <!-- HTML5 Audio Players -->
     <audio id="casino-audio-player" loop></audio>
     <audio id="trial-audio-player" loop></audio>
+    <audio id="ambient-audio-player" loop></audio>
+    <audio id="calculation-audio-player" loop></audio>
+    <audio id="tension-audio-player" loop></audio>
     <audio id="win-audio-player"></audio>
+    <audio id="ending-audio-player"></audio>
     <audio id="loss-audio-player"></audio>
 
     <div id="game-container" class="w-full max-w-4xl mx-auto relative">
@@ -183,7 +186,16 @@
                         </div>
                     </div>
                 </div>
-                
+
+                <div id="completion-password-box" class="hidden bg-yellow-100 border-4 border-yellow-400 text-gray-900 p-5 rounded-lg mb-6 max-w-xl mx-auto">
+                    <h2 class="game-font text-lg text-blue-900 mb-3">Blackboard Completion Password</h2>
+                    <p class="text-sm mb-2">Finished at <strong id="completion-finish-time"></strong> (local time)</p>
+                    <p class="text-sm mb-4">Submit this one string—and nothing else—to Blackboard. Copy the dash too.</p>
+                    <div id="completion-password" class="game-font text-xl md:text-2xl tracking-widest bg-white border-2 border-gray-500 rounded p-4 mb-3 select-all"></div>
+                    <button type="button" onclick="copyCompletionPassword()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 px-5 rounded">Copy Password</button>
+                    <p id="completion-copy-message" class="text-sm font-bold mt-2 h-5" role="status"></p>
+                </div>
+                 
                 <button onclick="window.location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Play Again</button>
             </div>
         </div>
@@ -210,27 +222,35 @@
     </div>
 
     <script>
-        // --- CUSTOM MUSIC URLS ---
-        // PASTE YOUR MP3 URLS HERE. Leave as "" to use the default synth music.
-        const CASINO_MUSIC_URL = "https://freepd.com/music/Asking%20Questions.mp3"; // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-        const TRIAL_MUSIC_URL = "https://freepd.com/music/Think%20About%20It.mp3";  // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
-        const WIN_MUSIC_URL = "https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3";    // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
-        const LOSS_MUSIC_URL = "https://freepd.com/music/Cursed%20Intro.mp3";   // e.g., "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3"
-        
-        // Disable default music to avoid Tone.js issues
-        const USE_DEFAULT_MUSIC = false;
+        // --- MUSIC URLS ---
+        const MUSIC_URLS = {
+            CASINO: "https://www.dropbox.com/scl/fi/im51f8c65yuerql2314ql/Music_Tension1_Free_licence.mp3?rlkey=rnhqd2kulok76knq1oj06jvs6&raw=1",
+            TRIAL: "https://www.dropbox.com/scl/fi/g297s1duu5ljanocarmzb/Ambient_Trials.mp3?rlkey=r89o3exf4hhr0w3r6fg4t9wnj&raw=1",
+            AMBIENT: "https://www.dropbox.com/scl/fi/xl2vbcvobnuh22gxlyq8p/Music_Ambient_Free_licence.mp3?rlkey=nw67pij1ng4ezdtefpqdmw0h9&raw=1",
+            CALCULATION: "https://www.dropbox.com/scl/fi/v9n357tebctg3v8tm5v9r/Music_adv_Free_licence.mp3?rlkey=3e824r32plzy0ty3f2a42fzgn&raw=1",
+            TENSION: "https://www.dropbox.com/scl/fi/hm3sfvntpl7iwutyr2l5g/Music_Tension_Free_licence.mp3?rlkey=53s8hpkm8fcp1n4hfhn6ubokw&raw=1",
+            WIN: "https://www.dropbox.com/scl/fi/qi5dtchp19pvv8ya5uvhk/Music_Calculation_or_resolution_Free_licence.mp3?rlkey=ziku5b6381zwh6s8enfxvceph&raw=1",
+            ENDING: "https://www.dropbox.com/scl/fi/tr0topu96nwx9qydc0upk/Music_Fin1_Free_licence.mp3?rlkey=xwybwipp1yr9b8h8id6jego01&raw=1",
+            LOSS: "https://www.dropbox.com/scl/fi/rra2qobgw6iy3ens6v07a/Losing_game.mp3?rlkey=iug3pt28yh20bzh3y5u4h9hvw&raw=1"
+        };
 
         // --- GAME STATE ---
         let totalSpins = 0, redCount = 0, blackCount = 0, greenCount = 0;
         let trialStep = 0, pValue = 0, testimonyIndex = 0;
         let isMusicMuted = false;
+        let currentMusicScene = null;
         
         // --- MUSIC PLAYERS ---
-        let defaultCasinoMusic, defaultTrialMusic;
-        const casinoAudioPlayer = document.getElementById('casino-audio-player');
-        const trialAudioPlayer = document.getElementById('trial-audio-player');
-        const winAudioPlayer = document.getElementById('win-audio-player');
-        const lossAudioPlayer = document.getElementById('loss-audio-player');
+        const audioPlayers = {
+            casino: document.getElementById('casino-audio-player'),
+            trial: document.getElementById('trial-audio-player'),
+            ambient: document.getElementById('ambient-audio-player'),
+            calculation: document.getElementById('calculation-audio-player'),
+            tension: document.getElementById('tension-audio-player'),
+            win: document.getElementById('win-audio-player'),
+            ending: document.getElementById('ending-audio-player'),
+            loss: document.getElementById('loss-audio-player')
+        };
 
         // --- DOM ELEMENTS ---
         const introScreen = document.getElementById('intro-screen');
@@ -263,117 +283,39 @@
             customModal.classList.remove('hidden');
         }
 
-        function setupDefaultMusic() {
-            try {
-                if (!USE_DEFAULT_MUSIC) {
-                    console.log('Default music disabled, using external audio files only');
-                    return;
-                }
-                
-                if (typeof Tone === 'undefined') {
-                    console.warn('Tone.js not loaded, skipping default music setup');
-                    return;
-                }
-                
-                // Only setup if Tone is ready
-                if (Tone.context.state !== 'running') {
-                    console.warn('Tone.js context not ready, skipping default music setup');
-                    return;
-                }
-                
-                const casinoSynth = new Tone.Synth({ oscillator: { type: "pulse", width: 0.6 }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.2, release: 0.4 } }).toDestination();
-                defaultCasinoMusic = new Tone.Sequence((time, note) => {
-                    casinoSynth.triggerAttackRelease(note, "8n", time);
-                }, ["C4", ["E4", "G4"], "C5", ["E5", "G4"]], "4n");
-                
-                const trialSynth = new Tone.AMSynth({ harmonicity: 1.5, envelope: { attack: 0.1, decay: 1, sustain: 0.5, release: 1 } }).toDestination();
-                defaultTrialMusic = new Tone.Loop(time => {
-                    trialSynth.triggerAttackRelease("C2", "1n", time);
-                }, "1n");
-
-                Tone.Transport.bpm.value = 120;
-            } catch (error) {
-                console.error('Error setting up default music:', error);
-            }
-        }
-
         musicToggleBtn.addEventListener('click', () => {
             isMusicMuted = !isMusicMuted;
-            if (typeof Tone !== 'undefined' && Tone.Master) {
-                Tone.Master.mute = isMusicMuted;
-            }
-            casinoAudioPlayer.muted = isMusicMuted;
-            trialAudioPlayer.muted = isMusicMuted;
-            winAudioPlayer.muted = isMusicMuted;
-            lossAudioPlayer.muted = isMusicMuted;
-            musicToggleBtn.textContent = isMusicMuted ? 'Music On' : 'Music Off';
+            Object.values(audioPlayers).forEach(player => player.muted = isMusicMuted);
+            musicToggleBtn.textContent = isMusicMuted ? 'Music: Off' : 'Music: On';
+            if (!isMusicMuted && currentMusicScene) playMusic(currentMusicScene);
         });
 
         function playMusic(scene) {
-            try {
-                // Stop all music first
-                if (defaultCasinoMusic && defaultCasinoMusic.state === 'started') defaultCasinoMusic.stop();
-                if (defaultTrialMusic && defaultTrialMusic.state === 'started') defaultTrialMusic.stop();
-                casinoAudioPlayer.pause();
-                trialAudioPlayer.pause();
-                winAudioPlayer.pause();
-                lossAudioPlayer.pause();
+            currentMusicScene = scene;
+            if (isMusicMuted) return;
 
-                const playPromise = (player) => {
-                    try {
-                        const promise = player.play();
-                        if (promise !== undefined) {
-                            promise.catch(error => console.error(`Audio playback failed for ${player.id}:`, error));
-                        }
-                    } catch (error) {
-                        console.error(`Error playing audio for ${player.id}:`, error);
-                    }
-                };
+            Object.values(audioPlayers).forEach(player => {
+                if (!player.paused) player.pause();
+            });
 
-                if (scene === 'casino') {
-                    if (CASINO_MUSIC_URL) playPromise(casinoAudioPlayer);
-                    else if(USE_DEFAULT_MUSIC && defaultCasinoMusic && Tone.context.state === 'running') {
-                        // Use Tone.now() + 0.1 to ensure we start in the future
-                        defaultCasinoMusic.start(Tone.now() + 0.1);
-                    }
-                } else if (scene === 'trial') {
-                    if (TRIAL_MUSIC_URL) playPromise(trialAudioPlayer);
-                    else if(USE_DEFAULT_MUSIC && defaultTrialMusic && Tone.context.state === 'running') {
-                        // Use Tone.now() + 0.1 to ensure we start in the future
-                        defaultTrialMusic.start(Tone.now() + 0.1);
-                    }
-                } else if (scene === 'win') {
-                    if (WIN_MUSIC_URL) playPromise(winAudioPlayer);
-                } else if (scene === 'loss') {
-                    if (LOSS_MUSIC_URL) playPromise(lossAudioPlayer);
+            const player = audioPlayers[scene];
+            if (player) {
+                player.currentTime = 0;
+                const promise = player.play();
+                if (promise !== undefined) {
+                    promise.catch(error => console.error(`Audio playback failed for ${scene}:`, error));
                 }
-            } catch (error) {
-                console.error('Error in playMusic function:', error);
             }
         }
 
         // --- GAME FLOW ---
-        startGameBtn.addEventListener('click', async () => {
+        startGameBtn.addEventListener('click', () => {
             try {
-                if (typeof Tone !== 'undefined') {
-                    await Tone.start();
-                    
-                    // Wait a bit for the context to be fully ready
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    setupDefaultMusic();
-                    
-                    if (typeof Tone.Transport !== 'undefined') {
-                        Tone.Transport.start();
+                Object.keys(audioPlayers).forEach(key => {
+                    if (MUSIC_URLS[key.toUpperCase()]) {
+                        audioPlayers[key].src = MUSIC_URLS[key.toUpperCase()];
                     }
-                } else {
-                    console.warn('Tone.js not loaded, continuing without audio');
-                }
-                
-                if (CASINO_MUSIC_URL) casinoAudioPlayer.src = CASINO_MUSIC_URL;
-                if (TRIAL_MUSIC_URL) trialAudioPlayer.src = TRIAL_MUSIC_URL;
-                if (WIN_MUSIC_URL) winAudioPlayer.src = WIN_MUSIC_URL;
-                if (LOSS_MUSIC_URL) lossAudioPlayer.src = LOSS_MUSIC_URL;
+                });
                 
                 introScreen.classList.add('hidden');
                 casinoPhase.classList.remove('hidden');
@@ -478,6 +420,14 @@
             { character: "You (The Investigator)", dialogue: "Because the p-value is so small, we REJECT the null hypothesis. The evidence strongly suggests the assumption of fairness is wrong. You're caught!", action: { type: 'button', text: 'GUILTY!', next: 10, style: 'large' } }
         ];
 
+        // Music follows the courtroom narrative rather than only the broad game phase.
+        const TRIAL_MUSIC_CUES = {
+            2: 'tension',       // The investigator objects
+            5: 'calculation',   // The administrator demands the p-value calculation
+            6: 'tension',       // The p-value becomes the key contested evidence
+            9: 'win'            // The case is resolved before the ending page
+        };
+
         function startTrial() { renderTrialStep(0); }
 
         function renderTrialStep(step) {
@@ -489,6 +439,9 @@
 
             const currentStep = trialScript[step];
             if (!currentStep) return;
+
+            const musicCue = TRIAL_MUSIC_CUES[step];
+            if (musicCue) playMusic(musicCue);
 
             characterNameEl.textContent = currentStep.character;
             dialogueTextEl.textContent = typeof currentStep.dialogue === 'function' ? currentStep.dialogue() : currentStep.dialogue;
@@ -599,26 +552,73 @@
             }
         }
 
-        function endGame(isGuilty, reason = "") {
-            try {
-                playMusic('none'); // Stop all background music
-                if (typeof Tone !== 'undefined' && Tone.Transport) {
-                    Tone.Transport.stop();
+        // --- BLACKBOARD COMPLETION PASSWORD ---
+        // hhmmss-cccccc, using the student's local finish time.
+        function makeCompletionPassword(date) {
+            const hours = date.getHours();
+            const minutes = date.getMinutes();
+            const seconds = date.getSeconds();
+            const hh = String(hours).padStart(2, '0');
+            const mm = String(minutes).padStart(2, '0');
+            const ss = String(seconds).padStart(2, '0');
+            const m = hours * 3600 + minutes * 60 + seconds;
+            const squareModulo = (m * m) % 1000000;
+            const check = (7919 * squareModulo + 104729 * m + 31337) % 1000000;
+
+            return {
+                time: `${hh}:${mm}:${ss}`,
+                code: `${hh}${mm}${ss}-${String(check).padStart(6, '0')}`
+            };
+        }
+
+        function showCompletionPassword() {
+            const password = makeCompletionPassword(new Date());
+            document.getElementById('completion-finish-time').textContent = password.time;
+            document.getElementById('completion-password').textContent = password.code;
+            document.getElementById('completion-password-box').classList.remove('hidden');
+        }
+
+        function copyCompletionPassword() {
+            const text = document.getElementById('completion-password').textContent;
+            const message = document.getElementById('completion-copy-message');
+            const done = () => {
+                message.textContent = 'Password copied.';
+                setTimeout(() => message.textContent = '', 2500);
+            };
+            const fallbackCopy = () => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    done();
+                } catch (error) {
+                    message.textContent = 'Select the password and copy it manually.';
                 }
-            } catch (error) {
-                console.error('Error stopping music:', error);
+                textarea.remove();
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done, fallbackCopy);
+            } else {
+                fallbackCopy();
             }
-            
+        }
+
+        function endGame(isGuilty, reason = "") {
             casinoPhase.classList.add('hidden');
             trialPhase.classList.add('hidden');
+            playMusic(isGuilty ? 'ending' : 'loss');
 
             if (isGuilty) { 
-                playMusic('win');
+                showCompletionPassword();
                 // Update the p-value in the statistical recap
                 document.getElementById('final-p-value').textContent = pValue.toFixed(4);
                 guiltyScreen.classList.remove('hidden'); 
             } else { 
-                playMusic('loss');
                 innocentReasonEl.textContent = reason; 
                 innocentScreen.classList.remove('hidden'); 
             }
