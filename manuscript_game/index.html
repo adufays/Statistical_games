@@ -15,7 +15,6 @@
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <title>Detective Lexi Conn and the Forger's Signature</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
@@ -93,14 +92,17 @@
 <body class="bg-gray-100 text-gray-800 flex items-center justify-center min-h-screen p-4 overflow-hidden">
 
     <div class="music-controls">
-        <button id="music-toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg w-full mb-2">Music Off</button>
+        <button id="music-toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg w-full mb-2">Music: On</button>
     </div>
     
     <audio id="phase1-audio-player" loop></audio>
     <audio id="phase2-audio-player" loop></audio>
+    <audio id="ambient-audio-player" loop></audio>
     <audio id="calculation-audio-player" loop></audio>
+    <audio id="tension-audio-player" loop></audio>
     <audio id="twist-audio-player" loop></audio>
     <audio id="win-audio-player"></audio>
+    <audio id="ending-audio-player"></audio>
     <audio id="loss-audio-player"></audio>
 
     <div id="game-container" class="w-full max-w-5xl mx-auto">
@@ -176,6 +178,14 @@
                 <h1 id="end-title" class="game-font text-4xl mb-4"></h1>
                 <p id="end-message" class="text-lg mb-6"></p>
                 <div id="end-recap" class="text-left bg-gray-700 p-4 rounded-lg mb-6 space-y-2" style="background-color: #073642;"></div>
+                <div id="completion-password-box" class="hidden border-4 p-5 rounded-lg mb-6 max-w-xl mx-auto" style="background-color: #eee8d5; border-color: #b58900; color: #002b36;">
+                    <h2 class="game-font text-lg mb-3" style="color: #073642;">Blackboard Completion Password</h2>
+                    <p class="text-sm mb-2">Finished at <strong id="completion-finish-time"></strong> (local time)</p>
+                    <p class="text-sm mb-4">Submit this one string—and nothing else—to Blackboard. Copy the dash too.</p>
+                    <div id="completion-password" class="game-font text-xl md:text-2xl tracking-widest bg-white border-2 border-gray-500 rounded p-4 mb-3 select-all"></div>
+                    <button type="button" onclick="copyCompletionPassword()" class="bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 px-5 rounded">Copy Password</button>
+                    <p id="completion-copy-message" class="text-sm font-bold mt-2 h-5" role="status"></p>
+                </div>
                 <button id="play-again-btn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 mt-4">Play Again</button>
             </div>
         </div>
@@ -244,12 +254,15 @@ function getAvatarUrl(characterKey, expressionIndex) {
 }
 
 const MUSIC_URLS = {
-    PHASE1: "https://freepd.com/music/Dreams%20of%20Vain.mp3",
-    PHASE2: "https://freepd.com/music/Limit%2070.mp3",
-    CALCULATION: "https://freepd.com/music/Meditating%20Beat.mp3",
-    TWIST: "https://freepd.com/music/After%20the%20End.mp3",
-    WIN: "https://freepd.com/music/Happy%20Whistling%20Ukulele.mp3",
-    LOSS: "https://freepd.com/music/Cursed%20Intro.mp3",
+    PHASE1: "https://www.dropbox.com/scl/fi/s2xjkhjx3tmpega8sb09c/Music_Ambient3_Free_licence_contamination.mp3?rlkey=3buanh58lcnzo4jk0nbdm4v0d&raw=1",
+    PHASE2: "https://www.dropbox.com/scl/fi/g297s1duu5ljanocarmzb/Ambient_Trials.mp3?rlkey=r89o3exf4hhr0w3r6fg4t9wnj&raw=1",
+    AMBIENT: "https://www.dropbox.com/scl/fi/xl2vbcvobnuh22gxlyq8p/Music_Ambient_Free_licence.mp3?rlkey=nw67pij1ng4ezdtefpqdmw0h9&raw=1",
+    CALCULATION: "https://www.dropbox.com/scl/fi/v9n357tebctg3v8tm5v9r/Music_adv_Free_licence.mp3?rlkey=3e824r32plzy0ty3f2a42fzgn&raw=1",
+    TENSION: "https://www.dropbox.com/scl/fi/hm3sfvntpl7iwutyr2l5g/Music_Tension_Free_licence.mp3?rlkey=53s8hpkm8fcp1n4hfhn6ubokw&raw=1",
+    TWIST: "https://www.dropbox.com/scl/fi/im51f8c65yuerql2314ql/Music_Tension1_Free_licence.mp3?rlkey=rnhqd2kulok76knq1oj06jvs6&raw=1",
+    WIN: "https://www.dropbox.com/scl/fi/qi5dtchp19pvv8ya5uvhk/Music_Calculation_or_resolution_Free_licence.mp3?rlkey=ziku5b6381zwh6s8enfxvceph&raw=1",
+    ENDING: "https://www.dropbox.com/scl/fi/tr0topu96nwx9qydc0upk/Music_Fin1_Free_licence.mp3?rlkey=xwybwipp1yr9b8h8id6jego01&raw=1",
+    LOSS: "https://www.dropbox.com/scl/fi/rra2qobgw6iy3ens6v07a/Losing_game.mp3?rlkey=iug3pt28yh20bzh3y5u4h9hvw&raw=1",
 };
 
 const gameState = {
@@ -298,9 +311,12 @@ const musicToggleBtn = document.getElementById('music-toggle-btn');
 const audioPlayers = {
     phase1: document.getElementById('phase1-audio-player'),
     phase2: document.getElementById('phase2-audio-player'),
+    ambient: document.getElementById('ambient-audio-player'),
     calculation: document.getElementById('calculation-audio-player'),
+    tension: document.getElementById('tension-audio-player'),
     twist: document.getElementById('twist-audio-player'),
     win: document.getElementById('win-audio-player'),
+    ending: document.getElementById('ending-audio-player'),
     loss: document.getElementById('loss-audio-player'),
 };
 const customModal = document.getElementById('custom-modal');
@@ -318,8 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-async function startGame() {
-    await Tone.start();
+function startGame() {
     Object.keys(audioPlayers).forEach(key => {
         if (MUSIC_URLS[key.toUpperCase()]) {
             audioPlayers[key].src = MUSIC_URLS[key.toUpperCase()];
@@ -333,13 +348,16 @@ async function startGame() {
 }
 
 let isMusicMuted = false;
+let currentMusicScene = null;
 function toggleMusic() {
     isMusicMuted = !isMusicMuted;
     Object.values(audioPlayers).forEach(player => player.muted = isMusicMuted);
-    musicToggleBtn.textContent = isMusicMuted ? 'Music On' : 'Music Off';
+    musicToggleBtn.textContent = isMusicMuted ? 'Music: Off' : 'Music: On';
+    if (!isMusicMuted && currentMusicScene) playMusic(currentMusicScene);
 }
 
 function playMusic(scene) {
+    currentMusicScene = scene;
     if (isMusicMuted) return;
     Object.values(audioPlayers).forEach(player => {
         if (!player.paused) player.pause();
@@ -646,6 +664,20 @@ const trialScript = [
     { char: 'JUDGE', expression: 3, text: "The evidence is clear, and the statistical reasoning is sound. This court finds the manuscript a forgery and Mr. Vellum GUILTY!", action: { type: 'button', text: 'Case Closed', next: 99 } }
 ];
 
+// Each cue follows a specific change in the courtroom argument.
+const TRIAL_MUSIC_CUES = {
+    1: 'tension',       // Calm presentation of the manuscript evidence
+    //2: 'tension',       // Vellum attacks the use of averages
+    3: 'calculation',   // Regression reasoning begins
+    5: 'tension',       // Vellum claims his tiny model is superior
+    6: 'calculation',   // The judge requests slope and standard-error calculations
+    8: 'tension',       // Vellum dismisses the statistics as noise
+    //9: 'calculation',   // The formal t-test is performed
+    //10: 'tension',      // Vellum challenges the t-statistic and p-value
+    12: 'twist',        // Cliffhanger: Vellum claims the entire test is invalid
+    14: 'win'           // Conn defeats the final objection before the verdict
+};
+
 function renderTrialStep(step) {
     gameState.trialStep = step;
 
@@ -657,10 +689,8 @@ function renderTrialStep(step) {
     const s = trialScript[step];
     if (!s) return;
 
-    if (step === 3) { playMusic('calculation'); }
-    if (step === 8) { playMusic('phase2'); }
-    if (s.action.twist) { playMusic('twist'); }
-    if (step === 15) { playMusic('win'); }
+    const musicCue = TRIAL_MUSIC_CUES[step];
+    if (musicCue) playMusic(musicCue);
 
     const charKey = s.char;
     const char = CHARACTERS[charKey];
@@ -852,17 +882,74 @@ function showQQPlot() {
 }
 
 
+// --- BLACKBOARD COMPLETION PASSWORD ---
+// hhmmss-cccccc, using the student's local finish time.
+function makeCompletionPassword(date) {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = date.getSeconds();
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    const m = hours * 3600 + minutes * 60 + seconds;
+    const squareModulo = (m * m) % 1000000;
+    const check = (7919 * squareModulo + 104729 * m + 31337) % 1000000;
+
+    return {
+        time: `${hh}:${mm}:${ss}`,
+        code: `${hh}${mm}${ss}-${String(check).padStart(6, '0')}`
+    };
+}
+
+function showCompletionPassword() {
+    const password = makeCompletionPassword(new Date());
+    document.getElementById('completion-finish-time').textContent = password.time;
+    document.getElementById('completion-password').textContent = password.code;
+    document.getElementById('completion-password-box').classList.remove('hidden');
+}
+
+function copyCompletionPassword() {
+    const text = document.getElementById('completion-password').textContent;
+    const message = document.getElementById('completion-copy-message');
+    const done = () => {
+        message.textContent = 'Password copied.';
+        setTimeout(() => message.textContent = '', 2500);
+    };
+    const fallbackCopy = () => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            done();
+        } catch (error) {
+            message.textContent = 'Select the password and copy it manually.';
+        }
+        textarea.remove();
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, fallbackCopy);
+    } else {
+        fallbackCopy();
+    }
+}
+
 function endGame(isWin, reason = "") {
     customModal.classList.add('hidden');
     screens.phase2.classList.add('hidden');
     screens.end.classList.remove('hidden');
+    playMusic(isWin ? 'ending' : 'loss');
 
     const titleEl = document.getElementById('end-title');
     const messageEl = document.getElementById('end-message');
     const recapEl = document.getElementById('end-recap');
 
     if (isWin) {
-        playMusic('win');
+        showCompletionPassword();
         titleEl.textContent = "GUILTY!";
         titleEl.className = 'game-font text-4xl mb-4 text-green-400';
         messageEl.textContent = "Your sharp statistical analysis has exposed Vellum's fraud. Justice is served!";
@@ -873,7 +960,7 @@ function endGame(isWin, reason = "") {
             <p>✔️ <strong>Central Limit Theorem:</strong> You correctly argued that even with non-normal residuals, the CLT makes your test for the slope coefficient valid for a large sample.</p>`;
 
     } else {
-        playMusic('loss');
+        document.getElementById('completion-password-box').classList.add('hidden');
         titleEl.textContent = "NOT GUILTY!";
         titleEl.className = 'game-font text-4xl mb-4 text-red-400';
         messageEl.textContent = reason;
