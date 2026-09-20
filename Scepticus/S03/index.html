@@ -1,1 +1,2167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Exercise 3: The Mirror</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EXERCISE 3
+  "The Mirror"
+  EDHEC · Statistical Models · Session 3
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine and same characters as the other exercises. The password
+  transformation is specific to Session 3.
+
+  SESSION 3 CURRICULUM
+  --------------------
+  Continuous variables, sample averages and variances, one-sided approximate
+  Normal tests, and a short comparison with two-sided tests. The data compare
+  self-reported height and weight with measured height and weight.
+
+  THE RULE THE EXERCISE EXISTS TO TEACH
+  -------------------------------------
+  Define the gap, state the direction, estimate uncertainty from the data,
+  and interpret a test about an average without turning it into a statement
+  about every individual.
+
+  NORMAL APPROXIMATION
+  --------------------
+  The variance is estimated from each sample of 75 age-specific gaps. Because
+  that estimate is uncertain, an exact test under independent Normal sampling
+  would use Student's t distribution. This exercise deliberately uses the
+  standard Normal distribution as an approximation. The approximation becomes
+  more accurate as the sample size grows. The same number of respondents is
+  assumed at each age, so that the average of the 75 age-specific gaps equals
+  the average gap of all respondents, and the target is the average gap across
+  the ages 16 to 90. The 75 fitted age profiles are also treated as independent
+  for the arithmetic. Both simplifying assumptions are stated on screen, and
+  independence is revisited at the end.
+
+  PYTHON
+  ------
+  NumPy, pandas and scipy.stats are loaded by Pyodide. The two tables are
+  pandas DataFrames. Normal probabilities are computed with stats.norm.cdf;
+  upper tails are written as 1 - stats.norm.cdf(z), matching the course.
+  The tables are embedded because a browser cannot open local workbooks.
+
+  THE DATA
+  --------
+  Figure+1+height...xlsx 75 rows, ages 16 to 90. Columns exactly as the
+                         workbook spells them: 'Age', 'Men self reported',
+                         'men measured', 'Women self reported',
+                         'Women measured'.
+  Figure+2+weight...xlsx 75 rows, ages 16 to 90. Columns 'age (in years) ',
+                         'Men: self reported', 'Men: measured',
+                         'Women: self reported', 'Women: measured'.
+                         The inconsistent capitalisation is the workbook's,
+                         and the game shows a data dictionary rather than
+                         silently relabelling anything.
+  Each row is one age-specific average, never one survey participant.
+
+  VERIFIED NUMBERS  (recomputed from the sources; all matching Part F)
+  -------------------------------------------------------------------
+  Male height gap, self reported minus measured, N = 75 age profiles
+     average gap                 = 2.037189 cm
+     estimated sample variance   = 1.508741 cm^2
+     estimated standard deviation= 1.228308 cm
+     standard error 0.141833      approximate Z = 14.3633
+     1 - Normal CDF underflows numerically to 0.0 at this statistic.
+
+  Female weight gap, self reported minus measured, N = 75 age profiles
+     average gap                 = -1.983692 kg
+     estimated sample variance   = 0.201538 kg^2
+     estimated standard deviation= 0.448930 kg
+     standard error 0.051838      approximate Z = -38.267
+     lower-tail p underflows numerically to 0.0.
+
+  PASSWORD  (Session 3-specific transformation)
+  ---------------------------------------------
+    password = hhmmss-cccccc
+    m        = hh*3600 + mm*60 + ss
+    q        = MOD(m*m + 73*m + 3003, 1000003)
+    r        = MOD(q*(m + 17), 1000003)
+    cccccc   = MOD(65537*r + 8191*q + 131071*m + 271828, 1000000)
+  Excel, with the submitted password as text in A2:
+    B2 =VALUE(LEFT(A2,2))*3600+VALUE(MID(A2,3,2))*60+VALUE(MID(A2,5,2))
+    C2 =MOD(B2*B2+73*B2+3003,1000003)
+    D2 =MOD(C2*(B2+17),1000003)
+    E2 =TEXT(MOD(65537*D2+8191*C2+131071*B2+271828,1000000),"000000")
+    F2 =IF(EXACT(E2,MID(A2,8,6)),"OK","FORGED")
+
+  SOURCES
+  -------
+  NHS England Digital, differences between self-reported and interviewer
+  measured height, weight and BMI, HSE 2011-2016.
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#hud.glitching{animation:glitch .12s steps(2) 8}
+@keyframes glitch{
+  0%{transform:translate(0,0)}25%{transform:translate(-3px,1px) skewX(-2deg); filter:hue-rotate(90deg)}
+  50%{transform:translate(3px,-1px) skewX(2deg)}75%{transform:translate(-2px,0); filter:invert(1)}100%{transform:none}
+}
+#hud .broken{color:var(--red)!important; font-weight:700; text-shadow:1px 0 rgba(255,0,0,.6),-1px 0 rgba(0,255,255,.6)}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---- N̂ and x̄ -----------------------------------------------------------
+   The combining marks U+0302 and U+0304 are missing from VT323 and from the
+   pixel font, so the browser drops them next to the letter and "N with a hat"
+   comes out as "N^". The accent is therefore drawn by CSS, which works in
+   every font: <span class="hat">N</span> and <span class="bar">x</span>.
+   Plain-text places that cannot carry a span (the notebook, the question
+   line, SVG labels) use the Python names N_hat and xbar instead.          */
+.hat,.bar{position:relative; display:inline-block; padding-top:.34em; line-height:1}
+.hat::after{content:'^'; position:absolute; left:0; width:100%; top:-.05em;
+  text-align:center; font-size:.92em; line-height:1; font-family:inherit}
+.bar::after{content:''; position:absolute; left:6%; right:6%; top:.18em;
+  border-top:.09em solid currentColor}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt.given{background:#7a5200; border-color:#ffcf6b #3a2600 #3a2600 #ffcf6b}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+/* the matching question of the last trial */
+.matchkey{background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66;
+  padding:9px 12px; margin-bottom:9px; font-size:14.5px; line-height:1.6; color:var(--cream)}
+.matchkey b{color:var(--amber)}
+.matchrow{display:flex; align-items:center; gap:7px; margin-bottom:7px; padding:8px 10px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.matchname{flex:1 1 auto; font-size:14.5px; color:var(--cream)}
+.matchbtn{flex:0 0 40px; background:#12122a; color:var(--cream); border:2px solid;
+  border-color:#50507e #0a0a18 #0a0a18 #50507e; font:700 13px Tahoma,sans-serif; padding:7px 0; cursor:pointer}
+.matchbtn:hover{background:#2f2f56}
+.matchbtn.on{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a; color:#fff}
+.matchbtn:disabled{cursor:default; opacity:.85}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+
+/* ---------- code panel ---------- */
+#code textarea{display:block; width:100%; min-height:320px; background:#06110a; color:var(--green);
+  font-family:var(--mono); font-size:20px; line-height:1.4; border:0; padding:10px 12px;
+  resize:vertical; outline:none; overflow:hidden; tab-size:4}
+#code .preview{background:#0c0c18; color:#8b8bb5; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:8px 12px; border-bottom:1px solid #2a2a44; white-space:pre-wrap}
+#code .envhead{display:flex; justify-content:space-between; gap:10px; align-items:center;
+  padding:7px 12px; background:#17172d; color:var(--cream); border-bottom:1px solid #2a2a44;
+  font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.35px}
+#code .envhead span{color:#9d9dc4; font-weight:400; letter-spacing:0}
+#code #out{background:#06110a; color:#bdbdbd; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:9px 11px; min-height:80px; white-space:pre-wrap; word-break:break-word; border-top:1px solid #1a2a1a}
+#out .ok{color:var(--green)} #out .err{color:#ff6b5e} #out .warn{color:var(--amber)}
+.codebar{display:flex; gap:8px; align-items:center; padding:7px; background:var(--panel); flex-wrap:wrap}
+.pyflag{margin-left:auto; font:700 10px Tahoma,sans-serif; color:#444}
+textarea#reflect{width:100%; min-height:130px; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:11px; font:15px/1.55 var(--body); resize:vertical}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.pyguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.pyguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,var(--navy),var(--navy-lt));
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.pyguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.pyguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.pyguide th,.pyguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.pyguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.pyguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.pyguide td:first-child{width:23%}
+.pyguide td:nth-child(2){width:39%}
+.pyguide td:nth-child(3){width:38%}
+.pyguide .dataset{padding:9px 12px; border-top:1px solid #343458; color:#c7c7df; font-size:13.5px; line-height:1.55}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  #code textarea{min-height:250px; font-size:18px}
+  .pyguide table,.pyguide tbody,.pyguide tr,.pyguide th,.pyguide td{display:block}
+  .pyguide thead{display:none}
+  .pyguide td{border-top:0; padding:3px 10px}
+  .pyguide td::before{display:block; margin-bottom:2px; color:var(--amber);
+    font:700 9px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+  .pyguide td:nth-child(1)::before{content:'SYNTAX'}
+  .pyguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .pyguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .pyguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EXERCISE III</div>
+    <div style="display:flex;gap:6px">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE MIRROR</h1>
+      <h2>Exercise III &nbsp;·&nbsp; Statistical Models</h2>
+      <p>You will compare self-reported and measured height and weight, formulate directional
+      hypotheses, estimate sampling uncertainty from the data, and carry out approximate
+      Normal tests.</p>
+      <p>Because the variance is estimated, an exact small-sample analysis under Normal sampling
+      would use Student's t distribution. Here we deliberately use the standard Normal
+      distribution as an approximation and discuss why that approximation improves with sample size.</p>
+      <div class="pyguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <p class="guideintro">NumPy, pandas and scipy.stats are already imported, and both
+        DataFrames are already loaded before every coding question. The examples deliberately
+        use different columns or numerical values from the questions.</p>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>SYNTAX</th><th>WHAT IT DOES</th><th>EXAMPLE FROM RELATED DATA</th></tr></thead>
+          <tbody>
+            <tr><td><code>data['column']</code></td><td>Selects one column from a pandas DataFrame and returns a pandas Series.</td><td><code>height['Women measured']</code></td></tr>
+            <tr><td><code>x - y</code></td><td>Subtracts two equal-length numerical Series row by row.</td><td><code>height['Women self reported'] - height['Women measured']</code></td></tr>
+            <tr><td><code>len(x)</code></td><td>Counts the observations in a Series or the rows in a DataFrame.</td><td><code>len(height['Age'])</code></td></tr>
+            <tr><td><code>x.mean()</code></td><td>Computes the arithmetic mean of a numerical Series.</td><td><code>height['Women measured'].mean()</code></td></tr>
+            <tr><td><code>x.var(ddof=1)</code></td><td>Estimates the variance using deviations from the sample mean and the denominator <code>N - 1</code>.</td><td><code>height['Women measured'].var(ddof=1)</code></td></tr>
+            <tr><td><code>np.sqrt(x)</code></td><td>Computes a square root.</td><td><code>np.sqrt(9)</code></td></tr>
+            <tr><td><code>stats.norm.cdf(z)</code></td><td>Returns the standard Normal probability to the left of <code>z</code>.</td><td><code>stats.norm.cdf(-1.64)</code></td></tr>
+            <tr><td><code>1 - stats.norm.cdf(z)</code></td><td>Returns the standard Normal probability to the right of <code>z</code>.</td><td><code>1 - stats.norm.cdf(1.64)</code></td></tr>
+            <tr><td><code>2 * (1 - stats.norm.cdf(abs(z)))</code></td><td>Computes a two-sided Normal p-value by doubling the smaller tail.</td><td><code>2 * (1 - stats.norm.cdf(abs(1.64)))</code></td></tr>
+            <tr><td><code>print(f'{value:0.3f}')</code></td><td>Prints one numerical value with three digits after the decimal point.</td><td><code>print(f'{np.sqrt(9):0.3f}')</code></td></tr>
+          </tbody>
+        </table>
+        <div class="dataset"><strong>Prepared environment:</strong>
+        <code>import numpy as np</code>, <code>import pandas as pd</code>, and
+        <code>from scipy import stats</code>. The DataFrames <code>height</code> and
+        <code>weight</code> each contain 75 age profiles.</div>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p class="note" id="pystatus" style="margin-top:14px">Preparing the terminal…</p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin" disabled>BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:320px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>case</span><b id="hud-subject">—</b></div>
+            <div class="hudrow"><span>r</span><b id="hud-y">—</b></div>
+            <div class="hudrow"><span>shape</span><b id="hud-p">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Level I &nbsp;·&nbsp; The Model Behind the Number</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">FINISHED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, the dash included. The time at which you finished is already
+      inside it, so there is nothing else to report.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG — replace the three background URLs with your own art.
+   Dropbox: use the share link and change the ending to  ?dl=1
+   (or leave them; each falls back to a gradient if it fails to load)
+   ================================================================ */
+const CONFIG = {
+  BACKGROUNDS: {
+    clinic: "https://placehold.co/1200x420/16222a/2f4a58?text=+",
+    lecture:"https://placehold.co/1200x420/221a26/453250?text=+",
+    fitting:"https://placehold.co/1200x420/26201a/544435?text=+"
+  },
+  FALLBACK: {
+    clinic: "linear-gradient(180deg,#0a161c,#1d3a46 60%,#2e6076)",
+    lecture:"linear-gradient(180deg,#140f18,#2c2136 60%,#48355a)",
+    fitting:"linear-gradient(180deg,#18120c,#3a2e22 60%,#5e4a34)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted.       */
+  RTOL: 0.02,
+  /* failed attempts on one question before SHOW THE ANSWER appears */
+  FAILS_BEFORE_SOLUTION: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS
+     milliseconds. Raise TYPE_MS to slow the dialogue down further. */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   AVATARS — inline SVG. The mouth is three sibling groups
+   (.mouth-a closed, .mouth-b ajar, .mouth-c open); the flap swaps
+   them by toggling a class on the wrapper. No network, no flicker.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- robe -->
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <!-- neck -->
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <!-- head -->
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <!-- hair -->
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <!-- beard -->
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <!-- brows -->
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <!-- nose -->
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- mouth (above the beard) -->
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <!-- monocle -->
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   PYTHON — Pyodide + NumPy + pandas + scipy, with a fallback.
+
+   The tables are genuine pandas DataFrames. scipy.stats supplies the
+   standard Normal CDF. In student code, upper-tail probabilities are
+   deliberately written as 1 - stats.norm.cdf(z), matching the course notation.
+   ================================================================ */
+const Py = (()=>{
+  let py=null, state='loading', out=[];
+
+  const BOOT = `
+import numpy as np, pandas as pd, warnings, math
+from scipy import stats
+
+_ACAD_WARN = []
+def _acad_show(message, category, filename, lineno, file=None, line=None):
+    _ACAD_WARN.append(category.__name__ + ': ' + str(message))
+warnings.showwarning = _acad_show
+warnings.simplefilter('always')
+
+
+# ---------------------------------------------------------------- data
+Frame = pd.DataFrame
+
+_AGE = np.array([
+    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+    41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
+    66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90
+])
+_H_MSR = np.array([
+    175.615271, 177.689697, 179.227314, 178.891096, 179.760045, 179.659216, 179.408661,
+    178.202359, 178.680552, 178.602408, 179.862054, 178.594933, 178.869041, 178.99508,
+    178.24583, 179.102009, 178.490783, 178.503827, 178.464131, 178.133044, 178.182024,
+    177.712589, 178.132702, 177.477505, 176.799209, 178.262379, 177.206546, 177.852778,
+    177.39291, 177.805457, 177.670545, 177.480214, 177.59935, 176.778599, 176.647562,
+    176.580874, 177.063213, 176.367225, 176.473378, 176.183885, 176.433317, 175.562818,
+    176.433079, 176.541935, 176.682957, 176.096026, 176.176273, 176.173136, 175.878144,
+    176.153802, 175.451326, 175.291635, 175.441715, 175.197184, 175.995577, 175.495989,
+    175.903135, 174.441278, 175.189268, 174.127836, 174.243154, 173.896436, 173.883269,
+    173.755846, 174.530553, 174.66838, 173.88742, 174.333292, 173.026041, 172.603721,
+    173.429354, 172.669303, 174.014477, 171.603211, 170.1
+])
+_H_MME = np.array([
+    174.624309, 176.424982, 177.668638, 177.348191, 178.26246, 178.204817, 178.702034,
+    177.312549, 177.407312, 177.203295, 178.799398, 177.717696, 177.80846, 178.043214,
+    177.28851, 178.203076, 177.406975, 177.787554, 177.918898, 177.243498, 177.229835,
+    176.684994, 177.008566, 176.614088, 176.018291, 177.124487, 175.86037, 176.655039,
+    176.131098, 176.35851, 176.365593, 176.487525, 176.208726, 175.483146, 175.547811,
+    175.459023, 175.553461, 174.888537, 175.222282, 174.568165, 175.035729, 173.943903,
+    174.676314, 174.859728, 174.826637, 173.998013, 174.395189, 174.146513, 173.839902,
+    173.864073, 173.077792, 172.743677, 173.056413, 172.81509, 173.386126, 172.445949,
+    173.054924, 171.371814, 172.187919, 171.105446, 171.290896, 170.640956, 170.169504,
+    170.231843, 171.330384, 171.48853, 169.605541, 170.098941, 168.667032, 168.557358,
+    168.665139, 167.818361, 168.41775, 167.329182, 165.2
+])
+_H_WSR = np.array([
+    163.642354, 163.998155, 163.975141, 164.249566, 164.643582, 164.346955, 164.138475,
+    165.042967, 164.851656, 164.591353, 164.453896, 164.15216, 164.309579, 164.780444,
+    163.836098, 163.564681, 163.962483, 163.739702, 164.188091, 164.236149, 163.900973,
+    164.830165, 164.065598, 163.436541, 163.472621, 163.713475, 163.262677, 162.855938,
+    163.724698, 164.154026, 163.152499, 163.331143, 163.362224, 163.107875, 163.032907,
+    163.354948, 162.974936, 162.452684, 162.834683, 163.390695, 162.964311, 161.729675,
+    162.443989, 161.573696, 161.766791, 162.340843, 161.532642, 161.37432, 162.778855,
+    161.78016, 162.126804, 161.185956, 160.959117, 161.229549, 160.931505, 161.133268,
+    160.697335, 161.520074, 160.691906, 160.799843, 160.068342, 160.624617, 160.39323,
+    160.068819, 159.436138, 159.8146, 159.58543, 158.850868, 158.68153, 157.82112,
+    159.430028, 158.525073, 159.381879, 157.98451, 156.8
+])
+_H_WME = np.array([
+    162.456658, 163.335824, 163.188713, 164.178557, 164.113561, 164.466833, 163.574346,
+    164.742966, 164.18912, 164.260057, 164.057003, 163.987747, 163.988529, 164.558545,
+    163.394141, 163.130017, 163.506731, 163.324376, 163.630009, 163.725179, 163.167115,
+    163.961655, 163.189104, 162.751099, 162.88528, 162.815162, 162.77252, 162.346683,
+    163.177686, 163.511803, 162.642901, 162.485068, 162.797958, 162.456724, 162.386327,
+    162.989262, 162.441559, 162.107362, 162.17633, 162.583604, 162.030027, 160.866588,
+    161.573708, 160.877513, 160.792964, 161.039224, 160.385047, 160.386348, 161.433282,
+    160.435749, 160.63706, 159.675443, 159.277768, 159.565539, 159.307129, 159.192916,
+    158.390811, 159.164872, 158.336932, 158.613611, 157.308899, 157.8069, 157.335173,
+    157.15274, 156.486274, 156.217334, 155.673674, 154.462569, 155.025806, 153.5781,
+    154.561608, 154.015737, 155.235563, 153.875919, 152
+])
+_W_MSR = np.array([
+    64.953604, 71.742957, 72.902124, 74.880522, 76.474569, 77.752127, 78.474683,
+    77.375459, 79.95756, 79.210388, 83.181974, 82.771119, 81.125337, 82.449045,
+    82.631377, 81.983415, 81.665942, 85.08668, 84.226038, 83.017823, 84.113054,
+    83.094983, 85.114056, 84.544541, 84.561916, 85.746857, 85.78927, 86.8854,
+    85.982408, 87.118923, 86.161327, 86.828516, 87.367016, 86.667108, 86.201317,
+    85.589291, 87.335123, 87.168886, 85.828893, 85.282253, 86.285917, 84.827723,
+    86.278038, 86.293028, 84.962604, 85.269607, 86.685369, 84.849712, 84.664521,
+    84.926039, 83.698487, 83.457792, 82.467321, 82.495304, 84.226403, 83.810093,
+    82.869322, 79.995787, 83.154076, 80.467549, 81.677957, 79.753872, 81.108613,
+    80.309441, 79.804527, 79.58622, 77.941703, 77.092027, 75.926851, 76.46865,
+    78.238939, 74.082884, 73.213072, 71.553564, 71.388658
+])
+_W_MME = np.array([
+    67.182842, 72.527739, 74.694351, 76.108673, 77.693779, 78.493619, 79.209881,
+    77.997236, 81.670129, 80.899794, 83.642057, 83.689394, 81.929035, 83.813011,
+    83.646013, 82.478197, 82.757975, 86.051927, 85.123214, 84.361323, 85.334327,
+    84.272035, 86.37134, 85.638314, 86.382458, 87.317926, 87.271877, 88.359968,
+    87.393418, 88.744628, 88.015649, 88.447929, 89.390316, 88.319022, 88.1529,
+    87.432554, 89.339914, 88.950249, 87.301993, 87.251154, 87.687526, 86.612533,
+    88.299522, 88.530864, 87.015289, 87.516944, 88.630366, 87.095606, 86.591297,
+    86.705978, 85.612707, 85.299968, 84.573847, 83.81695, 86.371043, 85.66056,
+    84.955088, 81.775423, 83.814547, 82.102223, 83.408997, 81.036434, 82.36165,
+    82.314546, 81.24677, 81.554512, 79.404706, 78.799626, 76.719544, 77.786339,
+    80.31512, 75.290302, 74.165084, 73.144638, 72.130546
+])
+_W_WSR = np.array([
+    57.943175, 59.855507, 61.347882, 62.164251, 63.622377, 66.020185, 65.784138,
+    64.721537, 65.217051, 66.772144, 67.473257, 67.838506, 67.33192, 68.111301,
+    68.096955, 66.758922, 67.967802, 68.639686, 68.908867, 69.245412, 68.700663,
+    69.625849, 69.780541, 68.989465, 70.59888, 68.642333, 68.561594, 68.874025,
+    71.044395, 72.207723, 70.762946, 70.827382, 71.771166, 71.457091, 71.714851,
+    71.507786, 70.649017, 69.647191, 71.092204, 70.893996, 72.578412, 71.407383,
+    70.019657, 69.937875, 70.416324, 70.339851, 70.91065, 69.714178, 71.728222,
+    69.704214, 70.190361, 68.852136, 68.601133, 70.350992, 69.462846, 69.91921,
+    68.532076, 68.398699, 67.498461, 68.139955, 67.871145, 67.886384, 68.803968,
+    67.125172, 65.867482, 65.462742, 64.474519, 62.422949, 61.630096, 64.03427,
+    61.260546, 59.767097, 62.924132, 61.929479, 56.346545
+])
+_W_WME = np.array([
+    60.378914, 62.885509, 63.079014, 63.910561, 65.537124, 68.126951, 67.758813,
+    66.294759, 67.225692, 68.574721, 69.597754, 69.227869, 69.325303, 69.992213,
+    69.970409, 68.64744, 69.999932, 70.201926, 70.761767, 70.937052, 70.521892,
+    71.920282, 71.844236, 71.200964, 72.760384, 70.722992, 70.673218, 70.929537,
+    72.926064, 74.376653, 73.304398, 72.941746, 74.265655, 73.858226, 74.163717,
+    73.667278, 72.445012, 72.070479, 73.362776, 73.450674, 75.07187, 73.621918,
+    72.105118, 71.93301, 72.639749, 72.179077, 72.861458, 72.125039, 73.754498,
+    72.160646, 72.105825, 71.302947, 70.753846, 72.663504, 71.423024, 71.878977,
+    70.387144, 70.288849, 69.387157, 70.428648, 70.227012, 70.346532, 71.237683,
+    68.874324, 67.781468, 67.633842, 66.237658, 63.62039, 62.768733, 65.444245,
+    63.016265, 60.733756, 63.07661, 63.803605, 56.741693
+])
+
+def _build_height():
+    """75 age profiles. The column names are the workbook's own."""
+    return Frame({'Age': _AGE,
+                  'Men self reported': _H_MSR, 'men measured': _H_MME,
+                  'Women self reported': _H_WSR, 'Women measured': _H_WME})
+
+def _build_weight():
+    """75 age profiles. Note the colons, and the space after 'years)'."""
+    return Frame({'age (in years) ': _AGE,
+                  'Men: self reported': _W_MSR, 'Men: measured': _W_MME,
+                  'Women: self reported': _W_WSR, 'Women: measured': _W_WME})
+
+height = _build_height()
+weight = _build_weight()
+
+MU_GAP_NULL = 0
+`;
+
+  async function boot(log){
+    if(typeof loadPyodide === 'undefined'){ state='failed'; return state; }
+    try{
+      log && log("LOADING PYTHON RUNTIME .......");
+      py = await loadPyodide();
+      log && log("LOADING NUMPY, PANDAS, SCIPY .");
+      await py.loadPackage(["numpy", "pandas", "scipy"]);
+      py.setStdout({ batched:(s)=>out.push(s) });
+      py.setStderr({ batched:(s)=>out.push(s) });
+      log && log("LOADING HEIGHT AND WEIGHT ....");
+      py.runPython(BOOT);
+      state='ready';
+    }catch(e){ state='failed'; }
+    return state;
+  }
+
+  /* run: returns {ok, stdout, warns, error} */
+  function run(src){
+    out = [];
+    if(state!=='ready') return {ok:false, stdout:'', warns:[], error:'Python runtime unavailable.'};
+    try{
+      py.runPython("_ACAD_WARN.clear()");
+      py.runPython(src);
+      let w=[];
+      try{ w = py.runPython("list(_ACAD_WARN)").toJs(); }catch(e){ w=[]; }
+      return {ok:true, stdout:out.join(''), warns:Array.from(w), error:null};
+    }catch(e){
+      const m = String(e.message||e);
+      const lines = m.trim().split("\n");
+      // keep the last few lines: that is the actual Python error
+      return {ok:false, stdout:out.join(''), warns:[], error:lines.slice(-3).join("\n")};
+    }
+  }
+
+  /* read a numeric global, or any numeric expression; null if it fails */
+  function num(expr){
+    if(state!=='ready') return null;
+    try{ const v = py.runPython(`float(${expr})`); return (typeof v==='number')?v:null; }
+    catch(e){ return null; }
+  }
+  function isnan(expr){
+    if(state!=='ready') return false;
+    try{ return !!py.runPython(`bool(np.isnan(np.float64(${expr})))`); }catch(e){ return false; }
+  }
+  /* read a list of numbers, for the widgets that draw the real data */
+  function list(expr){
+    if(state!=='ready') return null;
+    try{
+      const v = py.runPython(`[float(_x) for _x in (${expr})]`);
+      const a = v.toJs ? Array.from(v.toJs()) : Array.from(v);
+      if(v.destroy) v.destroy();
+      return a;
+    }catch(e){ return null; }
+  }
+  return { boot, run, num, isnan, list, get state(){return state;} };
+})();
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Each numerical check accepts an answer within CONFIG.RTOL (2%) of the
+   target, or within its own 'tol', whichever is larger. Checks marked
+   strict keep their stated absolute tolerance.
+   ================================================================ */
+const STEPS = [
+
+/* ========================== THE MIRROR ========================== */
+{ id:'mirror', type:'info', bg:'fitting', who:'master', mood:'amused', title:'THE MIRROR',
+  text:`The Health Survey for England records both self-reported and interviewer-measured values. The files contain 75 age-specific averages, one for each age from 16 to 90, and not 75
+  individual participants. Let us assume that the same number of participants was surveyed at
+  each age, so that the average of the 75 age-specific gaps is equal to the average gap of all the
+  participants. We also treat the 75 age profiles as independent observations, and we revisit that
+  simplification at the end.
+  Under these assumptions, the research questions are : <strong>Do men report a larger height
+  than their measured height, and do women report a smaller weight than their measured weight, on
+  average across the ages 16 to 90 ?</strong>`,
+  banner:'FILE: 75 AGE PROFILES',
+  hud:{subject:'SELF-REPORTS', r:'—', shape:'—'},
+  cont:'Open the two workbooks' },
+
+{ id:'q8', type:'code', bg:'fitting', who:'master', title:'QUESTION I · CREATE THE REPORTING GAPS',
+  text:`The Health Survey for England collected both self-reported and interviewer-measured
+  height and weight. The two workbooks hold an estimated average for each age from 16 to 90. There are 75
+  of them.
+  Create the two gaps, defined as self-reported minus measured. Do not average them yet.
+  <span class="fx">The capitalisation of the column names is the workbook's own, and it is not
+  consistent. Copy it exactly.</span>`,
+  preamble:`height = _build_height()\nweight = _build_weight()`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nfrom scipy import stats\n\n# DATAFRAMES ALREADY LOADED\nheight   # 75 age profiles\n# columns: 'Age', 'Men self reported', 'men measured', 'Women self reported', 'Women measured'\nweight   # 75 age profiles\n# columns: 'age (in years) ', 'Men: self reported', 'Men: measured', 'Women: self reported', 'Women: measured'`,
+  starter:`height_gap_men = ???\nweight_gap_women = ???\n\nprint('Male height-gap observations : ' + str(len(height_gap_men)))\nprint('Female weight-gap observations : ' + str(len(weight_gap_women)))`,
+  solution:`height_gap_men = height['Men self reported'] - height['men measured']\nweight_gap_women = weight['Women: self reported'] - weight['Women: measured']\n\nprint('Male height-gap observations : ' + str(len(height_gap_men)))\nprint('Female weight-gap observations : ' + str(len(weight_gap_women)))`,
+  checks:[{name:'height gap (sum)', expr:"height_gap_men.sum()", value:152.789175, tol:0.05},
+          {name:'weight gap (sum)', expr:"weight_gap_women.sum()", value:-148.776900, tol:0.05}],
+  hint:`Self-reported minus measured, i.e., height['Men self reported'] - height['men measured'], and the same shape for the women's weight.`,
+  right:`Seventy-five gaps of each kind, and not one average yet. That is deliberate.
+  A positive gap means that the self-reported value is larger than the measured one. A negative
+  gap means the opposite. You now hold the direction of every discrepancy, and you have not yet
+  looked at where they point.
+  We shall put both series on the screen before calculating a test.`,
+  wrongHint:`Reported minus measured, in that order. And copy the column names exactly as the
+  workbooks spell them, i.e., 'men measured' in lower case, and the colons in the weight file.`,
+  note:'D = reported - measured, 75 age profiles of each' },
+
+{ id:'q8b', type:'choice', bg:'fitting', who:'master', title:'QUESTION II · READ THE SIGNS',
+  text:`The upper panel shows the male height gaps; every point is above zero. The lower panel
+  shows the female weight gaps; every point is below zero.
+  <strong>Before computing any test statistic, what results should you expect from the
+  statistical tests?</strong>`,
+  q:'Predict the conclusions suggested by the two plots.',
+  options:[
+    {id:'a', label:'We should expect not to reject either Null hypothesis, because the points are not identical.'},
+    {id:'b', label:'We should expect to reject only for male height, because positive gaps count as stronger evidence than negative gaps.'},
+    {id:'c', label:'We should expect to reject both Null hypotheses: male height gaps support a positive average, and female weight gaps support a negative average.'},
+    {id:'d', label:'The plots prove that every man over-reports and every woman under-reports.'}
+  ],
+  correct:'c',
+  right:`That is the sensible prediction. All 75 male height gaps point above zero, and all 75
+  female weight gaps point below zero. The two sample averages should therefore lie far into the
+  tails chosen by the research questions.
+  The formal tests will quantify that evidence and still depend on their maintained assumptions.
+  The plots describe age-specific averages. They do not prove that every individual behaves in
+  the same way.`,
+  wrong:{
+    a:`Observations do not need to be identical. What matters is the average gap relative to its
+       estimated standard error, and both plots sit consistently on one side of zero.`,
+    b:`The sign determines which tail to use, not the strength of the evidence. A consistently
+       negative series can be just as compelling as a consistently positive one.`,
+    d:`Each point is an age-specific average, not an individual. A conclusion about average gaps
+       cannot be converted into a statement about every person.`
+  },
+  widget:'gaps',
+  note:'plots predict: male height mean > 0  ·  female weight mean < 0' },
+
+{ id:'q9', type:'choice', bg:'fitting', who:'master', title:'QUESTION III · ESTIMATOR, ESTIMATE, AND BIAS',
+  text:`Write <span class="kbd">D_i = R_i − M_i</span>, in which R is the self-reported value and
+  M is the measured value.
+  <strong>Which statement is correct ?</strong>`,
+  q:'Choose the correct statement about bias.',
+  options:[
+    {id:'a', label:'Self-reporting is unbiased when the variance of D_i is zero.'},
+    {id:'b', label:'Self-reporting is unbiased when the number of observations exceeds 50.'},
+    {id:'c', label:'Self-reporting is unbiased on average when E(D_i) = 0. The sample-mean rule can be an unbiased estimator of the unknown average gap. The number computed from these data is its estimate.'},
+    {id:'d', label:'The sample-mean rule is a biased estimator whenever a hypothesis test rejects zero.'}
+  ],
+  correct:'c',
+  right:`The word bias is doing two different jobs, and they must be kept apart.
+  <strong>One.</strong> The <em>reporting process</em> is unbiased for the measured value when
+  E(R − M) = 0.
+  <strong>Two.</strong> Under the assumptions stated at the start, the <em>rule</em> that maps the
+  sample to its mean can be an unbiased estimator of μ_D, the average gap across the ages 16 to 90. Once these data have
+  been observed, the calculated sample mean is a fixed <em>estimate</em>, not an estimator.
+  Thus an unbiased estimation rule can reveal a biased reporting process, with no contradiction.`,
+  wrong:{
+    a:`A zero variance would mean that everyone's gap is identical. It could be identically two
+       centimetres, which is not unbiased at all.`,
+    b:`Sample size affects the precision of the estimate. It has nothing to say about whether the
+       reporting process is centred.`,
+    d:`Rejecting zero says that the gap is probably not zero, i.e., that the <em>process</em> is
+       biased. The estimation rule is doing its job correctly by producing an estimate away from zero.`
+  },
+  note:'estimator = rule before observing data  ·  estimate = computed number' },
+
+{ id:'q10a', type:'choice', bg:'fitting', who:'master', title:'QUESTION IV · TALLER IN THEIR HEADS ?',
+  text:`We test whether men report a height larger than their measured height, on average across
+  the ages 16 to 90. Let <span class="kbd">μ_D</span> denote the average reporting gap across the
+  ages 16 to 90, each age having the same weight.
+  <strong>Select the hypotheses, before you look at the gaps.</strong>`,
+  q:'Choose the hypotheses for the male height gap.',
+  options:[
+    {id:'a', label:'H0 : μ_D > 0 against H1 : μ_D = 0'},
+    {id:'b', label:'H0 : μ_D = 0 against H1 : μ_D < 0'},
+    {id:'c', label:'H0 : μ_D = 0 against H1 : μ_D > 0'},
+    {id:'d', label:'H0 : D-bar = 0 against H1 : D-bar > 0'}
+  ],
+  correct:'c',
+  right:`The gap is reported minus measured, so over-reporting is a <em>positive</em> average gap
+  and the evidence would sit in the <strong>upper tail</strong>.
+  The direction came from the question, not from the data. That is the only order in which a
+  one-sided test is honest.`,
+  wrong:{
+    a:`The Null hypothesis needs the equality, so that there is one distribution to compute
+       under.`,
+    b:`That is the lower tail, which would test whether men <em>under</em>-report their height.
+       Keep it. You will need exactly that shape in two questions.`,
+    d:`Hypotheses are about μ_D, the unknown average gap across the ages 16 to 90, not about the
+       sample average that you are one line of code away from computing.`
+  },
+  note:'over-reporting -> positive gap -> upper tail' },
+
+{ id:'q10b', type:'code', bg:'fitting', who:'master', title:'QUESTION IV · THE APPROXIMATE UPPER-TAIL Z-TEST',
+  text:`The population variance is not known. Estimate it from the 75 observed gaps using
+  <span class="kbd">.var(ddof=1)</span>, then estimate the standard error.
+  Because the variance is estimated, an exact test under independent Normal sampling would use
+  Student's t distribution with 74 degrees of freedom. In this exercise we deliberately use the
+  standard Normal distribution as an approximation. The approximation improves as N grows.
+  <strong>Compute the estimated variance, standard error, approximate Z statistic and
+  upper-tail p-value.</strong>`,
+  preamble:`height = _build_height()\nweight = _build_weight()\nheight_gap_men = height['Men self reported'] - height['men measured']\nN_HEIGHT = len(height_gap_men)\naverage_height_gap = height_gap_men.mean()\nMU_GAP_NULL = 0`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nfrom scipy import stats\n\n# DATAFRAMES ALREADY LOADED\nheight   # 75 age profiles; height_gap_men is already computed\nweight   # 75 age profiles\n\nN_HEIGHT = 75\naverage_height_gap = height_gap_men.mean()\nMU_GAP_NULL = 0`,
+  starter:`variance_height = ???\nse_height = ???\nz_height = ???\np_height_upper = ???\n\nprint('Estimated variance : ' + f'{variance_height:0.3f}' + ' cm^2')\nprint('Average gap : ' + f'{average_height_gap:0.3f}' + ' cm')\nprint('Standard error : ' + f'{se_height:0.3f}' + ' cm')\nprint('Approximate Z statistic : ' + f'{z_height:0.2f}')\nprint('One-sided p-value : ' + str(p_height_upper))`,
+  solution:`variance_height = height_gap_men.var(ddof=1)\nse_height = np.sqrt(variance_height / N_HEIGHT)\nz_height = (average_height_gap - MU_GAP_NULL) / se_height\np_height_upper = 1 - stats.norm.cdf(z_height)\n\nprint('Estimated variance : ' + f'{variance_height:0.3f}' + ' cm^2')\nprint('Average gap : ' + f'{average_height_gap:0.3f}' + ' cm')\nprint('Standard error : ' + f'{se_height:0.3f}' + ' cm')\nprint('Approximate Z statistic : ' + f'{z_height:0.2f}')\nprint('One-sided p-value : ' + str(p_height_upper))`,
+  checks:[{name:'variance_height', value:1.508741, tol:0.002},
+          {name:'se_height', value:0.141833, tol:0.0006},
+          {name:'z_height', value:14.3633, tol:0.05},
+          {name:'p_height_upper', value:0, tol:1e-30, strict:true}],
+  hint:`Estimate the variance with height_gap_men.var(ddof=1). Then use np.sqrt(variance_height / N_HEIGHT). The upper tail is 1 - stats.norm.cdf(z_height).`,
+  right:`An estimated variance of <strong>1.509 cm²</strong>, an average of
+  <strong>+2.037 cm</strong>, and an approximate statistic of <strong>14.4</strong>.
+  The expression <span class="kbd">1 - stats.norm.cdf(z_height)</span> prints 0.0 because this
+  upper tail is beyond ordinary floating-point precision, not because the mathematical
+  probability is literally zero. We reject the Null hypothesis.
+  Under the maintained assumptions, these age profiles provide evidence that men report a larger
+  height than the interviewer measures, on average across the ages 16 to 90.
+  Read the end of that sentence slowly. This does not mean that every man over-reports his height, and
+  it does not establish that anyone is lying. Rounding up to the nearest convenient number,
+  memory of a younger self, shoes, and the shrinking that comes with age would all leave the
+  same footprint.`,
+  wrongHint:`Use the sample variance, not a supplied population variance. The upper-tail area is
+  1 - stats.norm.cdf(z_height). A result of 0.0 is accepted here because of numerical precision.`,
+  widget:'zheight',
+  wow:true,
+  banner:'MEN: +2.04 cm',
+  hud:{subject:'HEIGHT, MEN', r:'+2.037 cm', shape:'reject H0'},
+  note:'men: variance estimated from data  ·  approximate z = 14.4  ·  upper tail = 1 - CDF' },
+
+{ id:'q11a', type:'choice', bg:'fitting', who:'master', title:'QUESTION V · LIGHTER IN THEIR HEADS ?',
+  text:`Now the scale. We test whether women report a weight smaller than their measured weight,
+  on average across the ages 16 to 90. As before, <span class="kbd">μ_D</span> denotes the average
+  reporting gap across the ages 16 to 90, each age having the same weight.
+  <strong>Select the hypotheses.</strong>`,
+  q:'Choose the hypotheses for the female weight gap.',
+  options:[
+    {id:'a', label:'H0 : μ_D = 0 against H1 : μ_D > 0'},
+    {id:'b', label:'H0 : μ_D = 0 against H1 : μ_D < 0'},
+    {id:'c', label:'H0 : μ_D < 0 against H1 : μ_D = 0'},
+    {id:'d', label:'H0 : D-bar = 0 against H1 : D-bar < 0'}
+  ],
+  correct:'b',
+  right:`Under-reporting a weight makes reported minus measured <em>negative</em>, so the
+  evidence would sit in the <strong>lower tail</strong>.
+  The variance will again be estimated from the observed gaps, and the same approximate Normal
+  method will be used. Only the tail has moved, because only the question has moved.`,
+  wrong:{
+    a:`That is the upper tail, i.e., the test for reporting a <em>larger</em> weight than
+       measured. It is the height question wearing the wrong clothes.`,
+    c:`The equality belongs in the Null hypothesis. An inequality there gives you no single
+       distribution to compute under.`,
+    d:`The observed sample mean is already in your hands. The hypotheses are about μ_D, the unknown
+       average gap across the ages 16 to 90.`
+  },
+  note:'under-reporting -> negative gap -> lower tail' },
+
+{ id:'q11b', type:'code', bg:'fitting', who:'master', title:'QUESTION V · THE APPROXIMATE LOWER-TAIL Z-TEST',
+  text:`Estimate the variance from the female weight gaps with <span class="kbd">ddof=1</span>.
+  We again use the standard Normal distribution as an approximation.
+  <strong>Compute the estimated variance, standard error, approximate Z statistic and
+  lower-tail p-value.</strong>`,
+  preamble:`height = _build_height()\nweight = _build_weight()\nweight_gap_women = weight['Women: self reported'] - weight['Women: measured']\nN_WEIGHT = len(weight_gap_women)\naverage_weight_gap = weight_gap_women.mean()\nMU_GAP_NULL = 0`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nfrom scipy import stats\n\n# DATAFRAMES ALREADY LOADED\nheight   # 75 age profiles\nweight   # 75 age profiles; weight_gap_women is already computed\n\nN_WEIGHT = 75\naverage_weight_gap = weight_gap_women.mean()\nMU_GAP_NULL = 0`,
+  starter:`variance_weight = ???\nse_weight = ???\nz_weight = ???\np_weight_lower = ???\n\nprint('Estimated variance : ' + f'{variance_weight:0.3f}' + ' kg^2')\nprint('Average gap : ' + f'{average_weight_gap:0.3f}' + ' kg')\nprint('Standard error : ' + f'{se_weight:0.3f}' + ' kg')\nprint('Approximate Z statistic : ' + f'{z_weight:0.2f}')\nprint('One-sided p-value : ' + str(p_weight_lower))`,
+  solution:`variance_weight = weight_gap_women.var(ddof=1)\nse_weight = np.sqrt(variance_weight / N_WEIGHT)\nz_weight = (average_weight_gap - MU_GAP_NULL) / se_weight\np_weight_lower = stats.norm.cdf(z_weight)\n\nprint('Estimated variance : ' + f'{variance_weight:0.3f}' + ' kg^2')\nprint('Average gap : ' + f'{average_weight_gap:0.3f}' + ' kg')\nprint('Standard error : ' + f'{se_weight:0.3f}' + ' kg')\nprint('Approximate Z statistic : ' + f'{z_weight:0.2f}')\nprint('One-sided p-value : ' + str(p_weight_lower))`,
+  checks:[{name:'variance_weight', value:0.201538, tol:0.001},
+          {name:'se_weight', value:0.051838, tol:0.0006},
+          {name:'z_weight', value:-38.2672, tol:0.1},
+          {name:'p_weight_lower', value:0, tol:1e-30, strict:true}],
+  hint:`Estimate the variance with weight_gap_women.var(ddof=1). The lower tail is stats.norm.cdf(z_weight). Expect a printed zero this far into the tail.`,
+  right:`An estimated variance of <strong>0.202 kg²</strong>, an average of
+  <strong>−1.984 kg</strong>, and an approximate statistic of <strong>−38.3</strong>. We
+  reject the Null hypothesis.
+  Look at what the p-value printed. It may say something like 1e-320, and it may simply say
+  <span class="kbd">0.0</span>.
+  <span class="fx">Probability has not disappeared. It has become smaller than the numerical
+  display can hold. A double-precision number gives up somewhere below 10⁻³²⁴, and the
+  mathematics carries on without it.</span>
+  The sign does the storytelling. Men gain about two centimetres, women lose about two
+  kilograms, and no diet or stretching was required. And once again : this is evidence about the
+  average reporting gap across the ages 16 to 90, not a verdict on any individual woman.`,
+  wrongHint:`Use the sample variance with ddof=1. The lower tail is stats.norm.cdf(z_weight),
+  i.e., the area to the left. Numerical underflow to 0.0 is accepted.`,
+  widget:'zweight',
+  wow:true,
+  banner:'WOMEN: -1.98 kg',
+  hud:{subject:'WEIGHT, WOMEN', r:'-1.984 kg', shape:'reject H0'},
+  note:'women: variance estimated from data  ·  approximate z = -38.3  ·  lower tail = CDF' },
+
+{ id:'q12a', type:'code', bg:'fitting', who:'master', title:'QUESTION VI · BOTH DIRECTIONS',
+  text:`Suppose the company had only asked whether the reported and measured values differ,
+  without naming a direction in advance.
+  <strong>Compute the two-sided p-value for each gap.</strong>`,
+  preamble:`height = _build_height()\nweight = _build_weight()\nheight_gap_men = height['Men self reported'] - height['men measured']\nweight_gap_women = weight['Women: self reported'] - weight['Women: measured']\nvariance_height = height_gap_men.var(ddof=1)\nvariance_weight = weight_gap_women.var(ddof=1)\nz_height = height_gap_men.mean() / np.sqrt(variance_height / len(height_gap_men))\nz_weight = weight_gap_women.mean() / np.sqrt(variance_weight / len(weight_gap_women))`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nfrom scipy import stats\n\n# DATAFRAMES ALREADY LOADED\nheight   # 75 age profiles\nweight   # 75 age profiles\n\n# Sample variances and approximate statistics already computed\nz_height = 14.3633\nz_weight = -38.2672`,
+  starter:`p_height_two_sided = ???\np_weight_two_sided = ???\n\nprint('Male height, two-sided : ' + f'{p_height_two_sided:0.3e}')\nprint('Female weight, two-sided : ' + str(p_weight_two_sided))`,
+  solution:`p_height_two_sided = 2 * (1 - stats.norm.cdf(abs(z_height)))\np_weight_two_sided = 2 * (1 - stats.norm.cdf(abs(z_weight)))\n\nprint('Male height, two-sided : ' + f'{p_height_two_sided:0.3e}')\nprint('Female weight, two-sided : ' + str(p_weight_two_sided))`,
+  checks:[{name:'p_height_two_sided', value:0, tol:1e-30, strict:true},
+          {name:'p_weight_two_sided', value:0, tol:1e-30, strict:true}],
+  hint:`Use 2 * (1 - stats.norm.cdf(abs(z))) for each statistic. The absolute value selects the smaller tail before it is doubled.`,
+  right:`Both expressions print <strong>0.0</strong> at ordinary floating-point precision because
+  both tails are extraordinarily small. That numerical zero is not a mathematical probability
+  of exactly zero.
+  The decision does not change in these data, because both statistics are absurdly far from
+  zero. The lesson is the reasoning, not the verdict : the directional tests answered the
+  questions we asked in advance, and the two-sided tests would be the right instrument if either
+  direction of error mattered to the business.`,
+  wrongHint:`Two times the upper tail of the absolute value, for each statistic.`,
+  note:'two-sided = 2 x the smaller tail, for both gaps' },
+
+{ id:'q12b', type:'choice', bg:'fitting', who:'master', title:'QUESTION VI · WHAT CHANGED',
+  text:`<strong>Which statement is correct ?</strong>`,
+  q:'Choose the correct statement about the two kinds of test.',
+  options:[
+    {id:'a', label:'A two-sided p-value is always equal to a one-sided p-value.'},
+    {id:'b', label:'The two-sided test determines the direction after observing the data.'},
+    {id:'c', label:'For a symmetric distribution, the two-sided p-value is twice the smaller one-sided tail probability.'},
+    {id:'d', label:'A two-sided test is invalid when the standardized statistic is negative.'}
+  ],
+  correct:'c',
+  right:`Broader, and therefore more demanding of the evidence. You pay for the wider question
+  with a p-value twice as large.
+  A two-sided test does not choose a direction at all. That is precisely its virtue when you
+  have no direction to defend in advance.`,
+  wrong:{
+    a:`It is twice as large, for a symmetric distribution. They coincide only in the degenerate
+       case where the tail probability is one half.`,
+    b:`Nothing chooses a direction after the data. That is what we spent the whole session
+       forbidding.`,
+    d:`A negative statistic is perfectly ordinary, i.e., the observed average is below the Null
+       value. The absolute value handles it.`
+  },
+  note:'two-sided asks a broader question and costs a factor of two' },
+
+{ id:'q13', type:'multi', bg:'fitting', who:'master', mood:'angry', title:'THE VERDICT',
+  text:`Before I let you out.
+  <strong>Select every statement that this exercise supports.</strong>`,
+  q:'Tick every statement that is supported, then submit.',
+  options:[
+    {id:'a', label:'The variances used in these tests were estimated from the observed gaps.'},
+    {id:'c', label:'Using the standard Normal distribution here is an approximation that becomes more accurate as the sample size grows.'},
+    {id:'d', label:'Rejecting a Null hypothesis about an average proves that every individual differs in the same direction.'},
+    {id:'f', label:'A lower-tail Normal probability is stats.norm.cdf(z).'},
+    {id:'g', label:'The direction of a one-sided test should be stated before examining the observed result.'}
+  ],
+  correct:['a','c','f','g'],
+  right:`A, C, F and G.
+  D is the mistake that turns a statement about an average into a claim about every individual.
+  The Normal calculations are explicitly approximate because the variances were estimated, and
+  the direction of each one-sided test was fixed before interpreting the result.`,
+  wrongHint:`Four of the five statements are supported. Reconsider only the statement that turns a result
+  about an average into a claim about every individual.`,
+  note:'variance estimated  ·  Normal approximation  ·  choose the tail in advance' },
+
+{ id:'close', type:'info', bg:'fitting', who:'master', title:'THE ACADEMY · DISMISSAL',
+  text:`You defined each reporting gap before averaging it, stated each directional hypothesis
+  before testing it, and estimated both variances from the observed data.
+  The approximate Z-tests used the standard Normal distribution. Under independent Normal
+  sampling, accounting exactly for the uncertainty in the estimated variance would lead to a
+  Student t test. The distinction fades as the sample size grows.
+  One final caution. These 75 rows are fitted age-specific averages, and
+  adjacent ages are not independent in the way that 75 randomly sampled people would be. The
+  arithmetic is useful for learning the test, but its interpretation still depends on how the
+  data were made.
+  <span class="fx">A test about an average is not a verdict on every individual.</span>`,
+  banner:'ESTIMATE · APPROXIMATE · INTERPRET',
+  cont:'Collect the password',
+  final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudSubject:$('#hud-subject'), hudY:$('#hud-y'), hudP:$('#hud-p'), hud:$('#hud'),
+  doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+/* the expression a character wears until something changes it */
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  const n = node(who);
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const node = who==='student' ? el.student : el.master;
+  stopFlap();
+  let f=0;
+  flap = { node, id:setInterval(()=>{
+    node.classList.remove('talk-1','talk-2');
+    node.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(node, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  node.innerHTML = html;
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0, count=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  node.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  el.note.innerHTML = notes.map(n=>'▸ '+n).join('<br>');
+}
+
+/* ---- HUD ---- */
+function setHUD(h){
+  if(!h) return;
+  if(h.subject!==undefined) el.hudSubject.textContent = h.subject;
+  if(h.r!==undefined)       el.hudY.textContent       = h.r;
+  if(h.shape!==undefined){
+    el.hudP.textContent = h.shape;
+    el.hudP.classList.toggle('broken', String(h.shape).indexOf('?')>=0);
+  }
+}
+/* the HUD as it stood at step i: the latest one declared at or before it */
+function hudAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].hud) return STEPS[k].hud; }
+  return {subject:'—', r:'—', shape:'—'};
+}
+/* the same for the strip under the HUD */
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+function glitchHUD(){
+  el.hud.classList.add('glitching');
+  setTimeout(()=>el.hud.classList.remove('glitching'), 1100);
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lecture;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS
+
+   Dark marks on a pale ground, axis labels carrying their units, a box
+   tall enough to hold the axis band, and no picture that gives away an
+   answer before the student has committed to it. The tail pictures draw
+   the standard Normal density with the relevant tail shaded; when the
+   observed statistic is far outside the drawn range, which happens twice
+   here, the picture says so with an arrow instead of pretending to fit.
+   No QQ-plot appears anywhere, as the outline requires. The data are read
+   back out of Python, so the pictures show what the student computed.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel, used for the 75 age profiles */
+function panelSVG(o){
+  const W=700, H=o.H||272, L=o.L||80, R=684, T=44, B=(o.B||210);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||3}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.85}"/>`;
+    }
+  });
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}"
+      x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?'stroke-dasharray="8 6"':''}/>`;
+    if(l.label){
+      lines += `<text x="${R-4}" y="${(py(l.y2)-7).toFixed(1)}" fill="${l.color||PLOT.fit}" font-size="15"
+        text-anchor="end" font-family="VT323,monospace">${l.label}</text>`;
+    }
+  });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>
+      <text x="${px(v).toFixed(1)}" y="${B+21}" fill="${PLOT.label}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${v}</text>`;
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>
+      <text x="${L-9}" y="${(py(v)+5).toFixed(1)}" fill="${PLOT.label}" font-size="15" text-anchor="end" font-family="VT323,monospace">${o.yfmt?o.yfmt(v):v}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    <text x="${L}" y="24" fill="${PLOT.label}" font-size="17" font-family="VT323,monospace">${o.title||''}</text>
+    ${marks}${lines}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    <text x="${(L+R)/2}" y="${H-12}" fill="${PLOT.label}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${o.xlab||''}</text>
+    <text x="16" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 16 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* the standard Normal, with one tail shaded */
+function ztailSVG(z, side, note){
+  const W=700, H=236, L=60, R=660, T=48, B=180, LIM=6;
+  const px = v => L + (v+LIM)/(2*LIM)*(R-L);
+  const pdf = v => Math.exp(-0.5*v*v)/Math.sqrt(2*Math.PI);
+  const py = v => B - (v/pdf(0))*(B-T);
+  let curve='', shade='';
+  for(let i=0;i<=240;i++){
+    const v = -LIM + i*(2*LIM/240);
+    curve += (i?' L':'M') + px(v).toFixed(1) + ' ' + py(pdf(v)).toFixed(1);
+  }
+  const inRange = Math.abs(z) <= LIM;
+  const cut = inRange ? z : (z<0 ? -LIM : LIM);
+  const from = side==='lower' ? -LIM : cut;
+  const to   = side==='lower' ? cut  : LIM;
+  shade = `M${px(from).toFixed(1)} ${B}`;
+  for(let i=0;i<=80;i++){
+    const v = from + i*((to-from)/80);
+    shade += ` L${px(v).toFixed(1)} ${py(pdf(v)).toFixed(1)}`;
+  }
+  shade += ` L${px(to).toFixed(1)} ${B} Z`;
+  let ticks='';
+  for(let v=-6;v<=6;v+=2){
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>
+      <text x="${px(v).toFixed(1)}" y="${B+21}" fill="${PLOT.label}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${v}</text>`;
+  }
+  let mark='';
+  if(inRange){
+    mark = `<line x1="${px(z).toFixed(1)}" y1="${B}" x2="${px(z).toFixed(1)}" y2="${T-6}" stroke="${PLOT.fit}" stroke-width="2"/>
+      <text x="${px(z).toFixed(1)}" y="${T-12}" fill="${PLOT.fit}" font-size="17" text-anchor="middle"
+        font-family="VT323,monospace">z = ${z.toFixed(2)}</text>`;
+  } else {
+    const dir = z<0 ? -1 : 1;
+    const ex = z<0 ? L+6 : R-6;
+    mark = `<line x1="${ex - dir*46}" y1="${T+6}" x2="${ex}" y2="${T+6}" stroke="${PLOT.fit}" stroke-width="2"/>
+      <path d="M${ex} ${T+6} l ${-dir*9} -5 l 0 10 z" fill="${PLOT.fit}"/>
+      <text x="${ex - dir*54}" y="${T+11}" fill="${PLOT.fit}" font-size="17"
+        text-anchor="${z<0?'start':'end'}" font-family="VT323,monospace">z = ${z.toFixed(2)}, off this scale</text>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    <text x="${L}" y="24" fill="${PLOT.label}" font-size="17" font-family="VT323,monospace">The standard Normal distribution under the Null hypothesis</text>
+    <path d="${shade} " fill="${PLOT.fit}" fill-opacity="0.28"/>
+    <path d="${curve}" fill="none" stroke="${PLOT.ink}" stroke-width="2"/>
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}${mark}
+    <text x="${(L+R)/2}" y="${H-10}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace">${note||'standard errors from the Null value'}</text>
+  </svg>`;
+}
+
+/* ---- the transition ---- */
+function playMirror(host){
+  const svg = `<svg viewBox="0 0 700 200" style="width:100%;height:auto;display:block">
+    <rect width="700" height="200" fill="${PLOT.paper}"/>
+    <g stroke="${PLOT.ink}" stroke-width="3" fill="none">
+      <rect x="60" y="70" width="130" height="58" rx="26" fill="#fbfaf4"/>
+      <path d="M78 128 l -14 30 M172 128 l 14 30"/>
+      <text x="125" y="106" fill="${PLOT.label}" font-size="17" text-anchor="middle" font-family="VT323,monospace" stroke="none">I am fine</text>
+      <path d="M250 60 h 190 v 44 h -190 z" fill="#fbfaf4"/>
+      <path d="M270 60 v 14 M290 60 v 22 M310 60 v 14 M330 60 v 22 M350 60 v 14 M370 60 v 22 M390 60 v 14 M410 60 v 22"/>
+      <circle cx="560" cy="112" r="52" fill="#fbfaf4"/>
+      <path d="M560 112 l 30 -26"/>
+      <circle cx="560" cy="112" r="5" fill="${PLOT.ink}"/>
+    </g>
+    <text x="345" y="130" fill="${PLOT.label}" font-size="17" text-anchor="middle" font-family="VT323,monospace">a measuring tape</text>
+    <text x="560" y="184" fill="${PLOT.label}" font-size="17" text-anchor="middle" font-family="VT323,monospace">and a scale</text>
+    <text x="125" y="184" fill="${PLOT.label}" font-size="17" text-anchor="middle" font-family="VT323,monospace">what people say</text>
+    <text x="30" y="34" fill="${PLOT.fit}" font-size="18" font-family="VT323,monospace">The mirror is cheap. The tape is honest. We are going to price the difference.</text>
+  </svg>`;
+  host.innerHTML = plotFrame('THE MIRROR', svg);
+  return 1100;
+}
+
+/* ---- both reporting-gap series, shown before any test is computed ---- */
+function playGaps(host){
+  const ageHeight = Py.list("height['Age']");
+  const ageWeight = Py.list("weight['age (in years) ']");
+  const heightGap = Py.list("height_gap_men");
+  const weightGap = Py.list("weight_gap_women");
+
+  if(!ageHeight || !ageWeight || !heightGap || !weightGap){
+    host.innerHTML = plotFrame('EVIDENCE · THE TWO REPORTING GAPS',
+      `<div style="padding:24px;background:${PLOT.paper};color:${PLOT.label};font:18px var(--mono)">
+       The graph requires the Python results from the preceding question.</div>`);
+    return 300;
+  }
+
+  const heightPanel = panelSVG({
+    H:250, B:190,
+    series:[{x:ageHeight, y:heightGap, color:PLOT.ink, r:3.5}],
+    lines:[{x1:16, y1:0, x2:90, y2:0, color:PLOT.fit, w:2, dash:true,
+            label:'zero: no reporting gap'}],
+    xmin:14, xmax:92, ymin:-0.5, ymax:6,
+    xticks:[20,30,40,50,60,70,80,90], yticks:[0,1,2,3,4,5,6],
+    title:'Men: self-reported height minus measured height',
+    xlab:'Age profile (years)', ylab:'Height gap (cm)'
+  });
+  const weightPanel = panelSVG({
+    H:250, B:190,
+    series:[{x:ageWeight, y:weightGap, color:PLOT.second, r:3.5}],
+    lines:[{x1:16, y1:0, x2:90, y2:0, color:PLOT.fit, w:2, dash:true,
+            label:'zero: no reporting gap'}],
+    xmin:14, xmax:92, ymin:-3.5, ymax:0.5,
+    xticks:[20,30,40,50,60,70,80,90], yticks:[-3,-2,-1,0],
+    title:'Women: self-reported weight minus measured weight',
+    xlab:'Age profile (years)', ylab:'Weight gap (kg)'
+  });
+
+  host.innerHTML = plotFrame('EVIDENCE · THE TWO REPORTING GAPS',
+    heightPanel + weightPanel,
+    'All 75 height gaps are positive; all 75 weight gaps are negative. Each point is an age-specific average.');
+  return 1400;
+}
+
+/* ---- a tail picture, and for the two gaps the 75 profiles above it ---- */
+function playZ(host, which){
+  const isH = (which==='height');
+  const gap = Py.list(isH ? "height_gap_men" : "weight_gap_women");
+  const age = Py.list(isH ? "height['Age']" : "weight['age (in years) ']");
+  const z   = Py.num(isH ? "z_height" : "z_weight");
+  let top = '';
+  if(gap && age){
+    let mean = 0; gap.forEach(v=>mean+=v); mean /= gap.length;
+    const lo = isH ? -1 : -4, hi = isH ? 5 : 1;
+    top = panelSVG({
+      H:236, B:176,
+      series:[{x:age, y:gap, color:isH?PLOT.ink:PLOT.second, r:3.4}],
+      lines:[{x1:16, y1:0, x2:90, y2:0, color:PLOT.axis, w:1.5, dash:true, label:'no gap'},
+             {x1:16, y1:mean, x2:90, y2:mean, color:PLOT.fit, w:2,
+              label:'average ' + (mean>0?'+':'') + mean.toFixed(3) + (isH?' cm':' kg')}],
+      xmin:14, xmax:92, ymin:lo, ymax:hi,
+      xticks:[20,30,40,50,60,70,80,90],
+      yticks:isH?[-1,0,1,2,3,4,5]:[-4,-3,-2,-1,0,1],
+      title:isH ? 'Male reporting gap by age profile, self reported minus measured'
+                : 'Female reporting gap by age profile, self reported minus measured',
+      xlab:'Age (years)', ylab:isH ? 'Height gap (cm)' : 'Weight gap (kg)'
+    });
+  }
+  const zz = (z===null) ? (isH?14.37:-38.26) : z;
+  host.innerHTML = plotFrame(isH ? 'EVIDENCE · MEN AND THE MEASURING TAPE' : 'EVIDENCE · WOMEN AND THE SCALE',
+    top + ztailSVG(zz, isH?'upper':'lower', 'standard errors from a gap of zero'),
+    isH ? 'Every one of the 75 age profiles sits above zero.'
+        : 'The statistic is so far into the tail that the p-value falls below what a double can hold.');
+  return 1800;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='mirror')  return playMirror(host);
+  if(name==='gaps')    return playGaps(host);
+  if(name==='zheight') return playZ(host, 'height');
+  if(name==='zweight') return playZ(host, 'weight');
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.glitch) glitchHUD();
+    buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'match':   return zoneMatch(s);
+    case 'code':    return zoneCode(s);
+    case 'reflect': return zoneReflect(s);
+  }
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{
+    if(s.after){
+      el.zone.innerHTML='';
+      typeInto(el.dlg, s.after, 'master', ()=> contButton('Continue', next));
+    } else if(s.final){ finish(); }
+    else next();
+  });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  // a picture may be shown before the question, so that the student
+  // commits with the evidence in front of them
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='4px'; el.zone.appendChild(helpRow);
+  let fails=0;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+
+  const mySeq = seq;
+  function advance(givenAway){
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);
+    helpRow.innerHTML='';
+    addNote(s.note);
+    // the label is kept as HTML, so that a hat or a bar survives the echo
+    const label = s.options.find(o=>o.id===s.correct).label;
+    // the apprentice says the answer, then the master replies
+    setSpeaker('student');
+    const line = givenAway ? `<em>“…the answer was : ${label}.”</em>` : `<em>“${label}”</em>`;
+    typeInto(el.dlg, line, 'student', ()=>{
+      setTimeout(()=>{
+        if(mySeq!==seq) return;
+        setSpeaker('master');
+        if(s.wow) reactTo('wow');
+        // a step may reveal a second picture with the answer on it
+        let wait = 0;
+        if(s.widgetAfter){
+          const w=document.createElement('div'); el.zone.appendChild(w);
+          wait = mountWidget(s.widgetAfter, w);
+        }
+        setTimeout(()=>{ if(mySeq!==seq) return;
+          typeInto(el.dlg, s.right, 'master', ()=>{ contButton('Continue', next); }); }, wait);
+      }, 260);
+    });
+    el.zone.innerHTML='';
+  }
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE ANSWER';
+    b.onclick=()=>{
+      const good = box.querySelector(`[data-oid="${s.correct}"]`);
+      if(good) good.classList.add('given');
+      setTimeout(()=>{ if(mySeq===seq) advance(true); }, 500);
+    };
+    helpRow.appendChild(b);
+  }
+
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      advance(false);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      const w = (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.';
+      clearVerdict();
+      verdict('no', w);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+        offerSolution();
+        verdict('give','Two attempts. You may take the answer and keep going — the reasoning matters more than the guess.');
+      }
+      el.zone.appendChild(helpRow);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+/* ---- match: give each case its lesson ---- */
+function zoneMatch(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+
+  // the lessons, listed once, above the rows
+  const key=document.createElement('div'); key.className='matchkey';
+  key.innerHTML = s.lessons.map(l=>`<div><b>${l.id.toUpperCase()}.</b> ${l.label}</div>`).join('');
+  el.zone.appendChild(key);
+
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const chosen = {};
+  s.rows.forEach(r=>{
+    const row=document.createElement('div'); row.className='matchrow';
+    const name=document.createElement('span'); name.className='matchname'; name.textContent=r.label;
+    row.appendChild(name);
+    s.lessons.forEach(l=>{
+      const b=document.createElement('button');
+      b.className='matchbtn'; b.textContent=l.id.toUpperCase();
+      b.onclick=()=>{
+        if(b.disabled) return;
+        chosen[r.id]=l.id;
+        row.querySelectorAll('.matchbtn').forEach(x=>x.classList.remove('on'));
+        b.classList.add('on');
+      };
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+  });
+
+  const bar=document.createElement('div'); bar.style.cssText='margin-top:8px;display:flex;gap:8px;flex-wrap:wrap';
+  el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  const mySeq=seq; let fails=0;
+
+  function paint(){
+    box.querySelectorAll('.matchrow').forEach((row,i)=>{
+      const want = s.correct[s.rows[i].id];
+      row.querySelectorAll('.matchbtn').forEach(b=>{
+        b.disabled=true;
+        if(b.textContent.toLowerCase()===want) b.classList.add('on');
+        else b.classList.remove('on');
+      });
+    });
+  }
+  function advance(givenAway){
+    paint();
+    bar.innerHTML='';
+    addNote(s.note);
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{
+      if(mySeq!==seq) return;
+      el.zone.innerHTML='';
+      if(s.wow) reactTo('wow');
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }, 800);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>advance(true);
+    bar.appendChild(g);
+  }
+
+  submit.onclick=()=>{
+    const missing = s.rows.filter(r=>!chosen[r.id]).length;
+    clearVerdict();
+    if(missing){
+      verdict('no','Give every case a lesson before you submit.');
+      return;
+    }
+    const wrong = s.rows.filter(r=>chosen[r.id]!==s.correct[r.id]).length;
+    if(wrong===0){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    verdict('no', wrong + ' of the three are not in the right place. ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer, and read the three warnings once more.');
+    }
+    el.zone.appendChild(bar);
+  };
+}
+
+function zoneMulti(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const row=document.createElement('div'); row.style.cssText='margin-top:6px;display:flex;gap:8px;flex-wrap:wrap';
+  el.zone.appendChild(row);
+  const mySeq = seq;
+  let fails=0;
+
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; row.appendChild(submit);
+
+  function advance(givenAway){
+    inputs().forEach(b=>b.disabled=true);
+    box.querySelectorAll('label').forEach(l=>{
+      if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add(givenAway?'given':'right');
+    });
+    addNote(s.note);
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{
+      if(mySeq!==seq) return;
+      el.zone.innerHTML='';
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }, 700);
+  }
+  function offerSolution(){
+    if(row.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      inputs().forEach(b=>{ b.checked = s.correct.indexOf(b.value)>=0; });
+      advance(true);
+    };
+    row.appendChild(g);
+  }
+
+  submit.onclick=()=>{
+    if(chosen() === wanted){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    clearVerdict();
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer and keep going — what the test can and cannot see matters more than the ticking.');
+    }
+    el.zone.appendChild(row);
+  };
+}
+
+/* ---- code ---- */
+function openPythonHelper(){
+  const guide=document.querySelector('.pyguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelper',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Exercise III</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .pyguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference examples only — your exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+
+/* how far an answer may be from the target: the larger of its own
+   absolute tolerance and CONFIG.RTOL in relative terms. A check marked
+   'strict' keeps its absolute tolerance only.                         */
+function tolerance(c){
+  const abs = c.tol || 0;
+  if(c.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(c.value));
+}
+
+function zoneCode(s){
+  const wrap=document.createElement('div');
+  wrap.className='win95'; wrap.id='code';
+  wrap.innerHTML = `
+    <div class="titlebar"><span>C:\\ACADEMY\\PYTHON.EXE</span><span class="boxes">▬ □ ✕</span></div>
+    <div class="envhead"><b>YOUR PYTHON ENVIRONMENT</b><span>already prepared — do not copy these lines</span></div>
+    <div class="preview">${escapeHtml(s.shown||'')}</div>
+    <textarea spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    <div class="codebar">
+      <button class="btn primary" data-run>RUN ▶</button>
+      <button class="btn" data-hint>HINT</button>
+      <button class="btn" data-python-helper>PYTHON HELPER</button>
+      <span class="pyflag"></span>
+    </div>
+    <div id="out">ready.</div>`;
+  el.zone.appendChild(wrap);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='8px'; el.zone.appendChild(helpRow);
+
+  const ta=wrap.querySelector('textarea'), out=wrap.querySelector('#out');
+  ta.value = s.starter;
+  autosize(ta);
+  ta.addEventListener('input', ()=>autosize(ta));
+  wrap.querySelector('.pyflag').textContent =
+    (Py.state==='ready') ? 'PYTHON 3 · NUMPY · PANDAS · SCIPY' : 'FALLBACK MODE';
+
+  let fails=0, solved=false;
+  const mySeq = seq;
+
+  wrap.querySelector('[data-hint]').onclick = ()=>{
+    out.innerHTML = `<span class="warn">hint: ${escapeHtml(s.hint)}</span>`;
+  };
+  wrap.querySelector('[data-python-helper]').onclick = openPythonHelper;
+  wrap.querySelector('[data-run]').onclick = ()=>run();
+  ta.addEventListener('keydown', e=>{
+    if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); }
+    if(e.key==='Tab'){ e.preventDefault();
+      const p=ta.selectionStart; ta.value=ta.value.slice(0,p)+'    '+ta.value.slice(ta.selectionEnd);
+      ta.selectionStart=ta.selectionEnd=p+4; autosize(ta); }
+  });
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE SOLUTION';
+    b.onclick=()=>{
+      ta.value = s.solution; autosize(ta);
+      clearVerdict();
+      verdict('give','Here is the solution. Read it, then RUN is pressed for you.');
+      out.innerHTML = `<span class="warn">solution loaded — running it…</span>`;
+      setTimeout(()=>{ if(mySeq===seq) run(true); }, 900);
+    };
+    helpRow.appendChild(b);
+  }
+  function noteFailure(){
+    fails++;
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+  }
+
+  function run(given){
+    const src = ta.value;
+    if(src.indexOf('???')>=0){
+      out.innerHTML = `<span class="err">SyntaxError: you have not replaced every ???</span>`;
+      return;
+    }
+    if(Py.state!=='ready') return runFallback(src, given);
+
+    // clear the target names so that a stale value cannot pass the check
+    // only plain variable names can go stale; an 'expr' check reads the data
+    const names = s.checks.filter(c=>!c.expr).map(c=>c.name);
+    Py.run(`for _n in ${JSON.stringify(names)}:\n    globals().pop(_n, None)`);
+    Py.run(s.preamble);
+    const r = Py.run(src);
+
+    let lines=[];
+    if(r.stdout) lines.push(escapeHtml(r.stdout.replace(/\n+$/,'')));
+    r.warns.forEach(w=>lines.push(`<span class="warn">${escapeHtml(w)}</span>`));
+    if(!r.ok){
+      lines.push(`<span class="err">${escapeHtml(r.error)}</span>`);
+      out.innerHTML = lines.join('\n');
+      if(!solved){ reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+      return;
+    }
+
+    let allOK = true;
+    const verd=[];
+    s.checks.forEach(c=>{
+      const read = c.expr || c.name;        // a check may read an expression
+      if(c.nan){
+        const isn = Py.isnan(read);
+        verd.push(`${c.name} = <span class="${isn?'ok':'err'}">${isn?'nan':String(Py.num(read))}</span>`);
+        if(!isn) allOK=false;
+      } else {
+        const v = Py.num(read);
+        if(v===null){ verd.push(`<span class="err">${escapeHtml(c.name)} could not be read. Is it defined ?</span>`); allOK=false; return; }
+        const good = Math.abs(v-c.value) <= tolerance(c);
+        verd.push(`${c.name} = <span class="${good?'ok':'err'}">${fmt(v)}</span>`);
+        if(!good) allOK=false;
+      }
+    });
+    lines.push(`<span style="color:#5a6a8a">--- checked ---</span>`);
+    out.innerHTML = lines.concat(verd).join('\n');
+    if(solved) return;                      // already passed: keep the panel as it is
+    if(allOK) pass();
+    else { reactTo('wrong'); clearVerdict(); verdict('no', s.wrongHint); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  function runFallback(src, given){
+    // no Pyodide: accept if every required name is assigned something plausible
+    const ok = given || (s.checks.every(c=> new RegExp('\\b'+c.name+'\\s*=\\s*\\S').test(src))
+               && /stats\.norm\.cdf|np\.sqrt|len\(|\.mean\(|\.var\(/.test(src));
+    out.innerHTML = ok
+      ? `<span class="warn">Python is unavailable, so your code was checked by inspection only.</span>`
+      : `<span class="err">That does not look complete. Assign every variable that the question asks for.</span>`;
+    if(solved) return;
+    if(ok) pass(); else { reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  /* The code panel and its output stay on screen. The student reads what
+     Python printed, and only then asks for the next step.               */
+  function pass(){
+    if(solved) return;
+    solved = true;
+    reactTo('right');
+    addNote(s.note);
+    clearVerdict(); helpRow.innerHTML='';
+    verdict('ok','Correct. Read the output above, then continue.');
+    const row=document.createElement('div'); el.zone.appendChild(row);
+    const b=document.createElement('button');
+    b.className='btn primary'; b.textContent='CONTINUE ▶';
+    b.onclick=()=>{ if(mySeq!==seq) return; el.zone.innerHTML=''; reveal(); };
+    row.appendChild(b);
+    b.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
+  function reveal(){
+    if(s.wow) reactTo('wow');
+    if(s.widget){
+      const h=document.createElement('div'); el.zone.appendChild(h);
+      const wait = mountWidget(s.widget, h);
+      setTimeout(()=>{ if(mySeq!==seq) return;
+        typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+    } else {
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }
+  }
+}
+/* the editor grows with its content, so that no line is ever hidden */
+function autosize(ta){
+  ta.style.height='auto';
+  const min = parseInt(getComputedStyle(ta).minHeight,10) || 0;
+  ta.style.height = Math.max(min, ta.scrollHeight + 4) + 'px';
+}
+function fmt(v){
+  if(!isFinite(v)) return String(v);
+  return (Math.abs(v-Math.round(v))<1e-9) ? String(Math.round(v)) : v.toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ---- reflection ----
+   A free-text step, scored by keyword groups. No step of this exercise uses
+   it; it is kept because the engine is shared with the other exercises of
+   the course.                                                             */
+function zoneReflect(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const ta=document.createElement('textarea'); ta.id='reflect';
+  ta.placeholder='Two sentences.'; el.zone.appendChild(ta);
+  const row=document.createElement('div'); row.style.marginTop='8px'; row.style.display='flex'; row.style.gap='8px';
+  el.zone.appendChild(row);
+  const b=document.createElement('button'); b.className='btn primary'; b.textContent='SUBMIT';
+  row.appendChild(b);
+  let fails=0;
+
+  function advance(givenAway){
+    reactTo('right'); el.zone.innerHTML='';
+    const tail = `<span class="fx">A model answer, for your notes : ${s.model}</span>`;
+    const head = givenAway
+      ? `Here is the answer I was waiting for. Copy it into your notes and compare it with what you wrote.`
+      : s.right;
+    typeInto(el.dlg, head + tail, 'master', ()=>contButton('Continue', next));
+  }
+  function offerSolution(){
+    if(row.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW A MODEL ANSWER';
+    g.onclick=()=>{ advance(true); };
+    row.appendChild(g);
+  }
+
+  b.onclick=()=>{
+    const t = ta.value.toLowerCase();
+    if(t.trim().length < 40){
+      clearVerdict();
+      verdict('no','Two sentences, please. The Master is not impressed by brevity alone.');
+      reactTo('wrong'); fails++;
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution(); return;
+    }
+    const hits = s.groups.filter(g=>g.some(k=>t.indexOf(k)>=0)).length;
+    if(hits >= s.minGroups){ advance(false); }
+    else {
+      reactTo('wrong'); fails++;
+      clearVerdict();
+      verdict('no', s.wrongHint);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+    }
+  };
+}
+
+/* ================================================================
+   PASSWORD  —  Session 3 nonlinear transformation of the finish time
+     m    = h*3600 + min*60 + sec
+     q    = (m*m + 73*m + 3003) mod 1000003
+     r    = q*(m + 17) mod 1000003
+     code = (65537*r + 8191*q + 131071*m + 271828) mod 1e6
+   ================================================================ */
+function makePassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const q = (m*m + 73*m + 3003) % 1000003;
+  const r = (q*(m + 17)) % 1000003;
+  const code = (65537*r + 8191*q + 131071*m + 271828) % 1000000;
+  return {
+    time: `${hh}h ${mm}min ${ss}s`,
+    // hhmmss, then the nonlinear transformation of that same time
+    code: hh + mm + ss + '-' + String(code).padStart(6,'0')
+  };
+}
+
+function finish(){
+  const pw = makePassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = pw.time;
+  $('#pw-code').textContent = pw.code;
+  $('#endblurb').innerHTML =
+    `You distinguished an estimator from an observed estimate, estimated two variances from the
+     data, and used the standard Normal distribution as an explicit approximation. You also
+     stated each one-sided direction before interpreting the result.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU BUILT</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'ESTIMATE · APPROXIMATE · INTERPRET.';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  const txt = $('#pw-code').textContent;
+  const done = ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallbackCopy);
+  } else fallbackCopy();
+  function fallbackCopy(){
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ $('#copymsg').textContent='select and copy manually'; }
+    t.remove();
+  }
+};
+$('#btn-again').onclick = ()=>{ idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  el.doom.classList.remove('struck');
+  setHUD({subject:'—',r:'—',shape:'—'}); el.doom.textContent='CASE OPEN'; show('scr-game'); render(); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE  (also cover for the Pyodide download)
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v2.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "DETECTING CO-PROCESSOR ...... PRESENT",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "CERTAINTY MODULE ............ NOT FOUND",
+  "OPENING CASE FILE III ....... HEIGHT / WEIGHT",
+  ""
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${l}</span>`:l).join('<br>'); }
+
+(async function start(){
+  show('scr-boot');
+  for(const l of BOOT_LINES){ bootLog(l); await sleep(120); }
+  const st = await Py.boot(bootLog);
+  bootLog("");
+  if(st==='ready'){
+    bootLog("> PYTHON READY. NUMPY, PANDAS, SCIPY LOADED.");
+    bootLog("> DATAFRAMES LOADED: 75 AGE PROFILES x 2.");
+  }
+  else { bootLog("> PYTHON UNAVAILABLE — running in fallback mode."); }
+  bootLog("> PRESS ANY KEY");
+  const go = ()=>{ document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  $('#pystatus').textContent = st==='ready'
+    ? 'Terminal ready — NumPy, pandas and scipy.stats. The height and weight DataFrames are loaded.'
+    : 'Python could not be loaded. The exercise will check your code by inspection instead.';
+  $('#btn-begin').disabled = false;
+})();
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+$('#btn-begin').onclick = async ()=>{
+  const v = $('#playername').value.trim();
+  playerName = v || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+  show('scr-game');
+  setHUD({subject:'—',r:'—',shape:'—'});
+  idx=0; render();
+};
+</script>
+</body>
+</html>
