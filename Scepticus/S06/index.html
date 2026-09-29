@@ -1,1 +1,2009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Exercise 6: The Nightcap on Trial</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EXERCISE 6
+  "The Nightcap on Trial"
+  EDHEC · Statistical Models · Session 6
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine and same characters as exercise 5.
+
+  HOW THE EXERCISE WORKS
+  ----------------------
+  The game does NOT run Python. Students work in two windows:
+     VS Code    load Sleep_AU.xlsx, write and run the analysis;
+     this game  report numbers, choose interpretations, get feedback.
+  Every question has a HINT button that shows example Python code to run
+  in VS Code. The questions follow Guidelines_Sleep.pdf (1.a to 2.e), with
+  a warm-up that checks that the data are loaded.
+
+
+
+  DATA AND SOURCES
+  ----------------
+  Sleep_AU.xlsx comes from one smartwatch worn by one person: an
+  illustrative example, not the foundation of the claim. A larger study
+  with similar results is cited in the opening scene:
+  Pietilä, Julia, et al. "Acute effect of alcohol intake on cardiovascular
+  autonomic regulation during the first hours of sleep in a large
+  real-world sample of Finnish employees: observational study."
+  JMIR Mental Health 5.1 (2018): e9519.
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---- β with a hat -------------------------------------------------------
+   The combining circumflex is missing from some fonts, so the accent is
+   drawn by CSS: <span class="hat">β</span>₁. Plain-text places (the
+   notebook, the HUD) simply write b1.                                     */
+.hat{position:relative; display:inline-block; padding-top:.34em; line-height:1}
+.hat::after{content:'^'; position:absolute; left:0; width:100%; top:-.05em;
+  text-align:center; font-size:.92em; line-height:1; font-family:inherit}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt.given{background:#7a5200; border-color:#ffcf6b #3a2600 #3a2600 #ffcf6b}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow.given input,.numrow.given select{border-color:var(--amber)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then example Python for VS Code ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+.pyguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.pyguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,var(--navy),var(--navy-lt));
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.pyguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.pyguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.pyguide th,.pyguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.pyguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.pyguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.pyguide td:first-child{width:25%}
+.pyguide td:nth-child(2){width:37%}
+.pyguide td:nth-child(3){width:38%}
+.pyguide .dataset{padding:9px 12px; border-top:1px solid #343458; color:#c7c7df; font-size:13.5px; line-height:1.55}
+.pyguide pre{margin:0 12px 12px; padding:10px 12px; background:#06110a; color:var(--green);
+  font:17px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .pyguide table,.pyguide tbody,.pyguide tr,.pyguide th,.pyguide td{display:block}
+  .pyguide thead{display:none}
+  .pyguide td{border-top:0; padding:3px 10px}
+  .pyguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .pyguide td:nth-child(1)::before{content:'SYNTAX'}
+  .pyguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .pyguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .pyguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EXERCISE VI</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-pdf>QUESTIONS PDF</button>
+      <button class="toolbtn" data-open-data>DATA (XLSX)</button>
+      <button class="toolbtn" data-python-helper>PYTHON HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE NIGHTCAP<br>ON TRIAL</h1>
+      <h2>Exercise VI &nbsp;·&nbsp; Statistical Models</h2>
+      <p>Master Scepticus has always believed that a glass of wine helps you sleep. One person's
+      smartwatch, which recorded 77 evenings, disagrees. You will use a simple regression, two multiple
+      regressions, t-tests and a confidence interval to decide which of them is right.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · VS CODE</b>Download <code>Sleep_AU.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top. Load it, then write and run
+        every line of Python there. Keep your file: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Bring back the numbers, choose the interpretations,
+        and defend them in front of the Master. The game never runs Python.</div>
+      </div>
+      <p>Stuck ? Every question has a <strong>HINT</strong> button. It shows example Python code
+      that you can copy into VS Code, run, and read. Type numbers with a dot as the decimal
+      separator, e.g., <code>-4.095</code>. Three decimals are always enough.</p>
+      <div class="pyguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <p class="guideintro">Start your VS Code file with these lines. Put the Python file in the
+        same folder as <code>Sleep_AU.xlsx</code>, or give the full path to the Excel file.</p>
+        <pre>import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
+import statsmodels.api as sm
+
+data = pd.read_excel('Sleep_AU.xlsx')
+data.head()</pre>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>SYNTAX</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>data['column']</code></td><td>Selects one column of the table.</td><td><code>data['SleepDuration']</code></td></tr>
+            <tr><td><code>data.shape</code>, <code>x.mean()</code></td><td>Number of rows and columns; average of a column.</td><td><code>data['SleepDuration'].mean()</code></td></tr>
+            <tr><td><code>plt.scatter(x, y)</code></td><td>Draws a scatter plot, x horizontally and y vertically.</td><td><code>plt.scatter(data['SleepDuration'], data['SleepRecovery'])</code></td></tr>
+            <tr><td><code>x.corr(y)</code></td><td>Pearson correlation between two columns.</td><td><code>data['SleepDuration'].corr(data['SleepRecovery'])</code></td></tr>
+            <tr><td><code>np.log(x)</code></td><td>Natural logarithm. NumPy calls it <code>np.log</code>, not <code>np.ln</code>.</td><td><code>np.log(data['SleepDuration'])</code></td></tr>
+            <tr><td><code>sm.add_constant(X)</code></td><td>Adds the column of ones needed to estimate an intercept.</td><td><code>sm.add_constant(data[['SleepDuration']])</code></td></tr>
+            <tr><td><code>sm.OLS(y, X).fit()</code></td><td>Estimates a linear regression by ordinary least squares. The outcome comes first.</td><td><code>model = sm.OLS(data['SleepRecovery'], X).fit()</code></td></tr>
+            <tr><td><code>model.summary()</code></td><td>Prints the regression table: coef, std err, t, P&gt;|t|, R-squared.</td><td><code>print(model.summary())</code></td></tr>
+            <tr><td><code>model.params</code>, <code>.bse</code>, <code>.tvalues</code>, <code>.rsquared</code>, <code>.df_resid</code></td><td>Coefficients, standard errors, t-statistics, R², residual degrees of freedom.</td><td><code>model.params['SleepDuration']</code></td></tr>
+            <tr><td><code>stats.t.ppf(q, df)</code></td><td>Quantile of the t distribution, i.e., a critical value.</td><td><code>stats.t.ppf(0.975, 30)</code></td></tr>
+            <tr><td><code>stats.t.cdf(t, df)</code></td><td>Cumulative probability P(T ≤ t) of the t distribution. One minus it gives the upper-tail probability, for a p-value.</td><td><code>2 * (1 - stats.t.cdf(abs(t_stat), 30))</code></td></tr>
+            <tr><td><code>model.conf_int(alpha)</code></td><td>Confidence intervals of all coefficients at level 1 − alpha.</td><td><code>model.conf_int(alpha=0.05)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>model</span><b id="hud-model">—</b></div>
+            <div class="hudrow"><span>AU slope</span><b id="hud-slope">—</b></div>
+            <div class="hudrow"><span>R²</span><b id="hud-r2">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Exercise VI &nbsp;·&nbsp; The Nightcap on Trial</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">FINISHED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, the dash included. The time at which you finished is already
+      inside it, so there is nothing else to report.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the questions of the exercise, opened by the QUESTIONS PDF button */
+  QUESTIONS_PDF: "https://www.dropbox.com/scl/fi/tdcqn5oc343tc9nfj2mz5/Guidelines_Sleep.pdf?rlkey=0xgn0btl1jdtgj0re8u807fjh&raw=1",
+  /* the data of the exercise, downloaded by the DATA (XLSX) button */
+  DATA_FILE: "https://www.dropbox.com/scl/fi/13c9njaainn1d5p66tn2z/Sleep_AU.xlsx?rlkey=qwzox6m9byttrjwi5mpdwobvt&raw=1",
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { bar:'', lab:'', bedroom:'' },
+  FALLBACK: {
+    bar:    "linear-gradient(180deg,#140c08,#3a2414 60%,#6b3c1c)",
+    lab:    "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    bedroom:"linear-gradient(180deg,#05060f,#141a3a 60%,#27306a)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted, unless the
+     field is marked 'strict', in which case its own 'tol' applies.   */
+  RTOL: 0.02,
+  /* failed attempts on one question before SHOW THE ANSWER appears */
+  FAILS_BEFORE_SOLUTION: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 77 evenings of Sleep_AU.xlsx, embedded for the pictures
+   only. The student computes everything in VS Code.
+   ================================================================ */
+const DATA = {
+  AU:[8.884,2.748,1.901,5.544,5.94,4.092,1.452,4.092,4.224,4.488,6.0,4.356,3.24,2.376,4.68,7.138,6.936,4.5,1.98,5.322,4.496,3.168,6.468,4.416,4.092,7.448,3.0,8.712,2.112,6.336,7.8,1.62,6.72,3.6,3.6,5.676,3.312,1.68,4.152,3.168,1.584,1.716,8.724,6.811,4.224,5.808,4.356,3.828,3.696,3.156,7.55,6.626,7.236,7.8,5.333,4.752,1.6,4.762,3.168,6.389,1.056,5.069,9.4,3.036,5.156,5.56,5.465,6.336,4.956,7.92,1.0,1.803,3.168,5.232,9.0,6.072,5.712],
+  DUR:[484,478,497,531,515,450,547,443,448,447,460,525,438,441,449,437,438,432,438,404,547,468,497,429,410,378,427,404,430,463,489,431,475,419,441,421,441,406,530,441,492,471,504,492,493,617,556,530,567,515,398,480,517,473,564,540,541,487,558,544,448,496,367,469,463,499,483,473,389,394,486,440,474,485,466,464,416],
+  REC:[36,64,66,61,63,54,73,77,71,55,60,46,59,55,42,34,59,39,59,37,52,43,31,38,40,31,49,27,61,40,59,59,58,45,52,20,71,57,59,60,64,65,69,30,48,40,57,58,46,73,22,47,52,38,72,76,68,55,65,47,62,60,31,75,15,57,41,24,37,30,73,64,61,40,31,52,30]
+};
+
+/* ================================================================
+   AVATARS — inline SVG, identical to exercise 5. The mouth is three
+   sibling groups (.mouth-a closed, .mouth-b ajar, .mouth-c open); the
+   flap swaps them by toggling a class on the wrapper.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- robe -->
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <!-- neck -->
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <!-- head -->
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <!-- hair -->
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <!-- beard -->
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <!-- brows -->
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <!-- nose -->
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- mouth (above the beard) -->
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <!-- monocle -->
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from VS Code, or
+              drop-down choices ({kind:'select'})
+
+   A number field is accepted within CONFIG.RTOL of its target or within
+   its own 'tol', whichever is larger; 'strict:true' keeps 'tol' alone.
+   'abs:true' accepts either sign. 'alt' lists common wrong values, each
+   with its own feedback. 'pct:true' catches a proportion typed as a
+   percentage. A field without 'msg' gets a generic message.
+
+   'hint' is advice; 'code' is example Python for VS Code, shown by the
+   HINT button. 'qn' is the question number of Guidelines_Sleep.pdf,
+   shown in the case file. 'say' is what the apprentice answers aloud. 'hud' is
+   written into the case file once the step is solved, never before.
+   ================================================================ */
+const B0 = '<span class="hat">β</span>₀', B1 = '<span class="hat">β</span>₁', B2 = '<span class="hat">β</span>₂';
+
+const STEPS = [
+{ id:'open', type:'info', bg:'bar', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · CASE FILE VI',
+  text:`A glass of wine before bed helps you sleep. Everybody knows that. My grandmother knew it,
+  and she slept like a stone.
+  <span class="fx">He pours himself a small glass, looks at it, and does not drink it. Not yet.</span>
+  Tonight a smartwatch will testify against my grandmother. One watch, on one wrist, over 77
+  evenings : how much alcohol was drunk, how long the night lasted, and how well the body
+  recovered, measured from the heart rate.
+  One person is not a population. This file is an illustration, not a clinical trial. But keep it
+  in mind : much larger studies, with thousands of people, find the same kind of effect of alcohol
+  on sleep recovery.
+  You will question the data in <strong>VS Code</strong>. This window only
+  listens to what you bring back : numbers, choices, verdicts.
+  <span class="fx"><strong>For a more robust study see:</strong> Julia Pietilä et al., “Acute Effect of
+  Alcohol Intake on Cardiovascular Autonomic Regulation During the First Hours of Sleep in a Large
+  Real-World Sample of Finnish Employees: Observational Study,” <em>JMIR Mental Health</em> 5(1),
+  2018, e9519.</span>`,
+  widget:'table', banner:'CLAIM: A NIGHTCAP HELPS', cont:'Continue' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE LEDGER',
+  text:`First, the ritual. Download <span class="kbd">Sleep_AU.xlsx</span> with the DATA (XLSX)
+  button at the top. Open VS Code, create a Python file in the folder that contains it, and load
+  the data with pandas.
+  A file that loads can answer questions that a failed import cannot.
+  <strong>How many evenings does the file contain, and how many alcohol units are drunk on an
+  average evening ?</strong>`,
+  q:'Report what your loaded table says.',
+  fields:[
+    {id:'n', label:'Number of evenings, i.e., rows', value:77, tol:0, strict:true,
+     msg:'Count the rows, not the columns: data.shape gives (rows, columns).'},
+    {id:'mau', label:'Average AU per evening', value:4.760, tol:0.01, strict:true,
+     alt:[{value:471.43, tol:0.5, msg:'That is the average sleep duration in minutes. Take the mean of the AU column.'},
+          {value:51.13, tol:0.1, msg:'That is the average sleep recovery. Take the mean of the AU column.'}],
+     msg:'Take the mean of the AU column, i.e., data[\'AU\'].mean().'}],
+  hint:`If Python answers <b>FileNotFoundError</b>, it cannot see the Excel file. Put the .py file
+  and Sleep_AU.xlsx in the same folder and open that folder in VS Code, or give the full path of
+  the file to pd.read_excel.`,
+  code:`import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
+import statsmodels.api as sm
+
+data = pd.read_excel('Sleep_AU.xlsx')
+print(data.head())
+print(data.shape)          # (rows, columns)
+print(data['AU'].mean())`,
+  say:'77 evenings, and 4.76 AU on an average evening.',
+  right:`<strong>77</strong> evenings, and an average of <strong>4.76 AU</strong>, i.e., almost five
+  small beers an evening.
+  <span class="fx">He raises an eyebrow at nobody in particular.</span>
+  The watch does not judge. I do. The data are loaded, so the interrogation can begin.`,
+  note:'77 evenings; mean AU = 4.76' },
+
+{ id:'t1a', type:'choice', bg:'lab', who:'master', qn:'1.a',
+  title:'TRIAL II · THE CLOUD BEFORE THE LINE',
+  text:`Before any regression, a picture. Everybody wants the coefficient first... that is how
+  horoscopes are written.
+  In VS Code, <strong>draw a scatter plot of SleepRecovery (vertical axis) against AU (horizontal
+  axis)</strong>. Then tell me what kind of relationship you see.`,
+  q:'Which description does your scatter plot support ?',
+  options:[
+    {id:'a', label:'A strong positive relationship: the more alcohol, the better the recovery.'},
+    {id:'b', label:'A negative, roughly linear relationship, with a lot of scatter around the trend.'},
+    {id:'c', label:'No visible relationship: the points form a shapeless cloud.'},
+    {id:'d', label:'A perfect negative relationship: all the points lie on a straight line.'}
+  ], correct:'b',
+  hint:`AU goes on the x-axis, SleepRecovery on the y-axis. Then read the plot from left to right:
+  do the points drift up, drift down, or stay level ?`,
+  code:`plt.scatter(data['AU'], data['SleepRecovery'])
+plt.xlabel('Alcohol units (AU)')
+plt.ylabel('Sleep recovery')
+plt.show()`,
+  right:`Downhill, and roughly straight. Evenings with more alcohol tend to end with less recovery.
+  <span class="fx">He moves the glass a few centimetres further away.</span>
+  But look at the scatter. Around 4 or 5 AU, recovery goes from miserable to excellent. Alcohol is
+  a suspect, not the only person in the room.`,
+  wrong:{a:`Look at the right of your plot, where the heavy evenings are. Are those points high or
+  low ?`, c:`Squint less. The points drift downward from left to right, even if they do it untidily.`,
+  d:`If every point were on a line, you would not need statistics, only a ruler. Your cloud has
+  thickness.`},
+  widgetAfter:'scatter', note:'1.a · recovery falls as AU rises: negative, roughly linear, noisy' },
+
+{ id:'t1b', type:'numeric', bg:'lab', who:'master', qn:'1.b',
+  title:'TRIAL III · THE PRICE OF A GLASS',
+  text:`Now you may draw the line, because you have looked at the points.
+  <br><span class="kbd">Model 1 : SleepRecovery = β0 + β1·AU + ε</span><br>
+  Estimate Model 1 and read the linear regression summary.
+  <strong>Report the estimated intercept and the estimated slope.</strong>`,
+  q:'Report the two coefficients of Model 1.',
+  fields:[
+    {id:'b0', label:`Intercept ${B0}`, value:70.623, tol:0.02, strict:true,
+     msg:'The intercept is the coef of the const row. If there is no const row, you forgot sm.add_constant.'},
+    {id:'b1', label:`Slope ${B1}`, value:-4.095, tol:0.01, strict:true,
+     alt:[{value:0.6755, tol:0.005, msg:'That is the standard error of the slope. Read the coef column.'},
+          {value:-6.062, tol:0.02, msg:'That is the t-statistic of the slope. Read the coef column.'}],
+     msg:'The slope is the coef of the AU row.'}],
+  hint:`The model needs an intercept, so add a constant with <b>sm.add_constant</b> before calling
+  <b>sm.OLS</b>. The outcome, SleepRecovery, comes first.`,
+  code:`X1 = sm.add_constant(???) ## The explanatory variable, i.e., the AU column.
+M1 = sm.OLS(???, X1).fit() ## The outcome comes first.
+print(M1.summary())
+print(M1.params)`,
+  say:`${B0} ≈ 70.62 and ${B1} ≈ −4.095.`,
+  right:`${B0} ≈ <strong>70.62</strong> and ${B1} ≈ <strong>−4.095</strong>.
+  The intercept is the predicted recovery of an evening with zero alcohol. Careful : the driest
+  evening in the file has 1 AU, so the intercept speaks slightly outside the data.
+  The slope is the price list. I shall ask you to read it in a moment.`,
+  widgetAfter:'fit', hud:{model:'M1', slope:'-4.095'},
+  note:'1.b · Model 1: SleepRecovery = 70.62 - 4.095 x AU' },
+
+{ id:'t1c', type:'numeric', bg:'lab', who:'master', qn:'1.c',
+  title:'TRIAL IV · THE SQUARE IN THE MIRROR',
+  text:`The summary prints a number called <strong>R-squared</strong>, i.e., the share of the
+  variation in SleepRecovery that the line accounts for.
+  Next to it I want the correlation between AU and SleepRecovery. <strong>Report both numbers.</strong> Then we shall compare them.`,
+  q:'Report the fit of Model 1 and the correlation.',
+  fields:[
+    {id:'r2', label:'R² of Model 1', value:0.3288, tol:0.002, strict:true, pct:true,
+     alt:[{value:-0.5735, tol:0.003, msg:'That is the correlation. R² is in the top right corner of the summary.'},
+          {value:0.320, tol:0.0015, msg:'That is the adjusted R². Use the plain R-squared.'}],
+     msg:'Read R-squared in the summary, or print M1.rsquared.'},
+    {id:'r', label:'Correlation between AU and SleepRecovery', value:-0.5735, tol:0.01, strict:true,
+     alt:[{value:0.3288, tol:0.002, msg:'That is R², not the correlation. Use .corr().'}],
+     msg:'Compute data[\'AU\'].corr(data[\'SleepRecovery\']).'}],
+  hint:`R-squared is in the top right corner of the summary, or in <b>M1.rsquared</b>. The
+  correlation takes one line with <b>.corr()</b>. Print its square too, and look.`,
+  code:`print(M1.rsquared)
+
+r = data['AU'].corr(data['SleepRecovery'])
+print(r)
+print(r**2)`,
+  say:'R² ≈ 0.329 and r ≈ −0.573.',
+  right:`R² ≈ <strong>0.329</strong> and r ≈ <strong>−0.573</strong>.
+  They do not look related. They do not even have the same sign.`,
+  hud:{r2:'0.329'}, note:'1.c · R2 = 0.329; corr(AU, SleepRecovery) = -0.573' },
+
+{ id:'t1c2', type:'choice', bg:'lab', who:'master', qn:'1.c',
+  title:'TRIAL IV · WHERE DID THE MINUS SIGN GO ?',
+  text:`−0.573 and 0.329. They look like strangers. They are relatives.
+  <strong>Which statement connects them ?</strong>`,
+  q:'Choose the connection between R² and the correlation.',
+  options:[
+    {id:'a', label:'R² equals the correlation: 0.329 is simply −0.573 rounded differently.'},
+    {id:'b', label:'In a simple regression with an intercept, R² equals the squared correlation: (−0.573)² ≈ 0.329.'},
+    {id:'c', label:'R² equals the absolute value of the correlation divided by two.'},
+    {id:'d', label:'There is no link: R² comes from the regression and the correlation from the data.'}
+  ], correct:'b',
+  hint:`Look at the third number your code printed, i.e., r**2.`,
+  code:`r = data['AU'].corr(data['SleepRecovery'])
+print(r**2, M1.rsquared)`,
+  right:`Exactly. (−0.573)² ≈ 0.329. With one explanatory variable and an intercept, R² is the
+  square of the correlation.
+  Squaring removes the sign. R² tells you how much the line explains, never in which direction it
+  goes.
+  <span class="fx">And two thirds of the variation remain unexplained. Alcohol is not the only thing
+  that happens at night.</span>`,
+  wrong:{a:`0.329 and −0.573 do not even share a sign. Rounding is not that creative.`,
+  c:`0.573 divided by two is about 0.287, not 0.329. Try multiplying rather than dividing.`,
+  d:`Both numbers come from the same 77 points. Square the correlation in VS Code and look.`},
+  note:'1.c · simple regression: R2 = r^2 = (-0.573)^2' },
+
+{ id:'t1d', type:'numeric', bg:'bar', who:'master', qn:'1.d',
+  title:'TRIAL V · ONE MORE BEER',
+  text:`A slope without units is a number wearing a lab coat.
+  One alcohol unit is <span class="kbd">0.8 × volume in litres × alcohol %</span>. A 25 cl beer at
+  5% gives 0.8 × 0.25 × 5 = 1 AU.
+  <strong>What change in SleepRecovery does Model 1 predict for one additional beer ?</strong>
+  Then take a 75 cl bottle of wine at 12%, drunk alone. <strong>How many AU is that, and what recovery score does the model predict for it ?</strong>`,
+  q:'Translate the slope into drinks.',
+  fields:[
+    {id:'beer', label:'Predicted change in SleepRecovery for one more beer (1 AU)', value:-4.095, tol:0.01, strict:true,
+     alt:[{value:66.53, tol:0.1, msg:'That is the predicted recovery after 1 AU, not the change. The change is what one more AU adds.'}],
+     msg:'One beer is one more AU, so the predicted change is the slope itself.'},
+    {id:'wau', label:'AU in a 75 cl bottle of wine at 12%', value:7.2, tol:0.01, strict:true,
+     alt:[{value:720, tol:1, msg:'Volume in litres: 75 cl is 0.75 litre.'},
+          {value:0.072, tol:0.001, msg:'Use the percentage as a number, i.e., 12 and not 0.12, exactly as in the beer example.'}],
+     msg:'Compute 0.8 × 0.75 × 12.'},
+    {id:'wine', label:'Predicted SleepRecovery score for that bottle', value:41.138, tol:0.1,
+     alt:[{value:-29.484, tol:0.1, msg:'That is the predicted change, not the predicted score. Add the intercept.'}],
+     msg:'Evaluate the regression line at the AU of the bottle, i.e., the intercept plus the slope times the AU.'}],
+  hint:`One beer is +1 AU, so the predicted change is the slope. For the bottle, compute its AU first.
+  The predicted score is the regression line at that AU, i.e., the intercept plus the slope times
+  the AU.`,
+  code:`b1 = M1.params['AU'] ## Equivalently: b1 = M1.params[1]
+
+beer_change = b1 * 1
+wine_AU = 0.8 * 0.75 * 12
+wine_change = b1 * wine_AU
+predicted_value = ??? ## Linear regression evaluated at the wine_AU.
+
+print(beer_change, wine_AU, wine_change)`,
+  say:'One beer : about −4.1 points. The bottle is 7.2 AU, i.e., about 41.138 points.',
+  right:`One beer : about <strong>−4.1</strong> recovery points. The bottle : <strong>7.2 AU</strong>,
+  i.e., about <strong>41.138</strong> predicted recovery score. The bottle decreases the score by 29.5 points.
+  <span class="fx">He looks at his glass as if it had sent him an invoice.</span>
+  The average recovery in the file is 51. Twenty-nine points is the distance between a decent night
+  and a wrecked one. And 7.2 AU lies inside the observed range, from 1 to 9.4 AU, so the model is
+  not inventing evenings it never saw.
+  These are average predicted changes, not personal guarantees.`,
+  note:'1.d · +1 AU: -4.1 points; 75cl wine at 12% = 7.2 AU: -29.5 points' },
+
+{ id:'t1e', type:'numeric', bg:'lab', who:'master', mood:'raised', qn:'1.e',
+  title:'TRIAL VI · ZERO ON TRIAL',
+  text:`My grandmother’s lawyer has a simple defence : the true slope is zero, and your −4.095 is bad
+  luck.
+  Test <span class="kbd">H0 : β1 = 0</span> against <span class="kbd">H1 : β1 ≠ 0</span> at
+  α = 0.05. <strong>Report the t-statistic of AU, the critical value, and your decision.</strong>`,
+  q:'Run the test and give the verdict.',
+  fields:[
+    {id:'t', label:'t-statistic for H₀ : β₁ = 0', value:-6.062, tol:0.02, strict:true,
+     alt:[{value:-4.095, tol:0.01, msg:'That is the slope itself. Divide it by its standard error.'}],
+     msg:'t = (estimate − 0) / standard error, both from the AU row.'},
+    {id:'c', label:'Critical value at α = 0.05, two-sided', value:1.9921, tol:0.006, strict:true, abs:true,
+     alt:[{value:1.96, tol:0.004, msg:'1.96 is the quantile of the normal distribution. The test uses a t distribution with 77 − 2 = 75 degrees of freedom.'},
+          {value:1.6654, tol:0.004, msg:'That is a one-sided critical value. With a two-sided test, α/2 = 0.025 sits in each tail: use 0.975.'}],
+     msg:'Use stats.t.ppf(0.975, 75), i.e., the t distribution with the residual degrees of freedom of Model 1.'},
+    {id:'d', kind:'select', label:'Decision at α = 0.05', correct:'reject',
+     options:[['reject','Reject H₀'],['fail','Fail to reject H₀'],['accept','Accept H₀: the slope is zero']],
+     msg:'Compare |t| with the critical value. When |t| is larger, the data are too surprising for H₀.'}],
+  hint:`t = (${B1} − 0) / SE(${B1}). Both numbers are in the AU row of the summary, and statsmodels
+  even prints the t for you. The critical value is the 97.5% quantile of a t distribution with
+  <b>M1.df_resid</b> degrees of freedom.`,
+  code:`t_stat = ??? ## (estimate - value under H0) / standard error. Use M1.params and M1.bse.
+critical = stats.t.ppf(???, M1.df_resid) ## Which quantile for a two-sided test at 5% ?
+
+print(t_stat, critical)
+print(M1.pvalues['AU'])`,
+  say:'t ≈ −6.06, and the critical value is 1.99. We reject H₀.',
+  right:`t ≈ <strong>−6.06</strong>, far beyond ±1.99. The p-value is about 0.00000005. We reject
+  H₀ at 5%.
+  If the true slope were zero, a sample like ours would be a small miracle. I do not build
+  conclusions on miracles.
+  <span class="fx">The lawyer gathers his papers. He will be back with a better argument.</span>`,
+  widgetAfter:'ttest1', note:'1.e · t = -6.06, |t| > 1.99, p = 5e-8: reject b1 = 0' },
+
+{ id:'t1e2', type:'choice', bg:'lab', who:'master', qn:'1.e',
+  title:'TRIAL VI · WHAT EXACTLY DID WE REJECT ?',
+  text:`The verdict is in. Now the sentence, which is where most people get it wrong.
+  <strong>Which statement does the test support ?</strong>`,
+  q:'Choose the correct reading of the test.',
+  options:[
+    {id:'a', label:'Alcohol has now been proven to cause poor sleep recovery.'},
+    {id:'b', label:'The data are hard to reconcile with a zero slope: the negative association is very unlikely to be pure chance.'},
+    {id:'c', label:'The true slope is exactly −4.095.'},
+    {id:'d', label:'There is a 5% probability that H₀ is true.'}
+  ], correct:'b',
+  hint:`A t-test asks one question only : how surprising would these data be if β₁ were zero ?`,
+  right:`Exactly. The test rules out luck, under the assumptions of the model. It does not rule out
+  other explanations.
+  A t-test measures how surprising the data would be if β₁ were zero. It does not know why β₁ is
+  not zero.
+  <span class="fx">Causality needs something that no t-statistic can provide : that nothing hidden
+  in ε moves together with AU.</span>`,
+  wrong:{a:`The test cannot tell association from causation. If heavy evenings were also short
+  nights, the slope would carry both effects.`,
+  c:`That is the estimate. The true β₁ could be −3.5 or −5 without any drama. Wait for the
+  confidence interval.`,
+  d:`α is the risk of rejecting a true H₀, chosen before looking at the data. It is not the
+  probability that H₀ is true.`},
+  note:'1.e · significant is not causal: the test rules out chance, not other explanations' },
+
+{ id:'beat2', type:'info', bg:'bedroom', who:'master', mood:'angry', qn:'—',
+  title:'THE LAWYER RETURNS',
+  text:`<span class="fx">The lawyer is back, with a new argument and a very satisfied face.</span>
+  His argument : evenings with alcohol are late evenings. Late evenings make short nights. And short
+  nights, not the wine, ruin the recovery.
+  If he is right, Model 1 has blamed the glass for a crime committed by the clock. So we give the
+  clock a seat in the regression, in two different ways.
+  <br><span class="kbd">Model 2 : SleepRecovery = β0 + β1·AU + β2·SleepDuration + ε</span>
+  <br><span class="kbd">Model 3 : SleepRecovery = β0 + β1·AU + β2·ln(SleepDuration) + ε</span>`,
+  banner:'SUSPECT 2: THE CLOCK', cont:'Hear the argument' },
+
+{ id:'t2a', type:'choice', bg:'bedroom', who:'master', qn:'2.a',
+  title:'TRIAL VII · THE ALIBI',
+  text:`Model 1 relies on strict exogeneity, i.e., nothing hidden in the error term ε moves together
+  with AU. The lawyer claims that the length of the night is hiding there.
+  <strong>How does Model 2 try to deal with this possible violation ?</strong>`,
+  q:'Choose the best explanation.',
+  options:[
+    {id:'a', label:'Adding SleepDuration makes alcohol consumption random, as in an experiment.'},
+    {id:'b', label:'SleepDuration is added only to increase R²; exogeneity has nothing to do with it.'},
+    {id:'c', label:'In Model 1, SleepDuration sits in ε. If it affects recovery and moves with AU, the AU slope absorbs its effect. Model 2 takes it out of ε and holds it fixed.'},
+    {id:'d', label:'Adding SleepDuration removes every possible source of endogeneity.'}
+  ], correct:'c',
+  hint:`Ask what Model 1 does with everything it does not contain. Where does the effect of the night
+  length go ?`,
+  right:`Exactly. An omitted variable distorts the slope only if it does two things at once : it
+  affects the outcome, and it moves together with AU.
+  Model 2 moves sleep duration out of ε, so that β₁ compares evenings with the same night length.
+  <span class="fx">It repairs one leak. Stress, dinner, the hour of the last coffee, all still swim
+  in ε.</span>`,
+  wrong:{a:`Only an experiment, in which someone assigns the drinks, makes AU random. A regression
+  can hold variables fixed; it cannot assign them.`,
+  b:`R² does rise, but that is a side effect. The purpose is to stop β₁ from absorbing the effect of
+  the night length.`,
+  d:`One control closes one door. Every variable you did not measure is still in ε.`},
+  note:'2.a · Model 2 takes SleepDuration out of the error term and holds it fixed' },
+
+{ id:'t2a2', type:'numeric', bg:'bedroom', who:'master', qn:'2.a',
+  title:'TRIAL VII · CHECK THE ALIBI',
+  text:`An alibi can be checked. If the lawyer is right, heavy evenings should be clearly shorter
+  nights.
+  <strong>Compute the correlation between AU and SleepDuration.</strong> Then tell me what it
+  predicts for the AU slope once SleepDuration enters the model.`,
+  q:'Check the alibi before you believe it.',
+  fields:[
+    {id:'rd', label:'Correlation between AU and SleepDuration', value:-0.1031, tol:0.01, strict:true,
+     alt:[{value:-0.5735, tol:0.003, msg:'That is the correlation between AU and SleepRecovery. Use SleepDuration this time.'},
+          {value:0.3792, tol:0.003, msg:'That is the correlation between SleepDuration and SleepRecovery. The alibi is about AU and SleepDuration.'}],
+     msg:'Compute data[\'AU\'].corr(data[\'SleepDuration\']).'},
+    {id:'pred', kind:'select', label:'Once SleepDuration is in the model, the AU slope should…', correct:'small',
+     options:[['big','…change a lot, because the two variables are strongly correlated'],
+              ['small','…change only a little, because AU and SleepDuration barely move together'],
+              ['zero','…become exactly zero']],
+     msg:'A correlation of about 0.1 in absolute value is weak. How much of the AU effect can the night length have been carrying ?'}],
+  hint:`Same syntax as for AU and SleepRecovery. A scatter plot of the two variables tells the same
+  story.`,
+  code:`r_dur = data['AU'].corr(data['SleepDuration'])
+print(r_dur)
+
+plt.scatter(data['AU'], data['SleepDuration'])
+plt.xlabel('Alcohol units (AU)')
+plt.ylabel('Sleep duration (minutes)')
+plt.show()`,
+  say:'r ≈ −0.10. The AU slope should barely move.',
+  right:`r ≈ <strong>−0.10</strong>. Heavy evenings are barely shorter nights. The alibi is thin.
+  So the prediction is that the AU slope will hardly move. Predictions are cheap. Let us check this
+  one.`,
+  widgetAfter:'alibi', note:'2.a · corr(AU, SleepDuration) = -0.10: heavy evenings are barely shorter nights' },
+
+{ id:'t2b', type:'numeric', bg:'bedroom', who:'master', qn:'2.b',
+  title:'TRIAL VIII · TWO RULERS FOR THE NIGHT',
+  text:`Estimate Models 2 and 3 :
+  <br><span class="kbd">Model 2 : SleepRecovery = β0 + β1·AU + β2·SleepDuration + ε</span>
+  <br><span class="kbd">Model 3 : SleepRecovery = β0 + β1·AU + β2·ln(SleepDuration) + ε</span>
+  <br>Model 3 measures the night with the natural logarithm of its duration, which NumPy calls
+  <span class="kbd">np.log</span>.
+  <strong>Report the R² of both models, and choose the one that fits the data better.</strong>
+  While you are there, glance at the AU coefficient in each.`,
+  q:'Compare the two models.',
+  fields:[
+    {id:'r2m2', label:'R² of Model 2 (SleepDuration)', value:0.4324, tol:0.01, strict:true, pct:true,
+     alt:[{value:0.4385, tol:0.0015, msg:'That is the R² of Model 3. Model 2 uses SleepDuration itself, not its logarithm.'},
+          {value:0.4171, tol:0.0015, msg:'That is the adjusted R² of Model 2. Use the plain R-squared.'}],
+     msg:'Fit Model 2 with AU and SleepDuration, then read its R-squared.'},
+    {id:'r2m3', label:'R² of Model 3 (ln SleepDuration)', value:0.4385, tol:0.01, strict:true, pct:true,
+     alt:[{value:0.4324, tol:0.0015, msg:'That is the R² of Model 2. Model 3 uses np.log(SleepDuration).'},
+          {value:0.4234, tol:0.0015, msg:'That is the adjusted R² of Model 3. Use the plain R-squared.'}],
+     msg:'Create the log column with np.log, fit Model 3 with AU and that column, then read its R-squared.'},
+    {id:'best', kind:'select', label:'Which model fits the data slightly better ?', correct:'m3',
+     options:[['m2','Model 2'],['m3','Model 3'],['tie','They fit exactly equally well']],
+     msg:'Compare the two R² values. A higher R² means a better fit.'}],
+  hint:`Create the log column first. Then fit two regressions that differ only in the sleep variable.
+  Each R² is in its summary, or in <b>.rsquared</b>.`,
+  code:`data['lnDuration'] = ??? ## Natural logarithm of SleepDuration.
+
+X2 = sm.add_constant(data[['AU', 'SleepDuration']])
+M2 = sm.OLS(data['SleepRecovery'], X2).fit()
+
+X3 = ??? ## Same as X2, with lnDuration in place of SleepDuration.
+M3 = sm.OLS(data['SleepRecovery'], X3).fit()
+
+print(M2.rsquared, M3.rsquared)
+print(M2.params)
+print(M3.params)`,
+  say:'R² = 0.432 for Model 2 and 0.439 for Model 3. Model 3 fits slightly better.',
+  right:`Model 2 : <strong>0.432</strong>. Model 3 : <strong>0.439</strong>. Model 3 wins, by a nose.
+  Both models add the night length to Model 1, and R² jumps from 0.329 to about 0.43. The clock
+  matters for recovery.
+  Now look at the AU slope : −4.095 in Model 1, −3.857 in Model 2, −3.820 in Model 3. The alibi
+  barely moved it, exactly as the correlation predicted.
+  <span class="fx">The glass is still in the dock.</span>`,
+  widgetAfter:'models', hud:{model:'M3', slope:'-3.820', r2:'0.439'},
+  note:'2.b · R2: M2 = 0.432, M3 = 0.439; AU slope about -3.8 in both' },
+
+{ id:'t2b2', type:'choice', bg:'bedroom', who:'master', qn:'2.b',
+  title:'TRIAL VIII · IS THE RACE FAIR ?',
+  text:`Comparing R² values is not always legal. Adding any variable, even the phase of the moon,
+  never lowers R².
+  <strong>Why is it fair to compare the R² of Models 2 and 3 ?</strong>`,
+  q:'Choose the reason.',
+  options:[
+    {id:'a', label:'Both models explain the same outcome, SleepRecovery, on the same 77 evenings, with the same number of explanatory variables.'},
+    {id:'b', label:'R² is always a fair comparison between any two models.'},
+    {id:'c', label:'Model 3 uses a logarithm, and logarithms always increase R².'},
+    {id:'d', label:'The two R² values are different.'}
+  ], correct:'a',
+  hint:`List what the two models have in common, and what differs between them.`,
+  right:`Exactly. Same outcome, same evenings, same number of explanatory variables. Only the ruler
+  for the night changed, so R² is a fair referee. The adjusted R², which can be used for comparing models with different numbers of explanatory variables,  gives the same ranking. The adjusted R² will be covered in Data Mining.
+  But 0.007 is a thin margin. On this evidence, the two rulers are almost equivalent.`,
+  wrong:{b:`Not always. With a different outcome, R² measures a different variation. With more
+  explanatory variables, R² rises mechanically.`,
+  c:`A logarithm is a ruler, not a fertilizer. It helps when each extra minute matters less than the
+  previous one, and only then.`,
+  d:`That they differ is why we compare them, not why the comparison is fair.`},
+  note:'2.b · fair R2 comparison: same outcome, same data, same number of regressors' },
+
+{ id:'t2c', type:'numeric', bg:'bedroom', who:'master', qn:'2.c',
+  title:'TRIAL IX · ONE PERCENT MORE NIGHT',
+  text:`In Model 3, the coefficient of ln(SleepDuration) is large. Nobody sleeps 47 logarithms
+  longer, so we need a translation.
+  In a model where the outcome is in levels and the variable is in logs, a <strong>1% increase</strong>
+  in SleepDuration changes SleepRecovery by about <strong>β2 / 100</strong>.
+  <strong>Report the coefficient, the predicted change for a 1% longer night, and what is held
+  fixed.</strong>`,
+  q:'Translate the log coefficient.',
+  fields:[
+    {id:'b2', label:`Coefficient ${B2} of ln(SleepDuration) in Model 3`, value:47.745, tol:0.05,
+     alt:[{value:0.0976, tol:0.002, msg:'That is the SleepDuration coefficient of Model 2. Use Model 3, i.e., the lnDuration row.'}],
+     msg:'Read the coef of the lnDuration row in the Model 3 summary.'},
+    {id:'eff', label:'Predicted change in SleepRecovery for a 1% longer night', value:0.4775, tol:0.01,
+     alt:[{value:4.7745, tol:0.3, msg:'That is closer to a 10% longer night. For 1%, divide the coefficient by 100.'},
+          {value:47.745, tol:0.05, msg:'That is the coefficient itself. For a 1% increase, divide it by 100.'}],
+     msg:'Divide the coefficient by 100.'},
+    {id:'held', kind:'select', label:'What is held fixed in this comparison ?', correct:'au',
+     options:[['au','Alcohol consumption (AU)'],['rec','Sleep recovery'],['nothing','Nothing']],
+     msg:'In a multiple regression, each coefficient compares evenings that are identical in the other explanatory variables.'}],
+  hint:`${B2} is in the lnDuration row of the Model 3 summary. Divide it by 100. The other explanatory
+  variable of the model is the one held fixed.`,
+  code:`b2 = M3.params['lnDuration']
+print(b2)
+print(b2 / 100)     # change for a 1% longer night`,
+  say:`${B2} ≈ 47.7, so a 1% longer night adds about 0.48 points, AU held fixed.`,
+  right:`${B2} ≈ <strong>47.7</strong>, so a 1% longer night adds about <strong>0.48</strong> recovery
+  points, with AU held fixed.
+  A typical night in the file lasts 471 minutes, so 1% is less than five minutes.
+  Now the exchange rate. One AU costs about 3.8 points. To buy them back, you need about 8% more
+  sleep, i.e., roughly <strong>40 extra minutes per AU</strong>.
+  <span class="fx">He does the arithmetic twice. Nobody at the Academy has ever slept 40 minutes
+  longer per drink.</span>`,
+  note:'2.c · M3: +1% sleep = +0.48 points (AU fixed); one AU = about 40 minutes of sleep' },
+
+{ id:'t2d', type:'numeric', bg:'lab', who:'master', qn:'2.d',
+  title:'TRIAL X · IS ALCOHOL WORTH MINUS FOUR ?',
+  text:`Zero has had enough attention. A colleague claims that each AU costs exactly 4 recovery
+  points.
+  In Model 3, test <span class="kbd">H0 : β1 = −4</span> against <span class="kbd">H1 : β1 ≠ −4</span>
+  at α = 0.05. <strong>Report the t-statistic, the critical value and your decision.</strong>
+  Careful : the summary prints the test of β₁ = 0, not this one.`,
+  q:'Run the test and give the verdict.',
+  fields:[
+    {id:'t', label:'t-statistic for H₀ : β₁ = −4', value:0.2873, tol:0.01, abs:true,
+     alt:[{value:-6.100, tol:0.03, msg:'That is the t-statistic for β₁ = 0, printed by statsmodels. Subtract −4, i.e., add 4, before dividing by the standard error.'},
+          {value:-12.49, tol:0.1, msg:'You subtracted +4. The hypothesis is β₁ = −4, so the numerator is the estimate − (−4), i.e., the estimate + 4.'}],
+     msg:'t = (estimate − (−4)) / standard error, with the AU row of Model 3.'},
+    {id:'c', label:'Critical value at α = 0.05, two-sided', value:1.9925, tol:0.006, strict:true, abs:true,
+     alt:[{value:1.96, tol:0.004, msg:'1.96 is the normal quantile. Model 3 has 77 − 3 = 74 residual degrees of freedom: use the t distribution.'},
+          {value:1.6657, tol:0.004, msg:'That is a one-sided critical value. For a two-sided test, use 0.975.'}],
+     msg:'Use stats.t.ppf(0.975, 74), i.e., the residual degrees of freedom of Model 3.'},
+    {id:'d', kind:'select', label:'Decision at α = 0.05', correct:'fail',
+     options:[['reject','Reject H₀'],['fail','Fail to reject H₀'],['prove','Accept H₀: β₁ is exactly −4']],
+     msg:'Compare |t| with the critical value. A t-statistic close to zero means that the data are comfortable with H₀.'}],
+  hint:`t = (${B1} − (−4)) / SE(${B1}), with the AU estimate and standard error of Model 3. Model 3
+  estimates three coefficients, so it has 77 − 3 = 74 residual degrees of freedom.`,
+  code:`b1 = M3.params['AU']
+se1 = M3.bse['AU']
+
+t_stat = ??? ## Same formula as in Trial VI, but the value under H0 is now -4.
+critical = stats.t.ppf(???, M3.df_resid) ## Two-sided test at 5% again.
+p_value = 2 * (1 - stats.t.cdf(abs(t_stat), M3.df_resid))
+
+print(t_stat, critical, p_value)`,
+  say:'t ≈ 0.29, and the critical value is 1.99. We fail to reject H₀.',
+  right:`t ≈ <strong>0.29</strong>, well inside ±1.99, with a p-value of about 0.77. We fail to
+  reject H₀.
+  The data are perfectly comfortable with −4. They would also be comfortable with −3.5 or −4.5.
+  <span class="fx">Failing to reject is not accepting. A court acquits for lack of evidence; it does
+  not declare anyone innocent.</span>`,
+  widgetAfter:'ttest2', note:'2.d · M3, H0: b1 = -4: t = 0.29, p = 0.77, fail to reject' },
+
+{ id:'t2e', type:'numeric', bg:'lab', who:'master', qn:'2.e',
+  title:'TRIAL XI · THE WIDER NET',
+  text:`A test answers one question about one value. An interval answers it for every value at once.
+  <strong>Compute the 99% confidence interval for β₁ in Model 3</strong>, i.e., the estimate plus or
+  minus the critical value times the standard error, with 74 degrees of freedom.`,
+  q:'Build the 99% interval.',
+  fields:[
+    {id:'c', label:'Critical value for a 99% interval', value:2.6439, tol:0.006, strict:true, abs:true,
+     alt:[{value:2.5758, tol:0.004, msg:'2.576 is the normal quantile. With 74 degrees of freedom, use the t distribution.'},
+          {value:2.3778, tol:0.004, msg:'That is a one-sided 99% quantile. A two-sided 99% interval leaves 0.5% in each tail: use 0.995.'},
+          {value:1.9925, tol:0.004, msg:'That is the critical value of a 95% interval. For 99%, use 0.995.'}],
+     msg:'Use stats.t.ppf(0.995, 74).'},
+    {id:'lo', label:'Lower bound', value:-5.4757, tol:0.02, strict:true,
+     alt:[{value:-2.1645, tol:0.02, msg:'That is the upper bound. The lower bound is the more negative one.'},
+          {value:-5.4331, tol:0.015, msg:'That bound was built with the normal quantile 2.576. Use the t quantile.'},
+          {value:-5.0679, tol:0.02, msg:'That is the lower bound of the 95% interval. A 99% interval is wider.'}],
+     msg:'Lower bound = estimate − critical value × standard error.'},
+    {id:'hi', label:'Upper bound', value:-2.1645, tol:0.02, strict:true,
+     alt:[{value:-5.4757, tol:0.02, msg:'That is the lower bound. The upper bound is the less negative one.'},
+          {value:-2.2071, tol:0.015, msg:'That bound was built with the normal quantile 2.576. Use the t quantile.'},
+          {value:-2.5724, tol:0.02, msg:'That is the upper bound of the 95% interval. A 99% interval is wider.'}],
+     msg:'Upper bound = estimate + critical value × standard error.'}],
+  hint:`For 99%, α = 0.01, and a two-sided interval puts α/2 = 0.005 in each tail. The critical value
+  is therefore the 99.5% quantile of the t distribution. statsmodels can also give you the whole
+  interval with <b>conf_int(alpha=0.01)</b>.`,
+  code:`critical = stats.t.ppf(???, M3.df_resid) ## 99% two-sided: alpha/2 = 0.005 in each tail.
+lower = ??? ## estimate - critical value x standard error
+upper = ??? ## estimate + critical value x standard error
+print(critical, lower, upper)
+
+print(M3.conf_int(alpha=0.01))   # the same interval, directly`,
+  say:'Critical value 2.644, and the interval is [−5.48 ; −2.16].',
+  right:`About <strong>[−5.48 ; −2.16]</strong>, with a critical value of 2.644.
+  The whole interval sits below zero, even at 99%. And −4 sits comfortably inside it, which is why
+  the previous test could not reject it.
+  <span class="fx">A wider net, and the glass is still caught in it.</span>`,
+  widgetAfter:'ci', note:'2.e · 99% CI for b1 in M3: [-5.48 ; -2.16]' },
+
+{ id:'t2e2', type:'multi', bg:'lab', who:'master', qn:'2.e',
+  title:'TRIAL XI · READ THE NET',
+  text:`One last reading, and then you may sleep. Soberly.
+  A 99% interval contains exactly the values that a two-sided test at the 1% level would not
+  reject.
+  <strong>At the 1% level, which null hypotheses about β₁ in Model 3 would NOT be rejected ?</strong>`,
+  q:'Tick every hypothesis that survives.',
+  options:[
+    {id:'a', label:'H₀ : β₁ = 0'},
+    {id:'b', label:'H₀ : β₁ = −2.5'},
+    {id:'c', label:'H₀ : β₁ = −4'},
+    {id:'d', label:'H₀ : β₁ = −5'},
+    {id:'e', label:'H₀ : β₁ = −6'}
+  ], correct:['b','c','d'],
+  hint:`Take your interval [−5.48 ; −2.16] and check each value. Inside means not rejected.`,
+  right:`Exactly : −2.5, −4 and −5 are inside the interval, so none of them is rejected. Zero and −6
+  are outside it.
+  One interval, an infinity of tests, and not a single additional calculation.`,
+  wrongHint:`Take the interval [−5.48 ; −2.16] and check each value. Inside means not rejected;
+  outside means rejected.`,
+  note:'2.e · inside the 99% CI, not rejected at 1%: -5, -4, -2.5; rejected: 0 and -6' },
+
+{ id:'close', type:'info', bg:'bar', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`My grandmother was wrong, and so was the lawyer.
+  <span class="fx">He pours the small glass back into the bottle. It is harder than it looks.</span>
+  On this wrist, alcohol barely shortened the nights : the correlation is −0.10. It damaged what
+  happened inside them : about 4 recovery points per unit, whether or not the night length is held
+  fixed. A nightcap does not steal your hours. It steals the quality of your hours.
+  One watch proves nothing about everybody, of course. Its value is that it tells the same story as
+  studies of thousands of nights.
+  Four rules leave with you.
+  <strong>One.</strong> Plot before you fit. The cloud tells you whether a line deserves to exist.
+  <strong>Two.</strong> Translate a coefficient into units somebody cares about : points per beer,
+  points per bottle, minutes of sleep.
+  <strong>Three.</strong> Significance rules out chance, not other explanations. To answer a
+  suspected confounder, give it a seat in the regression and watch whether the coefficient moves.
+  <strong>Four.</strong> Failing to reject is not proving. An interval tells you every value that the
+  data still tolerate.
+  <span class="fx">The next time a client dinner ends with “one last glass”, you will know its price :
+  about 40 minutes of sleep that nobody will give back to you.</span>`,
+  banner:'PLOT. FIT. TRANSLATE. CONTROL. DOUBT.', cont:'Collect the password', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), hudModel:$('#hud-model'), hudSlope:$('#hud-slope'), hudR2:$('#hud-r2'),
+  doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  el.note.innerHTML = notes.map(n=>'▸ '+escapeHtml(n)).join('<br>');
+}
+
+/* ---- HUD: filled only by solved steps, so it never gives an answer away ---- */
+const HUD0 = {model:'—', slope:'—', r2:'—'};
+function setHUD(h){
+  if(!h) return;
+  if(h.model!==undefined) el.hudModel.textContent = h.model;
+  if(h.slope!==undefined) el.hudSlope.textContent = h.slope;
+  if(h.r2!==undefined)    el.hudR2.textContent    = h.r2;
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown after an answer, drawn from the embedded
+   data. Points are never connected; dark marks on a pale ground.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: one point series, plus optional straight lines */
+function panelSVG(o){
+  const W=700, H=o.H||300, L=o.L||84, R=684, T=44, B=(o.B||236);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||3.4}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.8}"/>`;
+    }
+  });
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}"
+      x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2.5}"/>`;
+  });
+  let pins='';
+  (o.pins||[]).forEach(p=>{
+    pins += TXT(px(p.x).toFixed(1), (py(p.y)+(p.dy||-12)).toFixed(1), p.label, {col:PLOT.fit, anchor:p.anchor, sz:17});
+  });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${marks}${lines}${pins}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* ---- the cold open: the first rows of the ledger ---- */
+function playTable(host){
+  const cols=[150,350,550];
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=108+i*24;
+    rows += TXT(cols[0],y,DATA.AU[i].toFixed(3),{sz:19}) + TXT(cols[1],y,DATA.DUR[i],{sz:19})
+          + TXT(cols[2],y,DATA.REC[i],{sz:19});
+  }
+  const svg=`<svg viewBox="0 0 700 262" style="width:100%;height:auto;display:block">
+    <rect width="700" height="262" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'SLEEP_AU.XLSX · THE FIRST FIVE OF 77 EVENINGS',{sz:18,anchor:'start'})}
+    ${TXT(cols[0],70,'AU',{sz:19,col:PLOT.ink})}${TXT(cols[1],70,'SleepDuration',{sz:19,col:PLOT.ink})}
+    ${TXT(cols[2],70,'SleepRecovery',{sz:19,col:PLOT.ink})}
+    <line x1="60" y1="80" x2="640" y2="80" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(cols[1],230,'alcohol units · minutes of sleep · recovery score (higher is better)',{sz:16})}
+    ${TXT(cols[1],252,'1 AU = 0.8 x volume in litres x alcohol %, e.g., a 25 cl beer at 5%',{sz:16,col:PLOT.second})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE LEDGER', svg, 'Recovery is computed by the watch from the heart rate during the night.');
+  return 600;
+}
+
+/* ---- recovery against alcohol, with or without the Model 1 line ---- */
+function playScatter(host, withFit){
+  const o = {
+    series:[{x:DATA.AU, y:DATA.REC}], lines:[], pins:[],
+    xmin:0, xmax:10, ymin:10, ymax:80,
+    xticks:[0,2,4,6,8,10], yticks:[10,20,30,40,50,60,70,80],
+    title: withFit ? 'SleepRecovery = 70.62 - 4.095 x AU' : 'Sleep recovery against alcohol, 77 evenings',
+    xlab:'Alcohol units (AU)', ylab:'Sleep recovery'
+  };
+  if(withFit){
+    o.lines.push({x1:1, y1:70.6226-4.0950*1, x2:9.4, y2:70.6226-4.0950*9.4});
+    o.pins.push({x:9.4, y:70.6226-4.0950*9.4, label:'-4.1 points per AU', anchor:'end', dy:26});
+  }
+  host.innerHTML = plotFrame(withFit ? 'EVIDENCE · MODEL 1' : 'EVIDENCE · THE CLOUD', panelSVG(o),
+    withFit ? 'The line is drawn over the observed range only, from 1 to 9.4 AU.'
+            : 'One point is one evening. Downhill, roughly straight, and very noisy.');
+  return 900;
+}
+
+/* ---- the alibi: night length against alcohol ---- */
+function playAlibi(host){
+  const o = {
+    series:[{x:DATA.AU, y:DATA.DUR, color:PLOT.second}],
+    lines:[{x1:1, y1:483.037-2.4387*1, x2:9.4, y2:483.037-2.4387*9.4}],
+    xmin:0, xmax:10, ymin:350, ymax:630,
+    xticks:[0,2,4,6,8,10], yticks:[350,400,450,500,550,600],
+    title:'Sleep duration against alcohol, r = -0.10',
+    xlab:'Alcohol units (AU)', ylab:'Sleep duration (minutes)'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE ALIBI', panelSVG(o),
+    'One more AU goes with about 2.4 fewer minutes of sleep. Heavy evenings are barely shorter nights.');
+  return 900;
+}
+
+/* ---- three models, one slope ---- */
+function playModels(host){
+  const card=(x,title,l1,slope,r2,col)=>`
+    <rect x="${x}" y="52" width="200" height="164" fill="#fbfaf4" stroke="${col}" stroke-width="2"/>
+    ${TXT(x+100,82,title,{sz:21,col:col})}
+    ${TXT(x+100,108,l1,{sz:16})}
+    ${TXT(x+100,150,'AU slope',{sz:16})}
+    ${TXT(x+100,176,slope,{sz:26,col:col})}
+    ${TXT(x+100,204,'R2 = '+r2,{sz:18})}`;
+  const svg=`<svg viewBox="0 0 700 236" style="width:100%;height:auto;display:block">
+    <rect width="700" height="236" fill="${PLOT.paper}"/>
+    ${TXT(30,32,'THE ALIBI ENTERS THE REGRESSION',{sz:18,anchor:'start'})}
+    ${card(30,'MODEL 1','AU only','-4.095','0.329',PLOT.ink)}
+    ${card(250,'MODEL 2','+ SleepDuration','-3.857','0.432',PLOT.second)}
+    ${card(470,'MODEL 3','+ ln(SleepDuration)','-3.820','0.439',PLOT.fit)}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · WHAT THE CONTROL CHANGED', svg,
+    'The fit improves a lot. The AU slope moves by less than 0.3 points.');
+  return 1000;
+}
+
+/* ---- a t distribution with its rejection region and the observed t ---- */
+function lgamma(z){
+  const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+    -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(z<0.5) return Math.log(Math.PI/Math.abs(Math.sin(Math.PI*z)))-lgamma(1-z);
+  z-=1; let x=c[0];
+  for(let i=1;i<9;i++) x+=c[i]/(z+i);
+  const t=z+7.5;
+  return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x);
+}
+function tpdf(x,n){
+  return Math.exp(lgamma((n+1)/2)-lgamma(n/2)-0.5*Math.log(n*Math.PI)-(n+1)/2*Math.log(1+x*x/n));
+}
+function playT(host, o){
+  const W=700,H=250,L=30,R=670,T=44,B=200,xmin=-7,xmax=7,ymax=0.42;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L), py=v=>B-v/ymax*(B-T);
+  let curve='';
+  for(let x=xmin;x<=xmax+1e-9;x+=0.05) curve+=(curve?'L':'M')+px(x).toFixed(1)+' '+py(tpdf(x,o.df)).toFixed(1)+' ';
+  const tail=(a,b)=>{
+    let p=`M${px(a).toFixed(1)} ${B} `;
+    for(let x=a;x<=b+1e-9;x+=0.05) p+=`L${px(x).toFixed(1)} ${py(tpdf(x,o.df)).toFixed(1)} `;
+    return `<path d="${p}L${px(b).toFixed(1)} ${B} Z" fill="${PLOT.fit}" fill-opacity=".28"/>`;
+  };
+  let ticks='';
+  [-6,-4,-2,0,2,4,6].forEach(v=>{
+    ticks+=`<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>`+TXT(px(v),B+21,v,{sz:15});
+  });
+  const tx=px(o.t);
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,o.title,{sz:17,anchor:'start'})}
+    ${tail(xmin,-o.crit)}${tail(o.crit,xmax)}
+    <path d="${curve}" fill="none" stroke="${PLOT.ink}" stroke-width="2"/>
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT(px(-o.crit)-8,B-10,'reject',{sz:15,col:PLOT.fit,anchor:'end'})}
+    ${TXT(px(o.crit)+8,B-10,'reject',{sz:15,col:PLOT.fit,anchor:'start'})}
+    <line x1="${tx.toFixed(1)}" y1="${B}" x2="${tx.toFixed(1)}" y2="${T+10}" stroke="${PLOT.second}" stroke-width="3"/>
+    ${TXT((tx+6).toFixed(1),T+14,'t = '+o.t.toFixed(2),{sz:18,col:PLOT.second,anchor:'start'})}
+    ${TXT(W/2,H-8,'t distribution with '+o.df+' degrees of freedom, if H0 were true',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame(o.frame, svg, o.foot);
+  return 1000;
+}
+
+/* ---- the 99% and 95% intervals on one ruler ---- */
+function playCI(host){
+  const W=700,H=236,L=40,R=670,xmin=-9,xmax=1,A=196;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L);
+  let ticks='';
+  for(let v=-9;v<=1;v++) ticks+=`<line x1="${px(v)}" y1="${A}" x2="${px(v)}" y2="${A+5}" stroke="${PLOT.axis}"/>`+TXT(px(v),A+21,v,{sz:15});
+  const vline=(v,lab,col)=>`<line x1="${px(v)}" y1="56" x2="${px(v)}" y2="${A}" stroke="${col}" stroke-width="2" stroke-dasharray="6 5"/>`
+    + TXT(px(v)-6,68,lab,{sz:16,col:col,anchor:'end'});
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,'Model 3: confidence intervals for the AU coefficient',{sz:17,anchor:'start'})}
+    ${vline(-4,'-4 : inside',PLOT.label)}
+    ${vline(0,'0 : outside',PLOT.fit)}
+    <rect x="${px(-5.4757)}" y="92" width="${px(-2.1645)-px(-5.4757)}" height="18" fill="${PLOT.ink}"/>
+    ${TXT(px(-5.4757)-10,106,'99% [-5.48 ; -2.16]',{sz:17,col:PLOT.ink,anchor:'end'})}
+    <rect x="${px(-5.0679)}" y="138" width="${px(-2.5724)-px(-5.0679)}" height="12" fill="${PLOT.second}"/>
+    ${TXT(px(-5.0679)-10,149,'95% [-5.07 ; -2.57]',{sz:17,col:PLOT.second,anchor:'end'})}
+    <circle cx="${px(-3.8201)}" cy="101" r="6" fill="${PLOT.paper}" stroke="${PLOT.fit}" stroke-width="2.5"/>
+    ${TXT(px(-3.8201),172,'estimate -3.82',{sz:16,col:PLOT.fit})}
+    <line x1="${L}" y1="${A}" x2="${R}" y2="${A}" stroke="${PLOT.axis}"/>
+    ${ticks}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE NET', svg,
+    'More confidence costs width. Even the wide net does not reach zero.');
+  return 1000;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='scatter') return playScatter(host, false);
+  if(name==='fit')     return playScatter(host, true);
+  if(name==='alibi')   return playAlibi(host);
+  if(name==='models')  return playModels(host);
+  if(name==='ttest1')  return playT(host, {t:-6.062, crit:1.992, df:75,
+    title:'Model 1, H0: b1 = 0', frame:'EVIDENCE · ZERO ON TRIAL',
+    foot:'The observed t sits far inside the rejection region. p is about 0.00000005.'});
+  if(name==='ttest2')  return playT(host, {t:0.287, crit:1.993, df:74,
+    title:'Model 3, H0: b1 = -4', frame:'EVIDENCE · MINUS FOUR ON TRIAL',
+    foot:'The observed t sits in the middle of the distribution. p is about 0.77.'});
+  if(name==='ci')      return playCI(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>buildZone(s));
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then example Python to run in VS Code ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE PYTHON · COPY IT INTO VS CODE AND RUN IT THERE</span>
+        <button class="toolbtn" data-copy>COPY CODE</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY CODE',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+
+  function advance(givenAway){
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);
+    const label = s.options.find(o=>o.id===s.correct).label;
+    conclude(s, givenAway ? `<em>“…the answer was : ${label}”</em>` : `<em>“${label}”</em>`, mySeq);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE ANSWER';
+    b.onclick=()=>{
+      const good = box.querySelector(`[data-oid="${s.correct}"]`);
+      if(good) good.classList.add('given');
+      setTimeout(()=>{ if(mySeq===seq) advance(true); }, 500);
+    };
+    bar.appendChild(b);
+  }
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      advance(false);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+        offerSolution();
+        verdict('give','Two attempts. You may take the answer and keep going — the reasoning matters more than the guess.');
+      }
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+
+  function advance(givenAway){
+    inputs().forEach(b=>b.disabled=true);
+    box.querySelectorAll('label').forEach(l=>{
+      if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add(givenAway?'given':'right');
+    });
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 700);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      inputs().forEach(b=>{ b.checked = s.correct.indexOf(b.value)>=0; });
+      advance(true);
+    };
+    bar.appendChild(g);
+  }
+  submit.onclick=()=>{
+    if(chosen() === wanted){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    clearVerdict();
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer and keep going.');
+    }
+  };
+}
+
+/* ---- numeric: numbers brought back from VS Code, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/\s+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+function tolerance(f){
+  const abs = f.tol || 0;
+  if(f.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(f.value));
+}
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., -4.095.';
+  const tol = tolerance(f);
+  const diff = f.abs ? Math.abs(Math.abs(v)-Math.abs(f.value)) : Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){ if(Math.abs(v-a.value) <= a.tol) return a.msg; }
+  if(!f.abs && Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in VS Code.');
+}
+function shownValue(f){
+  if(f.kind==='select') return f.correct;
+  return String(f.show !== undefined ? f.show : f.value);
+}
+
+function zoneNumeric(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  function advance(givenAway){
+    rows.forEach(r=>{ r.input.disabled=true; });
+    const line = givenAway ? `<em>“…the answer was : ${s.say}”</em>` : `<em>“${s.say}”</em>`;
+    setTimeout(()=>{ if(mySeq===seq) conclude(s, line, mySeq); }, givenAway ? 900 : 350);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      rows.forEach(r=>{ r.input.value = shownValue(r.f); r.row.classList.remove('bad','good'); r.row.classList.add('given'); });
+      clearVerdict();
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      reactTo('wow');
+      advance(true);
+    };
+    bar.appendChild(g);
+  }
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      advance(false);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. You may take the answer and keep going — but check it in VS Code first, the next question builds on it.');
+    }
+  };
+}
+
+/* ================================================================
+   PYTHON HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openPythonHelper(){
+  const guide=document.querySelector('.pyguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelper6',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Exercise VI</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .pyguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference syntax only. Run your code in VS Code; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-python-helper]').forEach(b=>b.onclick=openPythonHelper);
+document.querySelectorAll('[data-open-pdf]').forEach(b=>b.onclick=()=>window.open(CONFIG.QUESTIONS_PDF,'sleepGuidelines'));
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>window.open(CONFIG.DATA_FILE,'sleepData'));
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   PASSWORD  —  Session 6 formula, nonlinear in the finish time
+     m    = h*3600 + min*60 + sec
+     a    = (m*m + 131*m + 6006) mod 1000037
+     b    = (a*(m + 43) + 6*m*m) mod 1000037
+     code = (40503*b + 16381*a + 262147*m + 161803) mod 1e6
+   Every intermediate value stays below 2^53, so the arithmetic is exact.
+   Checked by check_passwords_S6.py.
+   ================================================================ */
+function makePassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const a = (m*m + 131*m + 6006) % 1000037;
+  const b = (a*(m + 43) + 6*m*m) % 1000037;
+  const code = (40503*b + 16381*a + 262147*m + 161803) % 1000000;
+  return {
+    time: `${hh}h ${mm}min ${ss}s`,
+    // hhmmss, then the nonlinear transformation of that same time
+    code: hh + mm + ss + '-' + String(code).padStart(6,'0')
+  };
+}
+
+function finish(){
+  const pw = makePassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = pw.time;
+  $('#pw-code').textContent = pw.code;
+  $('#endblurb').innerHTML =
+    `You plotted before you fitted, priced a beer and a bottle of wine in recovery points, and
+     rejected a zero slope without mistaking significance for causality. Then you gave the length of
+     the night a seat in the regression, watched the alcohol coefficient survive the alibi, compared
+     two models fairly, and built a 99% interval that still excludes zero.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: A NIGHTCAP HELPS';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  copyText($('#pw-code').textContent,
+    ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); },
+    ()=>{ $('#copymsg').textContent='select and copy manually'; });
+};
+$('#btn-again').onclick = ()=>{ idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  el.doom.classList.remove('struck'); el.doom.textContent='CASE OPEN';
+  setHUD(HUD0); show('scr-game'); render(); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v6.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "LOCATING SMARTWATCH ......... FOUND",
+  "COUNTING EMPTY GLASSES ...... CLASSIFIED",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "PYTHON INTERPRETER .......... NOT HERE. USE VS CODE.",
+  "OPENING CASE FILE VI ........ SLEEP_AU.XLSX, 77 EVENINGS",
+  "",
+  "> KEEP VS CODE AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  const v = $('#playername').value.trim();
+  playerName = v || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+  idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  setHUD(HUD0);
+  show('scr-game');
+  render();
+};
+</script>
+</body>
+</html>
