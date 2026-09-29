@@ -1,1 +1,2706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Exercise 5: A Misleading Difference and a Curved Future</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EXERCISE 5
+  "A Misleading Difference and a Curved Future"
+  EDHEC · Statistical Models · Session 5
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine, same characters and same password scheme as exercises
+  1, 2 and 4.
+
+  SESSION 5 CURRICULUM
+  --------------------
+  Scatter plots and correlation as diagnostics; simple linear regression;
+  intercept and slope; cohort composition; and natural-log transformations.
+  Formal regression tests, growth factors and doubling times are deliberately
+  left for later sessions. The exercise ends with a conditional extrapolation.
+
+  THE RULE THE EXERCISE EXISTS TO TEACH
+  -------------------------------------
+  Plot first. Fit second. Read the summary. Interpret cautiously.
+
+  PYTHON
+  ------
+  NumPy only at boot, so that the download stays light for a room full of
+  students. A small compatibility layer exposes the pandas and statsmodels
+  syntax used in class:
+
+      Series   a numpy array with .corr(other) added; arithmetic keeps the
+               type, so np.log(frame["Compute"]) is still a Series.
+      Frame    a column store with data["col"], assignment, .head(),
+               data[["a","b"]].mean(axis=1) and .plot.scatter(x=, y=).
+      pd       pd.DataFrame(dict) builds a Frame, for the predict calls.
+      sm.add_constant(x) and sm.OLS(y, X).fit() ordinary least squares with
+               one regressor, giving .params, .rsquared and .summary().
+
+  The regression is the textbook closed form. It is NOT a full pandas or
+  statsmodels installation: methods this exercise does not use are absent,
+  and only a single explanatory variable is supported. .plot.scatter does not call
+  matplotlib; it records the two column names and the game draws the
+  picture itself.
+
+  THE DATA — the tables are embedded, because a browser cannot open
+  a local file. Nothing was smoothed, deleted or altered.
+    lh_data.csv        77 rows, ages 10 to 86, the digitized 1986 National
+                       Geographic survey series of Gilbert and Wysocki.
+                       Downloaded from the gist named in the outline and
+                       cached beside the outline as 'lh_data.csv'.
+    notable_ai_models  1,062 rows x 47 columns. The frontier filter of the
+                       outline (Frontier model true, date from 2010, compute
+                       above zero) keeps 71 observations, 2010-09-26 to
+                       2025-07-09.
+
+
+  SOURCES
+  -------
+  Halpern and Coren, "Handedness and Life Span", NEJM 324(14), 1991, 998.
+  Gilbert and Wysocki, Neuropsychologia 30(7), 1992, 601-608.
+  Ferres et al., Archives of Public Health 81, 137 (2023): the reconstruction
+  that produces 9.3 years with no mortality effect by handedness.
+  Epoch AI, AI Models documentation. NVIDIA H100 specifications.
+  Eurostat, electricity consumption and trade 2023-2024, Table 3.
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<!-- Keep the loader and every asset it fetches on the same pinned release.
+     Passing this URL explicitly to loadPyodide is important when the exercise
+     is opened from a local file, an LMS iframe, or a copied/renamed HTML file:
+     stack-based auto-detection of the loader directory is not reliable there. -->
+<script>
+window.PYODIDE_INDEX_URL = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+window.PYODIDE_LOADER_ERROR = '';
+</script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"
+        crossorigin="anonymous"
+        onerror="window.PYODIDE_LOADER_ERROR='The Pyodide loader could not be downloaded.'"></script>
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#hud.glitching{animation:glitch .12s steps(2) 8}
+@keyframes glitch{
+  0%{transform:translate(0,0)}25%{transform:translate(-3px,1px) skewX(-2deg); filter:hue-rotate(90deg)}
+  50%{transform:translate(3px,-1px) skewX(2deg)}75%{transform:translate(-2px,0); filter:invert(1)}100%{transform:none}
+}
+#hud .broken{color:var(--red)!important; font-weight:700; text-shadow:1px 0 rgba(255,0,0,.6),-1px 0 rgba(0,255,255,.6)}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---- N̂ and x̄ -----------------------------------------------------------
+   The combining marks U+0302 and U+0304 are missing from VT323 and from the
+   pixel font, so the browser drops them next to the letter and "N with a hat"
+   comes out as "N^". The accent is therefore drawn by CSS, which works in
+   every font: <span class="hat">N</span> and <span class="bar">x</span>.
+   Plain-text places that cannot carry a span (the notebook, the question
+   line, SVG labels) use the Python names N_hat and xbar instead.          */
+.hat,.bar{position:relative; display:inline-block; padding-top:.34em; line-height:1}
+.hat::after{content:'^'; position:absolute; left:0; width:100%; top:-.05em;
+  text-align:center; font-size:.92em; line-height:1; font-family:inherit}
+.bar::after{content:''; position:absolute; left:6%; right:6%; top:.18em;
+  border-top:.09em solid currentColor}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt.given{background:#7a5200; border-color:#ffcf6b #3a2600 #3a2600 #ffcf6b}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+/* the matching question of the last trial */
+.matchkey{background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66;
+  padding:9px 12px; margin-bottom:9px; font-size:14.5px; line-height:1.6; color:var(--cream)}
+.matchkey b{color:var(--amber)}
+.matchrow{display:flex; align-items:center; gap:7px; margin-bottom:7px; padding:8px 10px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.matchname{flex:1 1 auto; font-size:14.5px; color:var(--cream)}
+.matchbtn{flex:0 0 40px; background:#12122a; color:var(--cream); border:2px solid;
+  border-color:#50507e #0a0a18 #0a0a18 #50507e; font:700 13px Tahoma,sans-serif; padding:7px 0; cursor:pointer}
+.matchbtn:hover{background:#2f2f56}
+.matchbtn.on{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a; color:#fff}
+.matchbtn:disabled{cursor:default; opacity:.85}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+
+/* ---------- code panel ---------- */
+#code textarea{display:block; width:100%; min-height:320px; background:#06110a; color:var(--green);
+  font-family:var(--mono); font-size:20px; line-height:1.4; border:0; padding:10px 12px;
+  resize:vertical; outline:none; overflow:hidden; tab-size:4}
+#code .preview{background:#0c0c18; color:#8b8bb5; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:8px 12px; border-bottom:1px solid #2a2a44; white-space:pre-wrap}
+#code .envhead{display:flex; justify-content:space-between; gap:10px; align-items:center;
+  padding:7px 12px; background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif;
+  letter-spacing:.3px; border-bottom:1px solid #343458}
+#code .envhead span{color:#9d9dc4; font-weight:400; letter-spacing:0}
+#code #out{background:#06110a; color:#bdbdbd; font-family:var(--mono); font-size:18px; line-height:1.4;
+  padding:9px 11px; min-height:80px; white-space:pre; overflow-x:auto; border-top:1px solid #1a2a1a}
+#out .ok{color:var(--green)} #out .err{color:#ff6b5e} #out .warn{color:var(--amber)}
+.summary-evidence{margin:0 0 10px; background:#06110a; border:2px solid;
+  border-color:#31513b #020703 #020703 #31513b; color:#d2d2d2; overflow-x:auto}
+.summary-evidence .summary-title{padding:6px 10px; background:#15152a; color:var(--amber);
+  font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.summary-evidence pre{margin:0; padding:9px 11px; font:17px/1.35 var(--mono); white-space:pre}
+.codebar{display:flex; gap:8px; align-items:center; padding:7px; background:var(--panel); flex-wrap:wrap}
+.pyflag{margin-left:auto; font:700 10px Tahoma,sans-serif; color:#444}
+textarea#reflect{width:100%; min-height:130px; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:11px; font:15px/1.55 var(--body); resize:vertical}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+.pyguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.pyguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,var(--navy),var(--navy-lt));
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.pyguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.pyguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.pyguide th,.pyguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.pyguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.pyguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.pyguide td:first-child{width:25%}
+.pyguide td:nth-child(2){width:37%}
+.pyguide td:nth-child(3){width:38%}
+.pyguide .dataset{padding:9px 12px; border-top:1px solid #343458; color:#c7c7df; font-size:13.5px; line-height:1.55}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  #code textarea{min-height:250px; font-size:18px}
+  .pyguide table,.pyguide tbody,.pyguide tr,.pyguide th,.pyguide td{display:block}
+  .pyguide thead{display:none}
+  .pyguide td{border-top:0; padding:3px 10px}
+  .pyguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .pyguide td:nth-child(1)::before{content:'SYNTAX'}
+  .pyguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .pyguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .pyguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EXERCISE V</div>
+    <div style="display:flex;gap:6px">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>A MISLEADING DIFFERENCE<br>AND A CURVED FUTURE</h1>
+      <h2>Exercise V &nbsp;·&nbsp; Statistical Models</h2>
+      <p>Master Scepticus has read in a medical journal that left-handers die nine years early.
+      He is taking the news remarkably well. You will use plots and your first regression to
+      discover why that comparison is misleading.</p>
+      <p>Then he will hand you the training compute of frontier AI models and a straight line that
+      predicts negative compute. You will fit a log-linear model, make a conditional prediction
+      for 2029, and say out loud what that extrapolation assumes.</p>
+      <div class="pyguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <p class="guideintro">The imports and data are prepared before every coding question.
+        Replace the <code>???</code>, then press <strong>RUN</strong>. The examples show the syntax
+        without giving away the exercise answers.</p>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>SYNTAX</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>data['column']</code></td><td>Selects a numerical column from a pandas DataFrame.</td><td><code>frontier['Compute']</code></td></tr>
+            <tr><td><code>x.corr(y)</code></td><td>Computes the Pearson correlation between two numerical columns.</td><td><code>frontier['Year'].corr(frontier['Compute'])</code></td></tr>
+            <tr><td><code>data.plot.scatter(x='x', y='y')</code></td><td>Draws a scatter plot using two named columns.</td><td><code>frontier.plot.scatter(x='Year', y='Compute')</code></td></tr>
+            <tr><td><code>np.log(x)</code></td><td>Computes the natural logarithm. In NumPy the function is <code>np.log</code>, not <code>np.ln</code>.</td><td><code>np.log(frontier['Compute'])</code></td></tr>
+            <tr><td><code>X = sm.add_constant(x)</code></td><td>Adds the constant column needed to estimate an intercept.</td><td><code>X = sm.add_constant(frontier['Year'])</code></td></tr>
+            <tr><td><code>model = sm.OLS(y, X).fit()</code></td><td>Estimates an ordinary least-squares regression.</td><td><code>model = sm.OLS(frontier['Compute'], X).fit()</code></td></tr>
+            <tr><td><code>print(model.summary())</code></td><td>Prints the regression table. Use its <code>coef</code> and <code>R-squared</code> entries in this exercise.</td><td><code>print(model.summary())</code></td></tr>
+            <tr><td><code>model.predict(new_X)</code></td><td>Uses a fitted model to predict outcomes for new explanatory-variable values. The new table must include the constant.</td><td><code>model.predict(pd.DataFrame({'const':[1.0], 'Year':[2029]}))</code></td></tr>
+            <tr><td><code>np.exp(log_value)</code></td><td>Reverses the natural logarithm and returns the value to its original units.</td><td><code>compute = np.exp(predicted_ln)</code></td></tr>
+          </tbody>
+        </table>
+        <div class="dataset"><strong>Prepared environment:</strong>
+        <code>import numpy as np</code>, <code>import pandas as pd</code>, and
+        <code>import statsmodels.api as sm</code>. The tables <code>lefties</code> and
+        <code>frontier</code> are rebuilt before each question.</div>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p class="note" id="pystatus" style="margin-top:14px">Preparing the terminal…</p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin" disabled>BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:320px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>case</span><b id="hud-subject">—</b></div>
+            <div class="hudrow"><span>r</span><b id="hud-y">—</b></div>
+            <div class="hudrow"><span>shape</span><b id="hud-p">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Level I &nbsp;·&nbsp; The Model Behind the Number</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">FINISHED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, the dash included. The time at which you finished is already
+      inside it, so there is nothing else to report.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG — replace the three background URLs with your own art.
+   Dropbox: use the share link and change the ending to  ?dl=1
+   (or leave them; each falls back to a gradient if it fails to load)
+   ================================================================ */
+const CONFIG = {
+  BACKGROUNDS: {
+    ward:   "https://placehold.co/1200x420/241c1c/523c3c?text=+",
+    archive:"https://placehold.co/1200x420/1d2033/3d425e?text=+",
+    server: "https://placehold.co/1200x420/0d1a1e/1e4650?text=+"
+  },
+  FALLBACK: {
+    ward:   "linear-gradient(180deg,#170f0f,#3a2626 60%,#5e3c3c)",
+    archive:"linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    server: "linear-gradient(180deg,#041014,#0f3540 60%,#1a616f)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted.       */
+  RTOL: 0.02,
+  /* failed attempts on one question before SHOW THE ANSWER appears */
+  FAILS_BEFORE_SOLUTION: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS
+     milliseconds. Raise TYPE_MS to slow the dialogue down further. */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   AVATARS — inline SVG. The mouth is three sibling groups
+   (.mouth-a closed, .mouth-b ajar, .mouth-c open); the flap swaps
+   them by toggling a class on the wrapper. No network, no flicker.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- robe -->
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <!-- neck -->
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <!-- head -->
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <!-- hair -->
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <!-- beard -->
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <!-- brows -->
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <!-- nose -->
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- mouth (above the beard) -->
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <!-- monocle -->
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   PYTHON — Pyodide + NumPy, with a pattern-matching fallback.
+
+   The boot code installs the statistics layer this exercise needs:
+   Series, Frame, pd.DataFrame, and the sm.add_constant / sm.OLS interface
+   for one regressor,
+   the F and t upper tails. See the header of this file for what it is and
+   what it is not. Every number it reports was checked against Part F of
+   the outline, which came from statsmodels and scipy.
+   ================================================================ */
+const Py = (()=>{
+  let py=null, state='loading', out=[], bootError='';
+
+  const BOOT = `
+import numpy as np, warnings, math
+
+_ACAD_WARN = []
+def _acad_show(message, category, filename, lineno, file=None, line=None):
+    _ACAD_WARN.append(category.__name__ + ': ' + str(message))
+warnings.showwarning = _acad_show
+warnings.simplefilter('always')
+
+
+# ---------------------------------------------------------------- tails
+def _betacf(a, b, x):
+    MAXIT = 500; EPS = 3.0e-16; FPMIN = 1.0e-300
+    qab = a + b; qap = a + 1.0; qam = a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < FPMIN:
+        d = FPMIN
+    d = 1.0 / d
+    h = d
+    for m in range(1, MAXIT + 1):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < FPMIN:
+            d = FPMIN
+        c = 1.0 + aa / c
+        if abs(c) < FPMIN:
+            c = FPMIN
+        d = 1.0 / d
+        h = h * d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < FPMIN:
+            d = FPMIN
+        c = 1.0 + aa / c
+        if abs(c) < FPMIN:
+            c = FPMIN
+        d = 1.0 / d
+        delta = d * c
+        h = h * delta
+        if abs(delta - 1.0) < EPS:
+            break
+    return h
+
+def _betai(a, b, x):
+    """The regularized incomplete beta function I_x(a, b)."""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lb = (math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+          + a * math.log(x) + b * math.log(1.0 - x))
+    bt = math.exp(lb)
+    if x < (a + 1.0) / (a + b + 2.0):
+        return bt * _betacf(a, b, x) / a
+    return 1.0 - bt * _betacf(b, a, 1.0 - x) / b
+
+class _FDist(object):
+    def sf(self, f, dfn, dfd):
+        """Upper tail of the F distribution, i.e., P(F > f)."""
+        f = float(f); dfn = float(dfn); dfd = float(dfd)
+        if f <= 0:
+            return 1.0
+        return _betai(dfd / 2.0, dfn / 2.0, dfd / (dfd + dfn * f))
+    def cdf(self, f, dfn, dfd):
+        return 1.0 - self.sf(f, dfn, dfd)
+
+class _TDist(object):
+    def sf(self, t, df):
+        """Upper tail of the Student t distribution, i.e., P(T > t)."""
+        t = float(t); df = float(df)
+        p = 0.5 * _betai(df / 2.0, 0.5, df / (df + t * t))
+        return p if t > 0 else 1.0 - p
+    def cdf(self, t, df):
+        return 1.0 - self.sf(t, df)
+
+class _Stats(object):
+    f = _FDist()
+    t = _TDist()
+
+stats = _Stats()
+
+
+# ---------------------------------------------------------------- data
+class Series(np.ndarray):
+    """A column. It is a numpy array, plus .corr()."""
+    def __new__(cls, values, name=''):
+        obj = np.asarray(values, dtype=float).view(cls)
+        obj.name = name
+        return obj
+    def __array_finalize__(self, obj):
+        if obj is None:
+            return
+        self.name = getattr(obj, 'name', '')
+    def corr(self, other):
+        a = np.asarray(self, dtype=float).ravel()
+        b = np.asarray(other, dtype=float).ravel()
+        return float(np.corrcoef(a, b)[0, 1])
+    @property
+    def iloc(self):
+        return self
+
+
+class _Columns(object):
+    """What frame[['a','b']] returns, so that .mean(axis=1) works."""
+    def __init__(self, cols):
+        self._c = cols
+    def mean(self, axis=None):
+        m = np.vstack([np.asarray(c, dtype=float) for c in self._c])
+        if axis == 1:
+            return Series(m.mean(axis=0))
+        return Series(m.mean(axis=1))
+
+
+_ACAD_PLOT = {}
+
+class _AcadPlotter(object):
+    def __init__(self, frame):
+        self._f = frame
+    def scatter(self, x=None, y=None, alpha=None, label=None, ax=None, **kw):
+        f = self._f
+        for col in (x, y):
+            if col not in f.columns:
+                raise KeyError('there is no column called ' + repr(col) +
+                               '. The columns are ' + str(f.columns))
+        if not _ACAD_PLOT:
+            _ACAD_PLOT['x'] = x
+            _ACAD_PLOT['y'] = y
+            _ACAD_PLOT['series'] = []
+        _ACAD_PLOT['series'].append(y)
+        print('scatter: x=' + repr(x) + ', y=' + repr(y) + ', ' + str(len(f[x])) + ' points')
+        return self
+
+
+class Frame(object):
+    """A very small column store, with the syntax of a DataFrame."""
+    def __init__(self, cols=None):
+        self._cols = {}
+        self._order = []
+        if cols:
+            for k in cols:
+                self[k] = cols[k]
+    def __getitem__(self, key):
+        if isinstance(key, list):
+            return _Columns([self._cols[k] for k in key])
+        return self._cols[key]
+    def __setitem__(self, key, value):
+        arr = np.asarray(value)
+        if arr.dtype.kind in 'ifub':
+            arr = Series(arr, key)
+        if key not in self._cols:
+            self._order.append(key)
+        self._cols[key] = arr
+    def __contains__(self, key):
+        return key in self._cols
+    def __len__(self):
+        return len(self._cols[self._order[0]]) if self._order else 0
+    @property
+    def columns(self):
+        return list(self._order)
+    @property
+    def shape(self):
+        return (len(self), len(self._order))
+    @property
+    def plot(self):
+        return _AcadPlotter(self)
+    def head(self, n=5):
+        w = 15
+        print(''.join(str(c)[:w-1].rjust(w) for c in self._order))
+        for t in range(min(int(n), len(self))):
+            row = ''
+            for c in self._order:
+                v = self._cols[c][t]
+                if isinstance(v, (float, np.floating)):
+                    a = abs(float(v))
+                    if a != 0 and (a >= 1e6 or a < 1e-3):
+                        row = row + ('{:.3e}'.format(float(v))).rjust(w)
+                    else:
+                        row = row + ('{:.3f}'.format(float(v))).rjust(w)
+                else:
+                    row = row + str(v)[:w-1].rjust(w)
+            print(row)
+
+
+class _PD(object):
+    """Just enough of pandas for the predict calls."""
+    def DataFrame(self, cols):
+        return Frame(cols)
+
+pd = _PD()
+
+
+# ------------------------------------------------------- the regression
+class _Params(dict):
+    """model.params, readable by name."""
+    def __getitem__(self, key):
+        # statsmodels returns a pandas Series: labels are preferred, but the
+        # familiar params[0] / params[1] positional form also works.
+        if isinstance(key, (int, np.integer)):
+            return list(self.values())[int(key)]
+        return super().__getitem__(key)
+    def __repr__(self):
+        return '\\n'.join(k.rjust(20) + '  ' + repr(v) for k, v in self.items())
+
+class _Fit(object):
+    """The result of an ordinary least squares fit with one regressor."""
+    def __init__(self, xname, yname, x, y, constname='Intercept'):
+        x = np.asarray(x, dtype=float)
+        y = np.asarray(y, dtype=float)
+        n = x.size
+        mx = x.mean(); my = y.mean()
+        dx = x - mx; dy = y - my
+        sxx = float(np.dot(dx, dx))
+        slope = float(np.dot(dx, dy)) / sxx
+        intercept = float(my - slope * mx)
+        fitted = intercept + slope * x
+        resid = y - fitted
+        ssr = float(np.dot(resid, resid))
+        sst = float(np.dot(dy, dy))
+        self.xname = xname
+        self.yname = yname
+        self.nobs = n
+        self.df_model = 1
+        self.df_resid = n - 2
+        self.constname = constname
+        self.params = _Params([(constname, intercept), (xname, slope)])
+        self.rsquared = 1.0 - ssr / sst
+        self.rsquared_adj = 1.0 - (1.0 - self.rsquared) * (n - 1) / (n - 2)
+        se_slope = math.sqrt((ssr / (n - 2)) / sxx)
+        se_int = math.sqrt((ssr / (n - 2)) * (1.0 / n + mx * mx / sxx))
+        self.bse = _Params([(constname, se_int), (xname, se_slope)])
+        t_slope = slope / se_slope
+        t_int = intercept / se_int
+        self.tvalues = _Params([(constname, t_int), (xname, t_slope)])
+        self.pvalues = _Params([
+            (constname, 2.0 * stats.t.sf(abs(t_int), n - 2)),
+            (xname, 2.0 * stats.t.sf(abs(t_slope), n - 2))])
+        self.fvalue = t_slope * t_slope
+        self.f_pvalue = self.pvalues[xname]
+        self.fittedvalues = Series(fitted)
+        self.resid = Series(resid)
+    def predict(self, other=None):
+        if other is None:
+            return self.fittedvalues
+        if isinstance(other, Frame):
+            xs = other[self.xname]
+        else:
+            design = np.asarray(other, dtype=float)
+            if design.ndim == 1:
+                if design.size != 2:
+                    raise ValueError('A prediction row must contain [const, ' + self.xname + '].')
+                # A one-dimensional [1, x] array is one observation with two
+                # regressors, as in statsmodels, not two observations.
+                xs = design[1:2]
+            elif design.ndim == 2:
+                if design.shape[1] != 2:
+                    raise ValueError('Prediction rows must contain const and ' + self.xname + '.')
+                xs = design[:, 1]
+            else:
+                raise ValueError('Prediction data must be a row or a two-dimensional table.')
+        return Series(self.params[self.constname] + self.params[self.xname] * np.asarray(xs, dtype=float))
+    def summary(self):
+        lines = []
+        lines.append('                            OLS Regression Results')
+        lines.append('==============================================================================')
+        lines.append('Dep. Variable: {:<20} R-squared:             {:>10.3f}'.format(self.yname, self.rsquared))
+        lines.append('Model:          OLS                  Adj. R-squared:        {:>10.3f}'.format(self.rsquared_adj))
+        lines.append('No. Observations:{:>10}             F-statistic:           {:>10.3f}'.format(self.nobs, self.fvalue))
+        lines.append('Df Residuals:   {:>10}             Prob (F-statistic):    {:>10.3g}'.format(self.df_resid, self.f_pvalue))
+        lines.append('==============================================================================')
+        lines.append('                     coef      std err            t        P>|t|')
+        lines.append('------------------------------------------------------------------------------')
+        for k in self.params:
+            lines.append('{:<18}{:>12.6g}{:>13.6g}{:>13.3f}{:>13.3g}'.format(
+                k, self.params[k], self.bse[k], self.tvalues[k], self.pvalues[k]))
+        lines.append('==============================================================================')
+        return '\\n'.join(lines)
+
+class _SMF(object):
+    def ols(self, formula, data=None):
+        left, right = formula.split('~')
+        yname = left.strip()
+        xname = right.strip()
+        if xname not in data.columns:
+            raise KeyError('there is no column called ' + repr(xname))
+        if yname not in data.columns:
+            raise KeyError('there is no column called ' + repr(yname))
+        return _OLS(xname, yname, data)
+
+class _OLS(object):
+    def __init__(self, xname, yname, data):
+        self._x = xname; self._y = yname; self._d = data
+    def fit(self):
+        return _Fit(self._x, self._y, self._d[self._x], self._d[self._y])
+
+smf = _SMF()
+
+
+class _Design(object):
+    """The two-column design matrix returned by sm.add_constant(x)."""
+    def __init__(self, x):
+        self.x = Series(x, getattr(x, 'name', 'x') or 'x')
+        self.xname = self.x.name
+
+class _ArrayOLS(object):
+    def __init__(self, y, X):
+        if not isinstance(X, _Design):
+            raise TypeError('Use X = sm.add_constant(x) before sm.OLS(y, X).')
+        self.y = Series(y, getattr(y, 'name', 'y') or 'y')
+        self.X = X
+    def fit(self):
+        return _Fit(self.X.xname, self.y.name, self.X.x, self.y, constname='const')
+
+class _SM(object):
+    def add_constant(self, x):
+        return _Design(x)
+    def OLS(self, y, X):
+        return _ArrayOLS(y, X)
+
+sm = _SM()
+
+
+# ------------------------------------------------- the published result
+mean_left = 66.03
+mean_right = 75.00
+F_handedness = 22.36
+df_numerator = 1
+df_residual = 945
+
+_AGE = np.array([
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
+    70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86
+])
+_MALE = np.array([
+    12.717558, 15.31883, 14.808281, 13.793744, 15.156304, 14.086186, 14.148993, 14.522524,
+    14.727009, 15.069371, 15.546784, 15.355535, 13.931035, 14.758585, 14.405859, 13.757413,
+    13.55474, 14.206009, 14.433386, 14.236956, 14.579011, 14.209302, 14.835157, 13.868005,
+    14.69728, 14.418826, 14.932436, 14.643378, 14.087477, 14.300782, 13.97323, 13.774299,
+    13.744226, 13.43901, 13.769644, 13.999182, 13.535489, 13.488144, 13.19951, 12.483964,
+    11.809994, 11.398049, 11.346692, 11.521821, 11.529377, 11.515268, 11.012345, 11.909262,
+    10.61854, 10.166639, 9.878732, 9.894726, 9.247996, 8.60011, 8.290708, 8.562868,
+    8.769725, 8.575956, 8.074389, 8.541653, 7.926832, 8.365911, 7.559047, 7.470178,
+    7.081322, 8.253478, 8.769882, 5.397068, 6.937204, 4.885999, 6.939382, 7.188198,
+    7.350204, 6.471204, 6.510858, 7.337968, 5.059387
+])
+_FEMALE = np.array([
+    12.198041, 11.144804, 11.54924, 11.276442, 11.572906, 12.077731, 12.057432, 11.524442,
+    12.17955, 11.882904, 11.970606, 12.154899, 12.872166, 11.539937, 11.331448, 11.676748,
+    10.865891, 12.309402, 11.056588, 11.368353, 11.593085, 11.681973, 11.104371, 11.143795,
+    10.926177, 11.431546, 11.24699, 11.367447, 10.83903, 10.86842, 10.559104, 11.643193,
+    10.49451, 10.990945, 11.389191, 10.07911, 10.357289, 10.264717, 9.892073, 9.251517,
+    9.405773, 9.587944, 8.700908, 8.753964, 8.509073, 8.675104, 8.141525, 8.077697,
+    7.810595, 8.027137, 7.653338, 7.206744, 7.396092, 6.561303, 6.744014, 6.933382,
+    6.715994, 6.290775, 6.598822, 6.283988, 5.493, 5.792567, 6.604398, 5.865391,
+    5.248952, 5.443444, 5.958591, 5.593611, 6.091359, 5.490092, 6.056423, 4.779491,
+    4.874899, 5.672536, 5.774881, 7.051459, 4.680948
+])
+_FY = np.array([
+    2025.517454, 2025.257358, 2025.156057, 2025.128679, 2024.616016, 2024.558522, 2024.468172, 2024.451745,
+    2023.928131, 2023.889802, 2023.73922, 2023.678987, 2023.52293, 2023.44627, 2023.353183, 2023.199863,
+    2022.799452, 2022.799452, 2022.490075, 2022.25462, 2022.199863, 2021.974675, 2021.933607, 2021.77755,
+    2021.774812, 2021.689938, 2021.670773, 2021.607803, 2021.027379, 2020.80219, 2020.495551, 2020.405202,
+    2020.073922, 2019.947296, 2019.859685, 2019.843258, 2019.826831, 2019.807666, 2019.807666, 2019.709103,
+    2019.709103, 2019.495551, 2019.413415, 2018.33128, 2017.793977, 2017.607803, 2017.520192, 2016.845996,
+    2016.766598, 2016.736482, 2016.071184, 2015.91718, 2015.821355, 2015.747433, 2015.098563, 2014.919918,
+    2014.689938, 2014.673511, 2014.673511, 2014.665298, 2014.459959, 2013.925394, 2013.862423, 2013.041068,
+    2012.922656, 2012.747433, 2012.528405, 2012.421629, 2011.711841, 2011.323066, 2010.733744
+])
+_FC = np.array([
+    5.000000e+26, 5.184000e+25, 3.800000e+26, 3.500000e+26, 2.960000e+25, 3.800000e+25,
+    2.700000e+25, 1.800000e+25, 5.000000e+25, 1.001000e+25, 4.800000e+24, 3.760000e+24,
+    3.866000e+24, 2.100000e+25, 7.340000e+24, 2.100000e+25, 2.530000e+24, 2.540000e+24,
+    2.741500e+24, 2.527200e+24, 2.578000e+24, 1.042100e+24, 6.310000e+23, 3.538000e+23,
+    8.586000e+23, 2.000000e+23, 2.047000e+24, 3.700000e+23, 8.220000e+22, 8.200000e+22,
+    4.765000e+22, 3.140000e+23, 1.120000e+23, 6.700000e+22, 2.612000e+22, 2.076000e+22,
+    1.077340e+23, 3.300000e+22, 9.000000e+21, 9.100000e+21, 2.200000e+22, 8.506700e+21,
+    6.190000e+21, 8.743950e+21, 6.494399e+20, 6.046095e+20, 8.430000e+20, 2.200000e+21,
+    4.360000e+20, 6.620000e+21, 1.900000e+21, 1.000000e+20, 1.231108e+19, 3.800000e+20,
+    2.397403e+19, 2.976000e+20, 5.600000e+19, 1.100000e+19, 1.229100e+19, 1.555200e+18,
+    3.411072e+18, 1.340928e+18, 5.320000e+17, 2.612736e+18, 4.780000e+17, 4.700000e+17,
+    6.000000e+17, 2.731968e+17, 5.200000e+16, 3.672864e+16, 5.396000e+16
+])
+_LY = np.array([
+    2026.632444, 2026.613279, 2026.596851, 2026.577687, 2026.572211, 2026.536619, 2026.533881, 2026.490075,
+    2026.487337, 2026.421629, 2026.416153, 2026.375086, 2026.323066, 2026.323066, 2026.309377, 2026.309377,
+    2026.306639, 2026.306639, 2026.268309, 2026.134155, 2026.11499, 2026.087611, 2025.996578, 2025.996578,
+    2025.95551, 2025.952772, 2025.914442, 2025.884326, 2025.826831, 2025.826831, 2025.813142, 2025.793977,
+    2025.772074, 2025.750171, 2025.750171, 2025.750171, 2025.744695, 2025.741958, 2025.722793, 2025.689938,
+    2025.689938, 2025.689938, 2025.676249, 2025.668036, 2025.665298, 2025.635181, 2025.635181, 2025.635181,
+    2025.626968, 2025.626968, 2025.618754, 2025.618754, 2025.596851, 2025.591376, 2025.591376, 2025.580424,
+    2025.572211, 2025.569473, 2025.569473, 2025.569473, 2025.561259, 2025.561259, 2025.553046, 2025.533881,
+    2025.52293, 2025.517454, 2025.50924, 2025.490075, 2025.490075, 2025.44627, 2025.44627, 2025.424367,
+    2025.421629, 2025.421629, 2025.402464, 2025.402464, 2025.383299, 2025.380561, 2025.377823, 2025.355921,
+    2025.344969, 2025.323066, 2025.323066, 2025.323066, 2025.323066, 2025.323066, 2025.323066, 2025.323066,
+    2025.323066, 2025.320329, 2025.306639, 2025.281999, 2025.281999, 2025.281999, 2025.281999, 2025.281999,
+    2025.273785, 2025.271047, 2025.257358, 2025.257358, 2025.257358, 2025.224504, 2025.208077, 2025.208077,
+    2025.194387, 2025.188912, 2025.186174, 2025.186174, 2025.156057, 2025.150582, 2025.150582, 2025.147844,
+    2025.147844, 2025.134155, 2025.134155, 2025.134155, 2025.134155, 2025.131417, 2025.128679, 2025.079398,
+    2025.052019, 2025.035592, 2025.035592, 2025.016427, 2025.016427, 2025.016427, 2024.999316, 2024.999316,
+    2024.980151, 2024.963723, 2024.963723, 2024.960986, 2024.947296, 2024.939083, 2024.939083, 2024.930869,
+    2024.922656, 2024.922656, 2024.865161, 2024.848734, 2024.824093, 2024.804928, 2024.804928, 2024.791239,
+    2024.769336, 2024.758385, 2024.758385, 2024.731006, 2024.731006, 2024.720055, 2024.717317, 2024.717317,
+    2024.717317, 2024.717317, 2024.717317, 2024.714579, 2024.714579, 2024.711841, 2024.681725, 2024.651608,
+    2024.616016, 2024.613279, 2024.599589, 2024.594114, 2024.574949, 2024.574949, 2024.558522, 2024.558522,
+    2024.558522, 2024.550308, 2024.52293, 2024.481862, 2024.479124, 2024.479124, 2024.468172, 2024.454483,
+    2024.451745, 2024.451745, 2024.44627, 2024.43258, 2024.43258, 2024.43258, 2024.413415, 2024.405202,
+    2024.388775, 2024.386037, 2024.372348, 2024.372348, 2024.364134, 2024.364134, 2024.364134, 2024.353183,
+    2024.347707, 2024.328542, 2024.328542, 2024.312115, 2024.309377, 2024.309377, 2024.309377, 2024.295688,
+    2024.295688, 2024.295688, 2024.29295, 2024.287474, 2024.287474, 2024.268309, 2024.257358, 2024.238193,
+    2024.235455, 2024.199863, 2024.180698, 2024.172485, 2024.161533, 2024.161533, 2024.156057, 2024.147844,
+    2024.145106, 2024.145106, 2024.145106, 2024.13963, 2024.093087, 2024.093087, 2024.093087, 2024.084873,
+    2024.07666, 2024.030116, 2024.010951, 2023.971937, 2023.952772, 2023.950034, 2023.941821, 2023.933607,
+    2023.928131, 2023.911704, 2023.911704, 2023.903491, 2023.889802, 2023.870637, 2023.851472, 2023.845996,
+    2023.84052, 2023.835044, 2023.835044, 2023.835044, 2023.835044, 2023.835044, 2023.835044, 2023.832307,
+    2023.829569, 2023.829569, 2023.826831, 2023.77755, 2023.772074, 2023.73922, 2023.73922, 2023.73922,
+    2023.73922, 2023.717317, 2023.681725, 2023.678987, 2023.678987, 2023.678987, 2023.657084, 2023.621492,
+    2023.616016, 2023.602327, 2023.542094, 2023.542094, 2023.542094, 2023.52293, 2023.50924, 2023.50924,
+    2023.473648, 2023.47091, 2023.353183, 2023.309377, 2023.271047, 2023.240931, 2023.21629, 2023.213552,
+    2023.199863, 2023.199863, 2023.156057, 2023.147844, 2023.109514, 2022.925394, 2022.873374, 2022.70089,
+    2022.618754, 2022.618754, 2022.588638, 2022.583162, 2022.52293, 2022.490075, 2022.473648, 2022.47091,
+    2022.468172, 2022.435318, 2022.353183, 2022.33128, 2022.33128, 2022.260096, 2022.25462, 2022.238193,
+    2022.199863, 2022.128679, 2022.109514, 2022.087611, 2021.974675, 2021.950034, 2021.947296, 2021.933607,
+    2021.77755, 2021.774812, 2021.689938, 2021.689938, 2021.607803, 2021.410678, 2020.405202, 2020.073922,
+    2019.826831
+])
+_LC = np.array([
+    3.240000e+24, 9.702000e+24, 1.100000e+24, 2.496000e+24, 1.800000e+24, 2.000100e+25,
+    1.845000e+24, 1.008000e+25, 1.050000e+24, 6.600000e+24, 6.985110e+24, 3.870000e+25,
+    2.700000e+24, 7.200000e+23, 9.702000e+24, 2.496000e+24, 6.804000e+24, 4.320000e+24,
+    3.850000e+24, 1.326000e+24, 6.840000e+24, 5.800000e+24, 1.400000e+24, 1.520000e+24,
+    2.430000e+24, 4.800000e+23, 4.200000e+24, 1.100000e+24, 9.867360e+24, 1.026000e+23,
+    8.640000e+23, 1.100000e+23, 6.000001e+24, 1.350000e+23, 3.150000e+23, 1.215000e+24,
+    4.420000e+24, 4.180000e+24, 3.594058e+24, 2.700000e+23, 1.680000e+23, 7.320000e+23,
+    1.512000e+25, 6.740000e+24, 3.726000e+24, 3.594058e+24, 2.592000e+24, 2.144409e+23,
+    1.530000e+24, 1.519200e+24, 1.800000e+24, 9.180000e+23, 6.600000e+25, 4.940000e+24,
+    5.490000e+23, 2.950000e+23, 6.480000e+23, 4.420000e+24, 4.200000e+23, 1.656000e+24,
+    4.752000e+24, 4.752000e+24, 1.575000e+24, 2.690000e+24, 2.976000e+24, 5.000000e+26,
+    1.216486e+24, 2.820000e+24, 1.800000e+23, 4.324006e+24, 4.186193e+24, 1.050000e+24,
+    1.150800e+24, 2.952000e+23, 1.287000e+24, 4.020010e+24, 3.672000e+24, 5.181000e+23,
+    6.120000e+23, 1.388556e+24, 3.088800e+24, 4.752000e+24, 6.480000e+23, 7.084800e+24,
+    3.196800e+24, 1.771200e+24, 8.640000e+23, 3.672000e+23, 1.296000e+23, 1.224245e+24,
+    4.360000e+23, 7.200000e+23, 6.720000e+24, 2.880000e+24, 8.100000e+23, 2.880000e+24,
+    9.000770e+23, 1.069200e+25, 4.080000e+24, 2.244000e+24, 5.184000e+25, 3.300000e+24,
+    3.911001e+25, 3.605902e+24, 1.300000e+24, 5.400000e+24, 1.485000e+23, 1.555200e+24,
+    3.800000e+26, 2.500000e+23, 7.353600e+23, 3.350000e+25, 4.101581e+24, 2.250000e+24,
+    1.008000e+23, 9.571200e+24, 9.940800e+23, 6.240000e+23, 3.500000e+26, 1.152000e+24,
+    3.500000e+24, 3.141763e+24, 2.123885e+24, 2.800000e+24, 1.400000e+24, 2.800000e+24,
+    1.800000e+23, 4.600000e+23, 3.300000e+24, 1.800000e+23, 5.832000e+23, 5.880000e+23,
+    9.320202e+23, 4.210000e+23, 1.250000e+24, 6.864977e+24, 6.000010e+24, 1.481482e+23,
+    1.072500e+24, 3.492370e+24, 2.505000e+25, 5.832000e+23, 1.800000e+23, 1.500000e+24,
+    1.428000e+23, 1.650000e+24, 1.400000e+23, 5.790000e+23, 1.733400e+23, 6.900000e+24,
+    7.800000e+24, 3.337200e+23, 8.218800e+23, 1.663200e+23, 1.587600e+24, 6.048000e+23,
+    2.511300e+23, 3.510000e+24, 1.789200e+24, 4.430000e+23, 2.960000e+25, 3.939110e+23,
+    4.000000e+23, 9.654000e+23, 4.512600e+23, 4.300000e+24, 3.800000e+25, 7.929000e+24,
+    1.224000e+24, 1.050000e+23, 1.890000e+23, 1.070000e+24, 4.320000e+23, 2.106000e+24,
+    2.700000e+25, 4.359613e+23, 1.800000e+25, 1.200000e+24, 1.818600e+23, 3.020000e+24,
+    2.940000e+23, 3.780000e+23, 3.000000e+23, 4.050000e+23, 1.428000e+23, 1.060800e+24,
+    1.645357e+24, 3.339970e+23, 1.800000e+24, 7.344000e+23, 1.907280e+23, 3.600000e+23,
+    1.020000e+24, 3.841092e+23, 1.536437e+23, 3.834718e+23, 4.032000e+23, 2.131200e+23,
+    3.020290e+23, 7.861000e+24, 7.200000e+23, 1.890000e+23, 2.340000e+24, 8.400010e+24,
+    6.300000e+23, 2.910000e+23, 2.574000e+23, 9.260000e+24, 2.600000e+24, 4.860000e+23,
+    8.000001e+24, 1.050000e+25, 3.870000e+23, 1.550000e+23, 7.500512e+23, 3.074400e+23,
+    2.738567e+23, 9.691000e+23, 3.900000e+24, 3.070000e+23, 1.300000e+24, 1.680000e+23,
+    3.360000e+23, 1.033200e+23, 1.260000e+24, 3.120000e+23, 8.040000e+23, 4.770000e+23,
+    1.722000e+23, 2.052000e+23, 7.740000e+23, 1.248000e+24, 5.000000e+25, 1.300000e+24,
+    2.440000e+23, 1.780000e+23, 1.001000e+25, 1.800000e+23, 1.037205e+23, 2.700000e+23,
+    2.900000e+24, 3.960000e+23, 6.100000e+23, 4.200000e+23, 7.800000e+23, 1.050000e+24,
+    1.260000e+23, 2.400000e+23, 1.092000e+23, 1.200000e+24, 2.500000e+23, 1.668000e+23,
+    3.090000e+23, 2.500000e+23, 4.800000e+24, 1.010000e+23, 1.170000e+23, 1.092000e+23,
+    1.200000e+24, 3.760000e+24, 2.030000e+23, 1.020000e+24, 1.200000e+24, 1.248000e+23,
+    5.300000e+23, 8.268000e+23, 8.100000e+23, 4.080000e+23, 1.600000e+23, 3.866000e+24,
+    9.984000e+23, 6.200000e+23, 1.000100e+24, 1.890000e+23, 7.340000e+24, 1.069978e+23,
+    3.890000e+24, 2.360000e+23, 2.400000e+23, 4.670000e+23, 2.100000e+25, 2.400000e+23,
+    2.730000e+23, 5.500000e+23, 1.932480e+23, 1.100000e+23, 3.240000e+23, 1.690000e+23,
+    3.546100e+23, 1.001946e+23, 3.549005e+23, 2.043740e+23, 3.656640e+23, 2.741500e+24,
+    2.200000e+23, 5.096079e+23, 1.100000e+23, 5.600000e+23, 1.200000e+23, 4.300000e+23,
+    3.530000e+23, 3.369578e+23, 2.527200e+24, 5.760000e+23, 2.578000e+24, 2.900000e+23,
+    3.550000e+23, 2.380100e+23, 1.042100e+24, 1.695600e+24, 3.636311e+23, 6.310000e+23,
+    3.538000e+23, 8.586000e+23, 1.476000e+23, 2.000000e+23, 3.700000e+23, 1.543500e+24,
+    3.140000e+23, 1.120000e+23, 1.077340e+23
+])
+
+def _build_lefties():
+    """The 1986 National Geographic survey series, 77 ages."""
+    return Frame({'Age': _AGE, 'Male': _MALE, 'Female': _FEMALE})
+
+def _build_frontier():
+    """The 71 frontier models: top ten by compute at release, from 2010."""
+    return Frame({'Year': _FY, 'Compute': _FC})
+
+def _build_large():
+    """The 321 large-scale models, i.e., at least 1e23 FLOP."""
+    return Frame({'Year': _LY, 'Compute': _LC})
+
+lefties = _build_lefties()
+frontier = _build_frontier()
+large = _build_large()
+
+`;
+
+  async function boot(log){
+    if(typeof loadPyodide === 'undefined'){
+      bootError = window.PYODIDE_LOADER_ERROR || 'The Pyodide loader did not define loadPyodide().';
+      log && log("> PYTHON STARTUP ERROR: " + bootError);
+      state='failed';
+      return state;
+    }
+    try{
+      log && log("LOADING PYTHON RUNTIME .......");
+      // Do not let Pyodide infer this directory from an Error stack. That
+      // inference can point at the HTML file (rather than the CDN) when this
+      // self-contained exercise is launched locally or inside an LMS.
+      py = await loadPyodide({ indexURL: window.PYODIDE_INDEX_URL });
+      log && log("LOADING NUMPY ................");
+      await py.loadPackage("numpy");
+      py.setStdout({ batched:(s)=>out.push(s) });
+      py.setStderr({ batched:(s)=>out.push(s) });
+      log && log("LOADING THE THREE TABLES .....");
+      py.runPython(BOOT);
+      state='ready';
+    }catch(e){
+      const fullError = String((e && e.message) || e || 'Unknown Python startup error')
+        .replace(/\s+/g, ' ').trim();
+      // Python tracebacks put the useful exception at the end. Preserve that
+      // end rather than showing only Pyodide's generic eval_code wrapper.
+      bootError = fullError.length > 500 ? '…' + fullError.slice(-500) : fullError;
+      console.error('Python startup failed:', e);
+      log && log("> PYTHON STARTUP ERROR: " + bootError);
+      state='failed';
+    }
+    return state;
+  }
+
+  /* run: returns {ok, stdout, warns, error} */
+  function run(src){
+    out = [];
+    if(state!=='ready') return {ok:false, stdout:'', warns:[], error:'Python runtime unavailable.'};
+    try{
+      py.runPython("_ACAD_WARN.clear()");
+      py.runPython(src);
+      let w=[];
+      try{ w = py.runPython("list(_ACAD_WARN)").toJs(); }catch(e){ w=[]; }
+      // Pyodide's batched stream callback supplies one line at a time without
+      // its trailing newline. Put those line breaks back so tables such as an
+      // OLS summary retain their rows and columns instead of becoming one
+      // extremely long, clipped line.
+      return {ok:true, stdout:out.join('\n'), warns:Array.from(w), error:null};
+    }catch(e){
+      const m = String(e.message||e);
+      const lines = m.trim().split("\n");
+      // keep the last few lines: that is the actual Python error
+      return {ok:false, stdout:out.join('\n'), warns:[], error:lines.slice(-3).join("\n")};
+    }
+  }
+
+  /* read a numeric global, or any numeric expression; null if it fails */
+  function num(expr){
+    if(state!=='ready') return null;
+    try{ const v = py.runPython(`float(${expr})`); return (typeof v==='number')?v:null; }
+    catch(e){ return null; }
+  }
+  function isnan(expr){
+    if(state!=='ready') return false;
+    try{ return !!py.runPython(`bool(np.isnan(np.float64(${expr})))`); }catch(e){ return false; }
+  }
+  /* read a list of numbers, for the widgets that draw the real data */
+  function list(expr){
+    if(state!=='ready') return null;
+    try{
+      const v = py.runPython(`[float(_x) for _x in (${expr})]`);
+      const a = v.toJs ? Array.from(v.toJs()) : Array.from(v);
+      if(v.destroy) v.destroy();
+      return a;
+    }catch(e){ return null; }
+  }
+  return {
+    boot, run, num, isnan, list,
+    get state(){return state;},
+    get bootError(){return bootError;}
+  };
+})();
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Each numerical check accepts an answer within CONFIG.RTOL (2%) of the
+   target, or within its own 'tol', whichever is larger. A check marked
+   'strict:true' uses 'tol' alone. A check may carry an 'expr' when the
+   value is not a plain variable, which is how the plotting trials verify
+   that the right columns went on the right axes.
+   ================================================================ */
+/* The classroom version is deliberately shorter than the archived draft above. */
+const STEPS = [
+{ id:'open', type:'info', bg:'ward', who:'master', mood:'angry', studentMood:'surprised',
+  title:'THE ACADEMY · CASE FILE V',
+  text:`If you are left-handed, I have bad news. A published medical report says that you will
+  die almost nine years early.
+  <span class="fx">He glances at your hands, then at his own, and looks discreetly relieved.</span>
+  Nine years is not a rounding error. The researchers compared people who died in the same
+  period, they had nearly a thousand death records, and they had a plausible story about tools
+  and machines designed for right-handers.
+  Today you will discover that every number in that sentence can be correct while the conclusion
+  is wrong. The subtraction is not our problem. Our question is whether the two groups are
+  comparable.
+  <span class="fx"><strong>Reference:</strong> Diane F. Halpern and Stanley Coren, “Handedness
+  and Life Span,” <em>New England Journal of Medicine</em> 324(14), 1991, 998.</span>`,
+  widget:'bars', banner:'CLAIM: 9 YEARS LOST', cont:'Open the survey' },
+
+{ id:'t1', type:'code', bg:'archive', who:'master', title:'TRIAL I · WHERE ARE THE OLDER LEFT-HANDERS ?',
+  text:`Let us leave the dead for a moment and look at the living. A 1986 survey recorded, at each
+  age, the percentage of male respondents and of female respondents reporting left-handedness.
+  Plot before you explain. Everybody explains first... that is how headlines are written.
+  <strong>Plot both percentages against age.</strong>`,
+  preamble:`lefties = _build_lefties()\n_ACAD_PLOT.clear()`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nimport statsmodels.api as sm\n\n# DATA ALREADY LOADED\nlefties   # 77 rows: 'Age', 'Male', 'Female'\n# Male and Female are percentages reporting left-handedness`,
+  starter:`ax = lefties.plot.scatter(x='Age', y=???, label='Graphic of male')\nlefties.plot.scatter(x='Age', y=???, label='Graphic of female', ax=ax)`,
+  solution:`ax = lefties.plot.scatter(x='Age', y='Male', label='Graphic of male')\nlefties.plot.scatter(x='Age', y='Female', label='Graphic of female', ax=ax)`,
+  checks:[{name:'the two series', strict:true, tol:0.5, value:1,
+           expr:"1 if _ACAD_PLOT.get('x')=='Age' and sorted(_ACAD_PLOT.get('series', [])) == ['Female','Male'] else 0"}],
+  hint:`Use 'Male' on the first line and 'Female' on the second.`,
+  right:`Reported left-handedness is around 12–15% among the younger respondents and around 5–7%
+  among the oldest. So where did the older left-handers go ?
+  <span class="fx">He lets the question hang in the air a little longer than necessary.</span>
+  The picture shows an age pattern. It does not yet say one word about why the pattern exists.`,
+  wrongHint:`The y arguments are column names, in quotes, i.e., 'Male' and 'Female'.`,
+  widget:'lhage', hud:{subject:'SURVEY 1986', r:'—', shape:'falls with age'},
+  note:'reported left-handedness falls with age in the 1986 survey' },
+
+{ id:'t2', type:'multi', bg:'archive', who:'master', title:'TRIAL II · ONE PICTURE, SEVERAL STORIES',
+  text:`A declining curve is an invitation to tell a story, and there is always more than one
+  story on offer. Some of them are even true.
+  <strong>Select every proposition that is compatible with this plot alone.</strong>`,
+  q:'Select all correct propositions.',
+  options:[
+    {id:'a', label:'Selective mortality could make left-handers less common at older ages.'},
+    {id:'b', label:'Older generations could have been more likely to suppress or not report left-handedness.'},
+    {id:'c', label:'The plot proves that left-handedness causes earlier death.'},
+    {id:'d', label:'The plot separates the effect of ageing from differences between birth cohorts.'}
+  ],
+  correct:['a','b'],
+  right:`Exactly. Both mortality and generational change are compatible with the graph.
+  In a survey conducted in one single year, age and birth cohort are tangled together. An
+  80-year-old in 1986 was born into a different social world from a 20-year-old.
+  The plot cannot tell whether left-handers disappeared or whether the labels changed. It is
+  compatible with both, and it chooses neither.`,
+  wrongHint:`The plot is generous with explanations and stingy with proof. It permits more than one
+  story, but it proves no causality, and it cannot separate ageing from birth cohort.`, widget:'lhage',
+  note:'the age plot supports both mortality and cohort explanations' },
+
+{ id:'t3', type:'code', bg:'archive', who:'master', title:'TRIAL III · TURN AGE INTO HISTORY',
+  text:`First, one value for each age. Create <span class="kbd">Mean_lh</span> by giving the male
+  and female percentages equal weight, i.e., add the two percentages and divide by two.
+  Second, the survey took place in 1986, so an age is also a birth year wearing a disguise.
+  Remove the disguise with <span class="kbd">1986 − Age</span>.
+  <strong>Create the two columns.</strong>`,
+  preamble:`lefties = _build_lefties()`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nimport statsmodels.api as sm\n\n# DATA ALREADY LOADED\nlefties   # columns: 'Age', 'Male', 'Female'`,
+  starter:`lefties['Mean_lh'] = ???\nlefties['Birth_year'] = ???\n\nlefties.head()`,
+  solution:`lefties['Mean_lh'] = (lefties['Male'] + lefties['Female']) / 2\nlefties['Birth_year'] = 1986 - lefties['Age']\n\nlefties.head()`,
+  checks:[{name:'Mean_lh (mean)', expr:"lefties['Mean_lh'].mean()", value:10.3348, tol:0.02},
+          {name:'Birth_year (mean)', expr:"lefties['Birth_year'].mean()", value:1938, tol:0.5, strict:true}],
+  hint:`Mean_lh is (Male + Female) / 2. Birth year is 1986 minus Age.`,
+  right:`Mean_lh is the equal-weight average of the two reported percentages at each age. It is
+  not the mean of individual-level responses.
+  Now be honest about the disguise. Birth year is only a linear re-expression of age. It reverses
+  the direction of the association and adds no new evidence, so it still cannot distinguish
+  mortality from generational reporting.
+  <span class="fx">A new column is not a new fact.</span>`,
+  wrongHint:`Put parentheses around Male + Female before dividing by 2. And birth year is 1986
+  minus Age; adding the age sends the oldest respondents into the future.`,
+  widget:'lhbirth', note:'birth year re-expresses age; it does not identify the mechanism' },
+
+{ id:'t4a', type:'code', bg:'archive', who:'master', title:'TRIAL IV · YOUR FIRST REGRESSION',
+  text:`Now you may draw a line, but only because you have already seen the points.
+  Birth year is centred at 1900, so that the intercept speaks about an actual edge of the data
+  rather than about the year zero, when very few surveys were conducted. For your very first
+  regression, I have estimated the model myself, so that you can concentrate on reading its
+  output.
+  <strong>Print the complete regression summary.</strong>`,
+  preamble:`lefties = _build_lefties()\nlefties['Mean_lh'] = (lefties['Male'] + lefties['Female']) / 2\nlefties['Birth_year'] = 1986 - lefties['Age']\nlefties['Years_since_1900'] = lefties['Birth_year'] - 1900\ny = lefties['Mean_lh']\nx = lefties['Years_since_1900']\nX = sm.add_constant(x)\nlefty_model = sm.OLS(y, X).fit()`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nimport statsmodels.api as sm\n\n# REGRESSION ALREADY ESTIMATED FOR THIS FIRST EXAMPLE\ny = lefties['Mean_lh']\nx = lefties['Years_since_1900']\nX = sm.add_constant(x)\nlefty_model = sm.OLS(y, X).fit()`,
+  starter:`print(lefty_model.???)`,
+  solution:`print(lefty_model.summary())`,
+  checks:[{name:'intercept', expr:"lefty_model.params['const']", value:5.837817, tol:0.002},
+          {name:'slope', expr:"lefty_model.params['Years_since_1900']", value:0.118342, tol:0.0005},
+          {name:'R-squared', expr:"lefty_model.rsquared", value:0.897089, tol:0.002}],
+  hint:`The fitted result has a summary() method.`,
+  right:`An intercept of <strong>5.838</strong>, a slope of <strong>0.118</strong>, and an
+  R-squared of <strong>0.897</strong>. Your first regression, and it did not hurt.
+  The coefficient table also displays standard errors and tests. Ignore them with a clear
+  conscience for today; they are the subject of the next session.`,
+  wrongHint:`Call summary() on lefty_model inside print().`,
+  widget:'lhfit', hud:{subject:'SURVEY 1986', r:'slope 0.118', shape:'fitted line'},
+  note:'Mean_lh = 5.838 + 0.118 × Years_since_1900; R2 = 0.897' },
+
+{ id:'t4b', type:'choice', bg:'archive', who:'master', title:'TRIAL IV · WHAT DOES 0.118 MEAN ?',
+  text:`Use the coefficient table you just printed (I.e., slope estimate of 0.118). 
+  <strong>Which interpretation of the slope is correct ?</strong>`,
+  q:'Choose the correct reading of 0.118.',
+  options:[
+    {id:'a', label:'Each year, an additional 11.8% of all people become left-handed.'},
+    {id:'b', label:'Left-handed people are born 0.118 years later.'},
+    {id:'c', label:'Across these cohorts, predicted reported left-handedness rises by about 0.118 percentage points for each additional birth year.'},
+    {id:'d', label:'Birth year has been proved to cause left-handedness.'}
+  ], correct:'c',
+  right:`Percentage points, not percent. The outcome is measured in percentage points, so the
+  slope is 0.118 percentage points per birth year. Over fifty birth years, that adds up to about
+  50 × 0.118 ≈ 5.9 percentage points.
+  The intercept is the fitted percentage for the 1900 cohort, about 5.84%, because the
+  explanatory variable was centred there.
+  <span class="fx">It is hard to believe that human hands changed that much in a few decades. The
+  schools and families that did or did not permit left-handed writing are better suspects.</span>`,
+  wrong:{a:`The outcome is already a percentage, so the slope is in percentage points, not an
+  11.8% growth rate. At that speed, the whole planet would be left-handed within a decade.`,
+  b:`A slope is measured in outcome units per unit of the explanatory variable, i.e., percentage
+  points per birth year. It says nothing about when left-handers are born.`,
+  d:`Regression describes an association here. If there is a causal story, it will have to come
+  from history, not from the coefficient.`},
+  note:'slope units = percentage points per birth year' },
+
+{ id:'t5', type:'choice', bg:'ward', who:'master', mood:'angry', title:'TRIAL V · THE DEATH-COHORT TRAP',
+  text:`Return to the dead. In a sample of people who died in 1989, for every single person,
+  <span class="kbd">age at death = 1989 − birth year</span>.
+  Later cohorts are therefore mechanically younger at death. And you have just shown that later
+  cohorts are also more likely to be reported as left-handed.
+  Build the trap.
+  <strong>What can create the reported nine-year gap even if handedness has no effect on
+  mortality ?</strong>`,
+  q:'Choose the mechanism.',
+  options:[
+    {id:'a', label:'The left-handed and right-handed groups consist of different distributions of birth cohorts (different ratios of left-handed over time).
+'},
+    {id:'b', label:'A large sample makes every observed difference causal.'},
+    {id:'c', label:'Changing age into birth year removes selective mortality from the data.'},
+    {id:'d', label:'Using percentages rather than counts creates nine years of age.'}
+  ], correct:'a',
+  right:`Exactly. Birth year was not hidden in a drawer. It was hidden inside age.
+  Older natural left-handers were more likely to have been forced to switch, and therefore
+  recorded as right-handed. The two reported groups can have different birth-cohort
+  compositions, and a gap in the average age at death follows without a single extra death.
+  The age plot remains compatible with selective mortality, but it cannot establish it, and the
+  death-cohort design cannot separate the competing explanation.
+  <span class="fx">By the same method, nursery school looks more dangerous than paratrooper
+  training : the pupils who die are younger.</span>
+  The nine years may not measure mortality at all. They may measure history.`,
+  wrong:{b:`Precision does not repair incomparable groups. A larger sample simply measures the
+  same artefact more precisely.`, c:`Birth year is a linear transformation of age. Renaming a
+  variable does not identify the mechanism.`, d:`Percentages and counts are two ways of
+  displaying prevalence, and neither of them manufactures nine years of age. The problem is
+  cohort composition.`},
+  widget:'trap', banner:'9 YEARS: A COHORT COMPARISON',
+  note:'cohort composition can create the age gap without a mortality effect' },
+
+{ id:'beat2', type:'info', bg:'server', who:'master', mood:'raised', title:'THE FORECASTING BRIEF',
+  text:`<span class="fx">The archive is gone. A room of humming servers, and one very large
+  forecasting problem.</span>
+  A regression can be perfectly computed and still answer the wrong question. Now I give you the
+  opposite problem, i.e., the right business question fed to the wrong scale.
+  You advise an organization planning future AI training runs. The file contains the training
+  compute of 71 frontier AI models released since 2010,
+  measured in floating-point operations, or FLOP.
+  Your question is concrete : how much compute might a frontier model require in 2029 ? We will
+  compare a raw linear model with a model of the natural logarithm of compute.`,
+  banner:'FILE: 71 FRONTIER MODELS', hud:{subject:'FRONTIER AI', r:'—', shape:'—'},
+  cont:'Take the brief' },
+
+{ id:'t6', type:'code', bg:'server', who:'master', title:'TRIAL VI · PLOT THE IMPOSSIBLE SCALE',
+  text:`You know the rule by now. Plot first.
+  The table contains only <span class="kbd">Year</span> and <span class="kbd">Compute</span>, and
+  that is enough for a first look.
+  <strong>Plot training compute against publication year on raw axes.</strong>`,
+  preamble:`frontier = _build_frontier()\n_ACAD_PLOT.clear()`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nimport statsmodels.api as sm\n\n# DATA ALREADY LOADED\nfrontier   # 71 models; columns: 'Year', 'Compute'`,
+  starter:`frontier.plot.scatter(x=???, y=???, alpha=0.65)`,
+  solution:`frontier.plot.scatter(x='Year', y='Compute', alpha=0.65)`,
+  checks:[{name:'the two axes', strict:true, tol:0.5, value:1,
+           expr:"1 if (_ACAD_PLOT.get('x'), _ACAD_PLOT.get('y')) == ('Year','Compute') else 0"}],
+  hint:`Use x='Year' and y='Compute'.`,
+  right:`The plot is not empty, although it tries hard to look empty. A handful of recent models
+  occupy most of the vertical axis, while a decade of earlier observations is squashed flat near
+  zero.
+  The relationship is curved rather than linear. Remember that the next time somebody offers you
+  a straight line.`,
+  wrongHint:`Time goes on the x-axis, i.e., x='Year', and training compute on the y-axis, i.e.,
+  y='Compute'.`,
+  widget:'rawscatter', hud:{subject:'FRONTIER AI', r:'0.368', shape:'curved'},
+  note:'on raw axes, the compute trend is strongly curved' },
+
+{ id:'t7a', type:'code', bg:'server', who:'master', title:'TRIAL VII · A FAIR TRIAL FOR A STRAIGHT LINE',
+  text:`Ignore the curvature. Fit the raw straight line anyway. Even a bad model deserves a fair
+  trial.
+  First create the years since 2010. Then, and this time without my help, write the complete
+  statsmodels sequence yourself : define <span class="kbd">y</span> and <span class="kbd">x</span>,
+  add the constant, estimate OLS, and <strong>print the full summary</strong>.`,
+  preamble:`frontier = _build_frontier()\nraw_model = None`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nimport statsmodels.api as sm\n\n# DATA ALREADY LOADED\nfrontier   # columns: 'Year', 'Compute'`,
+  starter:`frontier['Years_since_2010'] = frontier['Year'] - ???\ny = frontier[???]\nx = frontier[???]\nX = sm.add_constant(???)\nraw_model = ???\n\nprint(raw_model.summary())`,
+  solution:`frontier['Years_since_2010'] = frontier['Year'] - 2010\ny = frontier['Compute']\nx = frontier['Years_since_2010']\nX = sm.add_constant(x)\nraw_model = sm.OLS(y, X).fit()\n\nprint(raw_model.summary())`,
+  checks:[{name:'intercept', expr:"raw_model.params['const']", value:-4.7566e25, tol:1e22},
+          {name:'slope', expr:"raw_model.params['Years_since_2010']", value:7.4814e24, tol:1e21},
+          {name:'R-squared', expr:"raw_model.rsquared", value:0.135517, tol:0.002}],
+  hint:`First create frontier['Years_since_2010'] = frontier['Year'] - 2010. Then use quoted
+  column names, sm.add_constant(x), and sm.OLS(y, X).fit().`,
+  right:`An R-squared near <strong>0.136</strong>, and an intercept of about
+  <strong>−4.76 × 10²⁵ FLOP</strong>.
+  Read that intercept slowly. Year zero in this model is 2010, so it is the fitted compute of
+  2010, and it is negative.
+  <span class="fx">In 2010, according to this line, the computers of the world were busy
+  un-computing.</span>`,
+  wrongHint:`Add the constant to x, then pass y and X to sm.OLS in that order, i.e., the outcome
+  first.`,
+  widget:'rawfit', banner:'FITTED 2010: NEGATIVE COMPUTE',
+  note:'the raw line fits poorly and predicts negative compute in 2010' },
+
+{ id:'t7b', type:'choice', bg:'server', who:'master', title:'TRIAL VII · THE VERDICT',
+  text:`The straight line has had its fair trial. Use the scatter plot and the regression summary.
+  <strong>Which verdict is defensible ?</strong>`,
+  q:'Choose the verdict on the raw linear model.',
+  options:[
+    {id:'a', label:'Keep the raw line because the summary printed a coefficient for year.'},
+    {id:'b', label:'Negative compute is a meaningful technological prediction.'},
+    {id:'c', label:'Delete early observations until the line becomes positive.'},
+    {id:'d', label:'Reject the raw linear form: it fits poorly, contradicts non-negativity, and misses the visible curvature.'}
+  ], correct:'d',
+  right:`Exactly. And now the uncomfortable part. In the next session you will study formal
+  tests for regression coefficients. As a preview, the slope p-value printed in this summary is
+  about 0.0016, i.e., statistically significant.
+  <span class="fx">The model is significantly wrong.</span>
+  Significance says that the data are hard to reconcile with a zero slope. It does not say that
+  a straight line is an adequate description.`,
+  wrong:{a:`A printed coefficient is not a certificate. Every regression prints one, including the
+  wrong ones.`, b:`FLOP counts operations, and a count cannot be negative. An impossible fitted
+  value is evidence against the model, not a technological breakthrough.`, c:`Deleting valid
+  observations until the line behaves is not analysis, it is negotiation. It also changes the
+  question.`},
+  note:'a significant slope would not make an inadequate linear form correct' },
+
+{ id:'t8', type:'code', bg:'server', who:'master', mood:'raised', title:'TRIAL VIII · CHANGE THE RULER, NOT THE DATA',
+  text:`Investment, cluster size and hardware capability compound. Compute grows by multiplying,
+  not by adding, and a process that multiplies deserves a ruler on which equal distances mean
+  equal ratios.
+  So change the ruler, not the observations. Use the natural logarithm of compute, which NumPy
+  calls <span class="kbd">np.log</span>.
+  <strong>Create Ln_compute and compute its correlation with Year.</strong>`,
+  preamble:`frontier = _build_frontier()`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nimport statsmodels.api as sm\n\nfrontier   # columns: 'Year', 'Compute'`,
+  starter:`frontier['Ln_compute'] = ???\nr_ln = frontier['Year'].corr(frontier['Ln_compute'])\n\nprint('Raw correlation : ' + f"{frontier['Year'].corr(frontier['Compute']):0.6f}")\nprint('Natural-log correlation : ' + f'{r_ln:0.6f}')`,
+  solution:`frontier['Ln_compute'] = np.log(frontier['Compute'])\nr_ln = frontier['Year'].corr(frontier['Ln_compute'])\n\nprint('Raw correlation : ' + f"{frontier['Year'].corr(frontier['Compute']):0.6f}")\nprint('Natural-log correlation : ' + f'{r_ln:0.6f}')`,
+  checks:[{name:'Ln_compute (mean)', expr:"frontier['Ln_compute'].mean()", value:50.9984, tol:0.05},
+          {name:'r_ln', value:0.985794, tol:0.001}],
+  hint:`Use np.log(frontier['Compute']).`,
+  right:`From <strong>0.368</strong> on the raw scale to <strong>0.986</strong> on the
+  natural-log scale. Same seventy-one models, not one of them deleted.
+  The observations now lie close to a straight line, because equal vertical distances represent
+  equal proportional changes in compute.
+  Notice the order of events. The reason for the logarithm came first, and the better
+  correlation came afterwards. That is the only order in which a transformation is honest.`,
+  wrongHint:`Take the logarithm of Compute, not of Year : it is compute that grows by multiplying.
+  And NumPy calls the natural logarithm np.log, not np.ln.`,
+  widget:'logscatter', banner:'NATURAL-LOG SCALE: r = 0.986',
+  note:'corr(Year, Compute) = 0.368; corr(Year, ln Compute) = 0.986' },
+
+{ id:'t9', type:'code', bg:'server', who:'master', title:'TRIAL IX · FIT THE LOG-LINEAR MODEL',
+  text:`The points have granted their permission. Now you may fit the line.
+  I have prepared the four-column dataframe, but not the regression. Create the outcome
+  <span class="kbd">y_ln</span>, select the explanatory variable <span class="kbd">x</span>,
+  add the constant to build <span class="kbd">X</span>, and fit the model.
+  <strong>Then print the full summary.</strong>`,
+  preamble:`frontier = _build_frontier()\nfrontier['Years_since_2010'] = frontier['Year'] - 2010\nfrontier['Ln_compute'] = np.log(frontier['Compute'])\nlog_model = None`,
+  shown:`# PACKAGES ALREADY IMPORTED\nimport numpy as np\nimport pandas as pd\nimport statsmodels.api as sm\n\n# DATAFRAME ALREADY PREPARED\nfrontier   # 71 rows; columns: 'Year', 'Compute',\n           # 'Years_since_2010', 'Ln_compute'`,
+  starter:`y_ln = frontier[???]\nx = frontier[???]\nX = sm.add_constant(???)\nlog_model = sm.OLS(???, ???).fit()\n\nprint(log_model.summary())`,
+  solution:`y_ln = frontier['Ln_compute']\nx = frontier['Years_since_2010']\nX = sm.add_constant(x)\nlog_model = sm.OLS(y_ln, X).fit()\n\nprint(log_model.summary())`,
+  checks:[{name:'intercept', expr:"log_model.params['const']", value:36.839417, tol:0.01},
+          {name:'slope', expr:"log_model.params['Years_since_2010']", value:1.530893, tol:0.002},
+          {name:'R-squared', expr:"log_model.rsquared", value:0.971790, tol:0.002}],
+  hint:`Master Scepticus says: y_ln is the Ln_compute column; x is Years_since_2010. Add the
+  constant to x to create X, then fit sm.OLS(y_ln, X).`,
+  right:`The full summary is now in the Python output. Read the <strong>coef</strong> column for
+  the intercept and the slope, and the <strong>R-squared</strong> entry near the top.
+  I shall not read them for you. That is the next question.`,
+  wrongHint:`Create y_ln and x from the two named columns, use X = sm.add_constant(x), then fit
+  sm.OLS(y_ln, X) and print the summary.`,
+  widget:'logfit', banner:'A STRAIGHTER MODEL ON THE LOG SCALE',
+  note:'ln Compute = 36.839 + 1.531 × Years_since_2010; R2 = 0.972' },
+
+{ id:'t9b', type:'choice', bg:'server', who:'master', title:'TRIAL IX · READ THE LOG SUMMARY',
+  text:`Use the Python summary that you just printed.
+  <strong>Which set contains the intercept, slope and R-squared of the log model ?</strong>`,
+  summaryFrom:'t9',
+  summaryFallback:`                            OLS Regression Results
+==============================================================================
+Dep. Variable: Ln_compute           R-squared:                  0.972
+Model:          OLS                  Adj. R-squared:             0.971
+No. Observations:        71             F-statistic:             2376.940
+Df Residuals:           69             Prob (F-statistic):      3.36e-55
+==============================================================================
+                     coef      std err            t        P>|t|
+------------------------------------------------------------------------------
+const                  36.8394     0.317697      115.958     8.11e-81
+Years_since_2010       1.53089    0.0314004       48.754     3.36e-55
+==============================================================================`,
+  q:'Read the three values from the summary.',
+  options:[
+    {id:'a', label:'Intercept 36.839; slope 1.531; R-squared 0.972.'},
+    {id:'b', label:'Intercept 0.318; slope 0.0314; R-squared 0.972.'},
+    {id:'c', label:'Intercept 1.531; slope 36.839; R-squared 0.972.'},
+    {id:'d', label:'Intercept 48.754; slope 115.958; R-squared 0.971.'}
+  ], correct:'a',
+  right:`Correct. At Years_since_2010 = 0, i.e., in 2010, the model predicts ln(compute) =
+  36.839. Each additional year adds 1.531 natural-log units, and the line explains about 97.2%
+  of the variation in ln(compute) in this historical sample.
+  At last, a straight line that has earned its place on the plot.`,
+  wrong:{b:`Those are the raw-scale results, i.e., the model that predicted negative compute. It
+  has already been sentenced.`, c:`The intercept and the slope have swapped places, and 0.986
+  is the correlation, not the R-squared.`, d:`The intercept is reported in natural-log units.
+  And nobody in this file fits perfectly; this option invents an R-squared of 1.`},
+  note:'from the summary: intercept 36.839, slope 1.531, R2 = 0.972' },
+
+{ id:'t10', type:'code', bg:'server', who:'master', title:'TRIAL X · THE 2029 PREDICTION',
+  text:`The organization wants a planning number for 2029. The observed sample ends in July 2025,
+  so we are about to leave the data. We may extrapolate, but the word must stay attached to the
+  answer.
+  The log-linear model has already been estimated as <span class="kbd">log_model</span>. Build one
+  new design row for 2029 and use <span class="kbd">log_model.predict(...)</span> to predict
+  ln(compute). You could obtain the same value from <span class="kbd">log_model.params</span>.
+  <strong>Then undo the natural logarithm to obtain predicted FLOP.</strong>`,
+  preamble:`frontier = _build_frontier()\nfrontier['Years_since_2010'] = frontier['Year'] - 2010\nfrontier['Ln_compute'] = np.log(frontier['Compute'])\ny_ln = frontier['Ln_compute']\nx = frontier['Years_since_2010']\nX = sm.add_constant(x)\nlog_model = sm.OLS(y_ln, X).fit()`,
+  shown:`# LOG-LINEAR MODEL ALREADY ESTIMATED\nlog_model\n\n# 2029 is 19 years after 2010\n# Predict ln(compute), then transform it back to FLOP`,
+  starter:`years_2029 = 2029 - 2010\nX_2029 = pd.DataFrame({'const': [1.0],\n                       'Years_since_2010': [years_2029]})\npredicted_ln = ???              # use log_model.predict(X_2029)\npredicted_flop = ???            # undo the natural logarithm\n\nprint('Predicted ln(compute) : ' + f'{predicted_ln:0.3f}')\nprint('Predicted compute : ' + f'{predicted_flop:0.4e}' + ' FLOP')`,
+  solution:`years_2029 = 2029 - 2010\nX_2029 = pd.DataFrame({'const': [1.0],\n                       'Years_since_2010': [years_2029]})\npredicted_ln = log_model.predict(X_2029).iloc[0]\npredicted_flop = np.exp(predicted_ln)\n\nprint('Predicted ln(compute) : ' + f'{predicted_ln:0.3f}')\nprint('Predicted compute : ' + f'{predicted_flop:0.4e}' + ' FLOP')`,
+  checks:[{name:'predicted_ln', value:65.926381, tol:0.01},
+          {name:'predicted_flop', value:4.280196e28, tol:1e26}],
+  hint:`Use log_model.predict(X_2029).iloc[0]. Alternatively, compute the intercept plus the
+  slope times 19 from log_model.params. Then use np.exp(predicted_ln).`,
+  right:`The model predicts ln(compute) of about <strong>65.926</strong> for 2029. Returning to
+  the original scale gives about <strong>4.28 × 10²⁸ FLOP</strong>.
+  <span class="fx">He checks the transformation, then underlines the word extrapolation.</span>
+  This is what the fitted historical trend predicts if it continues beyond the observed data;
+  it is not a guaranteed future value.`,
+  wrongHint:`Use log_model.predict(X_2029).iloc[0] for the log-scale prediction, then np.exp to
+  return from ln(compute) to compute.`, widget:'forecast', banner:'2029: 4.28e28 FLOP, CONDITIONAL',
+  note:'2029 conditional prediction: ln Compute = 65.926, or about 4.28e28 FLOP' },
+
+{ id:'t10b', type:'choice', bg:'server', who:'master', title:'TRIAL X · WHAT EXACTLY DID THE LINE PROMISE ?',
+  text:`The arithmetic is exact given its inputs. The future is under no obligation to agree.
+  <strong>Which statement describes the result correctly ?</strong>`,
+  q:'Choose the defensible interpretation.',
+  options:[
+    {id:'a', label:'Every frontier model released in 2029 will require exactly 4.28e28 FLOP.'},
+    {id:'b', label:'If the fitted historical log-linear trend continues, the model predicts about 4.28e28 FLOP for 2029.'},
+    {id:'c', label:'The prediction is only 65.926 FLOP because that is the value printed first.'},
+    {id:'d', label:'No transformation is needed because the regression outcome and compute are on the same scale.'}
+  ], correct:'b',
+  right:`Exactly. The first prediction is in natural-log units and must be exponentiated. The
+  resulting FLOP value is conditional on extending the fitted historical trend beyond July 2025.
+  A forecast is not weakened by stating its conditions. It becomes usable.`,
+  wrong:{a:`One conditional scenario is not a law for every future model. "Exactly" is a word that
+  forecasts should avoid.`, c:`65.926 is ln(compute), not compute in FLOP. A frontier model
+  trained with 66 operations would be a pocket calculator with ambitions.`, d:`The regression
+  predicts ln(compute). Use np.exp to return to compute measured in FLOP.`},
+  note:'forecast = a conditional extrapolation of the historical log-linear trend' },
+
+{ id:'close', type:'info', bg:'archive', who:'master', mood:'amused', title:'THE ACADEMY · DISMISSAL',
+  text:`Nine missing years that a change in history could produce without a single extra death.
+  A straight line that computed negative operations. A beautiful log-linear fit that still
+  could not certify the future.
+  Four rules leave with you.
+  <strong>One.</strong> A graph can support several mechanisms without choosing among them.
+  <strong>Two.</strong> Read the coefficients and the fit from the regression summary, but look
+  at the scatter plot before you trust the line. A line must earn its place on the plot.
+  <strong>Three.</strong> A transformation should match how the process changes. It needs a
+  reason in the world, not only a better R-squared.
+  <strong>Four.</strong> A forecast inherits every assumption used to fit and extrapolate it. It
+  is a conditional sentence, not a prophecy.
+  <span class="fx">Plot. Build X. Fit. Read the summary. Predict conditionally. Then say what
+  would have to remain true.</span>`,
+  banner:'PLOT. FIT. READ. PREDICT CONDITIONALLY.', cont:'Collect the password', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudSubject:$('#hud-subject'), hudY:$('#hud-y'), hudP:$('#hud-p'), hud:$('#hud'),
+  doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+const pythonOutputs = Object.create(null); // successful stdout, keyed by trial id
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+/* the expression a character wears until something changes it */
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  const n = node(who);
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const node = who==='student' ? el.student : el.master;
+  stopFlap();
+  let f=0;
+  flap = { node, id:setInterval(()=>{
+    node.classList.remove('talk-1','talk-2');
+    node.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(node, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  node.innerHTML = html;
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0, count=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  node.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  el.note.innerHTML = notes.map(n=>'▸ '+n).join('<br>');
+}
+
+/* ---- HUD ---- */
+function setHUD(h){
+  if(!h) return;
+  if(h.subject!==undefined) el.hudSubject.textContent = h.subject;
+  if(h.r!==undefined)       el.hudY.textContent       = h.r;
+  if(h.shape!==undefined){
+    el.hudP.textContent = h.shape;
+    el.hudP.classList.toggle('broken', String(h.shape).indexOf('?')>=0);
+  }
+}
+/* the HUD as it stood at step i: the latest one declared at or before it */
+function hudAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].hud) return STEPS[k].hud; }
+  return {subject:'—', r:'—', shape:'—'};
+}
+/* the same for the strip under the HUD */
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+function glitchHUD(){
+  el.hud.classList.add('glitching');
+  setTimeout(()=>el.hud.classList.remove('glitching'), 1100);
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.archive;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS
+
+   The plots follow the display conventions of the outline: points and
+   never connected lines for observations, dark marks on a pale ground,
+   axis labels carrying their units, the same x range for the raw and the
+   log compute plots, and a fitted line that is solid inside the sample
+   and dashed beyond the last observation. Where two series share a panel
+   they carry a legend and a colourblind-safe pair, i.e., dark navy and
+   rust, so identity is never colour alone. The data are read back out of
+   Python, so the pictures show what the student actually computed.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+function fmtNum(v){ return Math.abs(v)>=1000 ? v.toLocaleString('en-US') : String(v); }
+
+/* a scatter panel: one or more point series, plus optional straight lines */
+function panelSVG(o){
+  const W=700, H=o.H||300, L=o.L||84, R=684, T=44, B=(o.B||236);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      if(s.x[i]<o.xmin || s.x[i]>o.xmax) continue;
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||3}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.85}"/>`;
+    }
+  });
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}"
+      x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}"
+      ${l.dash?`stroke-dasharray="8 6"`:''}/>`;
+  });
+  let pins='';
+  (o.pins||[]).forEach(p=>{
+    pins += `<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.y).toFixed(1)}" r="5.5" fill="none"
+      stroke="${PLOT.fit}" stroke-width="2.5"/>
+      <text x="${px(p.x).toFixed(1)}" y="${(py(p.y)-13).toFixed(1)}" fill="${PLOT.fit}" font-size="16"
+        text-anchor="${p.anchor||'middle'}" font-family="VT323,monospace">${p.label}</text>`;
+  });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>
+      <text x="${px(v).toFixed(1)}" y="${B+21}" fill="${PLOT.label}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${o.xfmt?o.xfmt(v):v}</text>`;
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>
+      <text x="${L-9}" y="${(py(v)+5).toFixed(1)}" fill="${PLOT.label}" font-size="15" text-anchor="end" font-family="VT323,monospace">${o.yfmt?o.yfmt(v):v}</text>`;
+  });
+  let legend='';
+  if(o.legend){
+    o.legend.forEach((g,i)=>{
+      const lx = L + i*180;
+      legend += `<circle cx="${lx+5}" cy="30" r="4.5" fill="${g.color}"/>
+        <text x="${lx+16}" y="35" fill="${PLOT.label}" font-size="15" font-family="VT323,monospace">${g.label}</text>`;
+    });
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    <text x="${L}" y="${o.legend?18:24}" fill="${PLOT.label}" font-size="17" font-family="VT323,monospace">${o.title||''}</text>
+    ${legend}
+    ${marks}${lines}${pins}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    <text x="${(L+R)/2}" y="${H-12}" fill="${PLOT.label}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${o.xlab||''}</text>
+    <text x="16" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 16 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* ---- the cold open: two mean ages ---- */
+function playBars(host){
+  const W=700,H=210,L=200,R=640;
+  const bar=(y,v,lab,col)=>{
+    const w=(v/80)*(R-L);
+    return `<text x="${L-14}" y="${y+21}" fill="${PLOT.label}" font-size="17" text-anchor="end" font-family="VT323,monospace">${lab}</text>
+      <rect x="${L}" y="${y}" width="${w.toFixed(1)}" height="30" fill="${col}"/>
+      <text x="${L+w+10}" y="${y+22}" fill="${PLOT.label}" font-size="18" font-family="VT323,monospace">${v.toFixed(2)} years</text>`;
+  };
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    <text x="30" y="34" fill="${PLOT.label}" font-size="18" font-family="VT323,monospace">MEAN AGE AT DEATH, AS REPORTED IN 1991</text>
+    ${bar(60,75.00,'RIGHT-HANDED',PLOT.ink)}
+    ${bar(104,66.03,'LEFT / MIXED',PLOT.second)}
+    <line x1="${L}" y1="150" x2="${R}" y2="150" stroke="${PLOT.axis}"/>
+    <text x="${L-14}" y="180" fill="${PLOT.fit}" font-size="19" text-anchor="end" font-family="VT323,monospace">DIFFERENCE</text>
+    <text x="${L}" y="180" fill="${PLOT.fit}" font-size="19" font-family="VT323,monospace">8.97 years</text>
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE HEADLINE', svg,
+    'Halpern and Coren, New England Journal of Medicine, 1991.');
+  return 700;
+}
+
+/* ---- handedness by age, two series ---- */
+function playLhAge(host){
+  let age=Py.list("lefties['Age']"), m=Py.list("lefties['Male']"), f=Py.list("lefties['Female']");
+  if(!age||!m||!f){ age=[10,86]; m=[13,5]; f=[12,5]; }
+  host.innerHTML = plotFrame('EVIDENCE · ONE MILLION RESPONDENTS, 1986', panelSVG({
+    series:[{x:age,y:m,color:PLOT.ink,r:3.4},{x:age,y:f,color:PLOT.second,r:3.4}],
+    legend:[{label:'Graphic of male',color:PLOT.ink},{label:'Graphic of female',color:PLOT.second}],
+    xmin:6, xmax:90, ymin:3, ymax:17,
+    xticks:[10,20,30,40,50,60,70,80,90], yticks:[4,6,8,10,12,14,16],
+    title:'Reported left-handedness by age',
+    xlab:'Age in 1986 (years)', ylab:'Reported left-handedness (%)'
+  }), 'One point is one age. Note the word reported.');
+  return 1000;
+}
+
+/* ---- handedness by birth cohort, with or without the fitted line ---- */
+function playLhBirth(host, withFit){
+  let b=Py.list("(1986 - lefties['Age'])"),
+      y=Py.list("lefties[['Male','Female']].mean(axis=1)");
+  if(!b||!y){ b=[1900,1976]; y=[6,13]; }
+  const lines=[], pins=[];
+  if(withFit){
+    const a=Py.num("lefty_model.params['const']"), s=Py.num("lefty_model.params['Years_since_1900']");
+    const i0=(a===null?5.837817:a), s0=(s===null?0.118342:s);
+    lines.push({x1:1900, y1:i0, x2:1976, y2:i0+76*s0});
+    pins.push({x:1900, y:i0, label:'intercept ' + i0.toFixed(2) + '%', anchor:'start'});
+  }
+  host.innerHTML = plotFrame(withFit ? 'EVIDENCE · THE FITTED LINE' : 'EVIDENCE · BY BIRTH COHORT',
+    panelSVG({
+      series:[{x:b,y:y,color:PLOT.ink,r:3.6}],
+      lines:lines, pins:pins,
+      xmin:1896, xmax:1980, ymin:3, ymax:15,
+      xticks:[1900,1920,1940,1960,1980], yticks:[4,6,8,10,12,14],
+      title:withFit ? 'Mean_lh = 5.838 + 0.118 x Years_since_1900' : 'Mean reported left-handedness by birth year',
+      xlab:'Birth year', ylab:'Reported left-handedness (%)'
+    }),
+    withFit ? 'Solid line inside the observed cohorts, 1900 to 1976. Do not extend it.'
+            : 'One point is one birth cohort, i.e., one age in the survey.');
+  return withFit ? 1400 : 1000;
+}
+
+/* ---- the cohort trap ---- */
+function playTrap(host){
+  const T=(x,y,t,sz,col)=>`<text x="${x}" y="${y}" fill="${col||PLOT.label}" font-size="${sz||17}" text-anchor="middle" font-family="VT323,monospace">${t}</text>`;
+  const A=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${PLOT.second}" stroke-width="2" marker-end="url(#ah5)"/>`;
+  const svg=`<svg viewBox="0 0 700 232" style="width:100%;height:auto;display:block">
+    <defs><marker id="ah5" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0 0 L9 4.5 L0 9 z" fill="${PLOT.second}"/></marker></defs>
+    <rect width="700" height="232" fill="${PLOT.paper}"/>
+    ${T(350,32,'EVERYONE IN THIS SAMPLE DIED IN 1989',18)}
+    ${T(350,74,'birth year',19)}
+    ${A(300,86,196,124)} ${A(400,86,504,124)}
+    ${T(180,142,'age at death = 1989 - birth year')}
+    ${T(520,142,'probability of being')}
+    ${T(520,162,'reported left-handed')}
+    ${T(350,200,'The two handedness groups are made of different birth cohorts.',16,PLOT.fit)}
+    ${T(350,222,'No mortality effect is needed to produce a nine-year gap.',16,PLOT.fit)}
+  </svg>`;
+  host.innerHTML = plotFrame('THE MECHANISM', svg,
+    'Ferres et al. 2023: 9.3 years with no mortality effect; 0.02 years once cohort prevalence is held constant.');
+  return 1400;
+}
+
+/* ---- frontier compute: raw, raw+fit, log, log+fit, forecast ---- */
+function computeSeries(logScale){
+  const x = Py.list("frontier['Year']");
+  const y = logScale ? Py.list("np.log(frontier['Compute'])") : Py.list("frontier['Compute']");
+  if(!x || !y) return {x:[2010,2025], y:logScale?[38,61]:[1e16,5e26]};
+  return {x:x, y:y};
+}
+function playCompute(host, mode){
+  const isLog = (mode!=='raw' && mode!=='rawfit');
+  const d = computeSeries(isLog);
+  const XMIN=2009.5, XMAX=(mode==='forecast')?2030:2026.5;
+  const o = {
+    series:[{x:d.x, y:d.y, color:PLOT.ink, r:3.4, alpha:0.7}],
+    lines:[], pins:[],
+    xmin:XMIN, xmax:XMAX,
+    xticks:[2010,2014,2018,2022,2026,2030].filter(v=>v<=XMAX),
+    xlab:'Publication year'
+  };
+  if(isLog){
+    o.ymin=35; o.ymax=(mode==='forecast')?69:64;
+    o.yticks=(mode==='forecast')?[35,40,45,50,55,60,65]:[35,40,45,50,55,60];
+    o.ylab='Natural log of training compute (FLOP)';
+    o.title='Natural log of the training compute of 71 frontier models';
+  } else {
+    o.ymin=-6e25; o.ymax=5.4e26;
+    o.yticks=[0,1e26,2e26,3e26,4e26,5e26];
+    o.yfmt=v=>(v===0?'0':(v/1e26).toFixed(0)+'e26');
+    o.ylab='Training compute (FLOP)';
+    o.title='Training compute of 71 frontier models, raw scale';
+  }
+  let foot='One point is one model. Points are never connected.';
+
+  if(mode==='rawfit'){
+    const a=Py.num("raw_model.params['const']"), s=Py.num("raw_model.params['Years_since_2010']");
+    const i0=(a===null?-4.7566e25:a), s0=(s===null?7.4814e24:s);
+    o.lines.push({x1:2010, y1:i0, x2:2026, y2:i0+16*s0});
+    o.lines.push({x1:XMIN, y1:0, x2:XMAX, y2:0, color:PLOT.axis, w:1});
+    o.pins.push({x:2010, y:i0, label:'fitted 2010 = -4.76e25', anchor:'start'});
+    o.title='The raw fitted line, and where it sits in 2010';
+    foot='The fitted line is below zero until 2016.4. Compute cannot be negative.';
+  }
+  if(mode==='logfit' || mode==='forecast'){
+    const a=Py.num("log_model.params['const']"), s=Py.num("log_model.params['Years_since_2010']");
+    const i0=(a===null?36.839417:a), s0=(s===null?1.530893:s);
+    const yAt = yr => i0 + (yr-2010)*s0;
+    o.lines.push({x1:2010, y1:yAt(2010), x2:2025.52, y2:yAt(2025.52)});
+    if(mode==='forecast'){
+      o.lines.push({x1:2025.52, y1:yAt(2025.52), x2:2029, y2:yAt(2029), dash:true});
+      o.pins.push({x:2029, y:yAt(2029), label:'2029: ' + yAt(2029).toFixed(2) + ' ln FLOP', anchor:'end'});
+      o.title='Fitted inside the sample, dashed beyond it';
+      foot='The last observation is 9 July 2025. Everything dashed is extrapolation.';
+    } else {
+      o.title='ln compute = 36.839 + 1.531 x Years_since_2010';
+      foot='The natural-log scale turns the exponential-looking curve into a near-straight line.';
+    }
+  }
+  const titles = {raw:'EVIDENCE · THE RAW SCALE', rawfit:'EVIDENCE · A SIGNIFICANT IMPOSSIBLE LINE',
+                  log:'EVIDENCE · THE SAME DATA, NEW RULER', logfit:'EVIDENCE · THE LOG-LINEAR FIT',
+                  forecast:'EVIDENCE · THE 2029 EXTRAPOLATION'};
+  let inner = panelSVG(o);
+
+  if(mode==='rawfit'){           // a residual panel underneath
+    const res = Py.list("raw_model.resid"), yr = Py.list("frontier['Year']");
+    if(res && yr){
+      let mx=0; res.forEach(v=>{ mx=Math.max(mx, Math.abs(v)); });
+      inner += panelSVG({
+        H:170, B:118,
+        series:[{x:yr, y:res, color:PLOT.second, r:3, alpha:0.75}],
+        lines:[{x1:XMIN, y1:0, x2:XMAX, y2:0, color:PLOT.fit, w:1.5, dash:true}],
+        xmin:XMIN, xmax:XMAX, ymin:-mx*1.1, ymax:mx*1.1,
+        xticks:[2010,2014,2018,2022,2026],
+        yticks:[-2e26,0,2e26], yfmt:v=>(v===0?'0':(v/1e26).toFixed(0)+'e26'),
+        title:'Residuals of the raw model against year',
+        xlab:'Publication year', ylab:'Residual (FLOP)'
+      });
+      foot='The residuals are not an unstructured band around zero. Their spread explodes in the recent years.';
+    }
+  }
+  host.innerHTML = plotFrame(titles[mode]||'EVIDENCE', inner, foot);
+  return (mode==='rawfit') ? 1800 : 1200;
+}
+
+/* ---- the two populations ---- */
+function playSlopeCards(host){
+  const ls = Py.num("LARGE_SLOPE"), lf = Py.num("LARGE_FACTOR");
+  const slope2 = (ls===null?0.222943:ls), factor2 = (lf===null?1.670872:lf);
+  const card=(x,title,l1,l2,l3,col)=>`
+    <rect x="${x}" y="52" width="300" height="150" fill="#fbfaf4" stroke="${col}" stroke-width="2"/>
+    <text x="${x+18}" y="82" fill="${col}" font-size="19" font-family="VT323,monospace">${title}</text>
+    <text x="${x+18}" y="112" fill="${PLOT.label}" font-size="16" font-family="VT323,monospace">${l1}</text>
+    <text x="${x+18}" y="140" fill="${PLOT.label}" font-size="16" font-family="VT323,monospace">${l2}</text>
+    <text x="${x+18}" y="176" fill="${col}" font-size="24" font-family="VT323,monospace">${l3}</text>`;
+  const svg=`<svg viewBox="0 0 700 230" style="width:100%;height:auto;display:block">
+    <rect width="700" height="230" fill="${PLOT.paper}"/>
+    <text x="30" y="34" fill="${PLOT.label}" font-size="18" font-family="VT323,monospace">THE SAME MODEL, TWO POPULATIONS</text>
+    ${card(30,'FRONTIER','71 models, top ten at release','from September 2010','4.62 x per year',PLOT.ink)}
+    ${card(370,'LARGE SCALE','321 models above 1e23 FLOP','from October 2019',factor2.toFixed(2)+' x per year',PLOT.second)}
+  </svg>`;
+  host.innerHTML = plotFrame('SCOPE · WHICH MODELS ARE IN THE FILE', svg,
+    'Large-scale log slope ' + slope2.toFixed(6) + ' log10 FLOP per year. The definition of the sample is part of the model.');
+  return 1400;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='bars')       return playBars(host);
+  if(name==='lhage')      return playLhAge(host);
+  if(name==='lhbirth')    return playLhBirth(host, false);
+  if(name==='lhfit')      return playLhBirth(host, true);
+  if(name==='trap')       return playTrap(host);
+  if(name==='rawscatter') return playCompute(host, 'raw');
+  if(name==='rawfit')     return playCompute(host, 'rawfit');
+  if(name==='logscatter') return playCompute(host, 'log');
+  if(name==='logfit')     return playCompute(host, 'logfit');
+  if(name==='forecast')   return playCompute(host, 'forecast');
+  if(name==='slopecards') return playSlopeCards(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.glitch) glitchHUD();
+    buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'match':   return zoneMatch(s);
+    case 'code':    return zoneCode(s);
+    case 'reflect': return zoneReflect(s);
+  }
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{
+    if(s.after){
+      el.zone.innerHTML='';
+      typeInto(el.dlg, s.after, 'master', ()=> contButton('Continue', next));
+    } else if(s.final){ finish(); }
+    else next();
+  });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  // a picture may be shown before the question, so that the student
+  // commits with the evidence in front of them
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  if(s.summaryFrom){
+    const evidence=document.createElement('div');
+    evidence.className='summary-evidence';
+    const title=document.createElement('div');
+    title.className='summary-title';
+    title.textContent='PYTHON OUTPUT · REGRESSION SUMMARY';
+    const pre=document.createElement('pre');
+    pre.textContent=pythonOutputs[s.summaryFrom] || s.summaryFallback || 'No regression summary is available.';
+    evidence.appendChild(title); evidence.appendChild(pre); el.zone.appendChild(evidence);
+  }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='4px'; el.zone.appendChild(helpRow);
+  let fails=0;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+
+  const mySeq = seq;
+  function advance(givenAway){
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);
+    helpRow.innerHTML='';
+    addNote(s.note);
+    // the label is kept as HTML, so that a hat or a bar survives the echo
+    const label = s.options.find(o=>o.id===s.correct).label;
+    // the apprentice says the answer, then the master replies
+    setSpeaker('student');
+    const line = givenAway ? `<em>“…the answer was : ${label}.”</em>` : `<em>“${label}”</em>`;
+    typeInto(el.dlg, line, 'student', ()=>{
+      setTimeout(()=>{
+        if(mySeq!==seq) return;
+        setSpeaker('master');
+        if(s.wow) reactTo('wow');
+        // a step may reveal a second picture with the answer on it
+        let wait = 0;
+        if(s.widgetAfter){
+          const w=document.createElement('div'); el.zone.appendChild(w);
+          wait = mountWidget(s.widgetAfter, w);
+        }
+        setTimeout(()=>{ if(mySeq!==seq) return;
+          typeInto(el.dlg, s.right, 'master', ()=>{ contButton('Continue', next); }); }, wait);
+      }, 260);
+    });
+    el.zone.innerHTML='';
+  }
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE ANSWER';
+    b.onclick=()=>{
+      const good = box.querySelector(`[data-oid="${s.correct}"]`);
+      if(good) good.classList.add('given');
+      setTimeout(()=>{ if(mySeq===seq) advance(true); }, 500);
+    };
+    helpRow.appendChild(b);
+  }
+
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      advance(false);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      const w = (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.';
+      clearVerdict();
+      verdict('no', w);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+        offerSolution();
+        verdict('give','Two attempts. You may take the answer and keep going — the reasoning matters more than the guess.');
+      }
+      el.zone.appendChild(helpRow);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+/* ---- match: give each case its lesson ---- */
+function zoneMatch(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+
+  // the lessons, listed once, above the rows
+  const key=document.createElement('div'); key.className='matchkey';
+  key.innerHTML = s.lessons.map(l=>`<div><b>${l.id.toUpperCase()}.</b> ${l.label}</div>`).join('');
+  el.zone.appendChild(key);
+
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const chosen = {};
+  s.rows.forEach(r=>{
+    const row=document.createElement('div'); row.className='matchrow';
+    const name=document.createElement('span'); name.className='matchname'; name.textContent=r.label;
+    row.appendChild(name);
+    s.lessons.forEach(l=>{
+      const b=document.createElement('button');
+      b.className='matchbtn'; b.textContent=l.id.toUpperCase();
+      b.onclick=()=>{
+        if(b.disabled) return;
+        chosen[r.id]=l.id;
+        row.querySelectorAll('.matchbtn').forEach(x=>x.classList.remove('on'));
+        b.classList.add('on');
+      };
+      row.appendChild(b);
+    });
+    box.appendChild(row);
+  });
+
+  const bar=document.createElement('div'); bar.style.cssText='margin-top:8px;display:flex;gap:8px;flex-wrap:wrap';
+  el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  const mySeq=seq; let fails=0;
+
+  function paint(){
+    box.querySelectorAll('.matchrow').forEach((row,i)=>{
+      const want = s.correct[s.rows[i].id];
+      row.querySelectorAll('.matchbtn').forEach(b=>{
+        b.disabled=true;
+        if(b.textContent.toLowerCase()===want) b.classList.add('on');
+        else b.classList.remove('on');
+      });
+    });
+  }
+  function advance(givenAway){
+    paint();
+    bar.innerHTML='';
+    addNote(s.note);
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{
+      if(mySeq!==seq) return;
+      el.zone.innerHTML='';
+      if(s.wow) reactTo('wow');
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }, 800);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>advance(true);
+    bar.appendChild(g);
+  }
+
+  submit.onclick=()=>{
+    const missing = s.rows.filter(r=>!chosen[r.id]).length;
+    clearVerdict();
+    if(missing){
+      verdict('no','Give every case a lesson before you submit.');
+      return;
+    }
+    const wrong = s.rows.filter(r=>chosen[r.id]!==s.correct[r.id]).length;
+    if(wrong===0){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    verdict('no', wrong + ' of the three are not in the right place. ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer, and read the three warnings once more.');
+    }
+    el.zone.appendChild(bar);
+  };
+}
+
+function zoneMulti(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const row=document.createElement('div'); row.style.cssText='margin-top:6px;display:flex;gap:8px;flex-wrap:wrap';
+  el.zone.appendChild(row);
+  const mySeq = seq;
+  let fails=0;
+
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; row.appendChild(submit);
+
+  function advance(givenAway){
+    inputs().forEach(b=>b.disabled=true);
+    box.querySelectorAll('label').forEach(l=>{
+      if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add(givenAway?'given':'right');
+    });
+    addNote(s.note);
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{
+      if(mySeq!==seq) return;
+      el.zone.innerHTML='';
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }, 700);
+  }
+  function offerSolution(){
+    if(row.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      inputs().forEach(b=>{ b.checked = s.correct.indexOf(b.value)>=0; });
+      advance(true);
+    };
+    row.appendChild(g);
+  }
+
+  submit.onclick=()=>{
+    if(chosen() === wanted){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    clearVerdict();
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer and keep going — what the test can and cannot see matters more than the ticking.');
+    }
+    el.zone.appendChild(row);
+  };
+}
+
+/* ---- code ---- */
+function openPythonHelper(){
+  const guide=document.querySelector('.pyguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelper',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Exercise V</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .pyguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference examples only — your exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+
+/* how far an answer may be from the target: the larger of its own
+   absolute tolerance and CONFIG.RTOL in relative terms. A check marked
+   'strict' keeps its absolute tolerance only.                         */
+function tolerance(c){
+  const abs = c.tol || 0;
+  if(c.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(c.value));
+}
+
+function zoneCode(s){
+  const wrap=document.createElement('div');
+  wrap.className='win95'; wrap.id='code';
+  wrap.innerHTML = `
+    <div class="titlebar"><span>C:\\ACADEMY\\PYTHON.EXE</span><span class="boxes">▬ □ ✕</span></div>
+    <div class="envhead"><b>YOUR PYTHON ENVIRONMENT</b><span>already prepared — do not copy these lines</span></div>
+    <div class="preview">${escapeHtml(s.shown||'')}</div>
+    <textarea spellcheck="false" autocapitalize="off" autocorrect="off"></textarea>
+    <div class="codebar">
+      <button class="btn primary" data-run>RUN ▶</button>
+      <button class="btn" data-hint>HINT</button>
+      <button class="btn" data-python-helper>PYTHON HELPER</button>
+      <span class="pyflag"></span>
+    </div>
+    <div id="out">ready.</div>`;
+  el.zone.appendChild(wrap);
+  const helpRow=document.createElement('div'); helpRow.style.marginTop='8px'; el.zone.appendChild(helpRow);
+
+  const ta=wrap.querySelector('textarea'), out=wrap.querySelector('#out');
+  ta.value = s.starter;
+  autosize(ta);
+  ta.addEventListener('input', ()=>autosize(ta));
+  wrap.querySelector('.pyflag').textContent =
+    (Py.state==='ready') ? 'PYTHON 3 · NUMPY · PANDAS · STATSMODELS' : 'FALLBACK MODE';
+
+  let fails=0, solved=false;
+  const mySeq = seq;
+
+  wrap.querySelector('[data-hint]').onclick = ()=>{
+    out.innerHTML = `<span class="warn">hint: ${escapeHtml(s.hint)}</span>`;
+  };
+  wrap.querySelector('[data-python-helper]').onclick = openPythonHelper;
+  wrap.querySelector('[data-run]').onclick = ()=>run();
+  ta.addEventListener('keydown', e=>{
+    if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); }
+    if(e.key==='Tab'){ e.preventDefault();
+      const p=ta.selectionStart; ta.value=ta.value.slice(0,p)+'    '+ta.value.slice(ta.selectionEnd);
+      ta.selectionStart=ta.selectionEnd=p+4; autosize(ta); }
+  });
+
+  function offerSolution(){
+    if(helpRow.querySelector('button')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE SOLUTION';
+    b.onclick=()=>{
+      ta.value = s.solution; autosize(ta);
+      clearVerdict();
+      verdict('give','Here is the solution. Read it, then RUN is pressed for you.');
+      out.innerHTML = `<span class="warn">solution loaded — running it…</span>`;
+      setTimeout(()=>{ if(mySeq===seq) run(true); }, 900);
+    };
+    helpRow.appendChild(b);
+  }
+  function noteFailure(){
+    fails++;
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+  }
+
+  function run(given){
+    const src = ta.value;
+    if(src.indexOf('???')>=0){
+      out.innerHTML = `<span class="err">SyntaxError: you have not replaced every ???</span>`;
+      return;
+    }
+    if(Py.state!=='ready') return runFallback(src, given);
+
+    // clear the target names so that a stale value cannot pass the check
+    // only plain variable names can go stale; an 'expr' check reads the data
+    const names = s.checks.filter(c=>!c.expr).map(c=>c.name);
+    Py.run(`for _n in ${JSON.stringify(names)}:\n    globals().pop(_n, None)`);
+    Py.run(s.preamble);
+    const r = Py.run(src);
+
+    let lines=[];
+    if(r.stdout) lines.push(escapeHtml(r.stdout.replace(/\n+$/,'')));
+    r.warns.forEach(w=>lines.push(`<span class="warn">${escapeHtml(w)}</span>`));
+    if(!r.ok){
+      lines.push(`<span class="err">${escapeHtml(r.error)}</span>`);
+      out.innerHTML = lines.join('\n');
+      if(!solved){ reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+      return;
+    }
+
+    pythonOutputs[s.id] = r.stdout ? r.stdout.replace(/\n+$/,'') : '';
+
+    let allOK = true;
+    const verd=[];
+    s.checks.forEach(c=>{
+      const read = c.expr || c.name;        // a check may read an expression
+      if(c.nan){
+        const isn = Py.isnan(read);
+        verd.push(`${c.name} = <span class="${isn?'ok':'err'}">${isn?'nan':String(Py.num(read))}</span>`);
+        if(!isn) allOK=false;
+      } else {
+        const v = Py.num(read);
+        if(v===null){ verd.push(`<span class="err">${escapeHtml(c.name)} could not be read. Is it defined ?</span>`); allOK=false; return; }
+        const good = Math.abs(v-c.value) <= tolerance(c);
+        verd.push(`${c.name} = <span class="${good?'ok':'err'}">${fmt(v)}</span>`);
+        if(!good) allOK=false;
+      }
+    });
+    lines.push(`<span style="color:#5a6a8a">--- checked ---</span>`);
+    out.innerHTML = lines.concat(verd).join('\n');
+    if(solved) return;                      // already passed: keep the panel as it is
+    if(allOK) pass();
+    else { reactTo('wrong'); clearVerdict(); verdict('no', s.wrongHint); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  function runFallback(src, given){
+    // no Pyodide: accept if every required name is assigned something plausible
+    const ok = given || (s.checks.every(c=> c.expr || new RegExp('\\b'+c.name+'\\s*=\\s*\\S').test(src))
+               && /sm\.OLS\(|sm\.add_constant\(|\.summary\(|\.corr\(|\.plot\.scatter\(|\.head\(|np\.log\(|np\.exp\(/.test(src));
+    out.innerHTML = ok
+      ? `<span class="warn">Python is unavailable, so your code was checked by inspection only.</span>`
+      : `<span class="err">That does not look complete. Assign every variable that the question asks for.</span>`;
+    if(solved) return;
+    if(ok) pass(); else { reactTo('wrong'); noteFailure(); el.zone.appendChild(helpRow); }
+  }
+
+  /* The code panel and its output stay on screen. The student reads what
+     Python printed, and only then asks for the next step.               */
+  function pass(){
+    if(solved) return;
+    solved = true;
+    reactTo('right');
+    addNote(s.note);
+    clearVerdict(); helpRow.innerHTML='';
+    verdict('ok','Correct. Read the output above, then continue.');
+    const row=document.createElement('div'); el.zone.appendChild(row);
+    const b=document.createElement('button');
+    b.className='btn primary'; b.textContent='CONTINUE ▶';
+    b.onclick=()=>{ if(mySeq!==seq) return; el.zone.innerHTML=''; reveal(); };
+    row.appendChild(b);
+    b.scrollIntoView({block:'nearest', behavior:'smooth'});
+  }
+  function reveal(){
+    if(s.wow) reactTo('wow');
+    if(s.widget){
+      const h=document.createElement('div'); el.zone.appendChild(h);
+      const wait = mountWidget(s.widget, h);
+      setTimeout(()=>{ if(mySeq!==seq) return;
+        typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+    } else {
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next));
+    }
+  }
+}
+/* the editor grows with its content, so that no line is ever hidden */
+function autosize(ta){
+  ta.style.height='auto';
+  const min = parseInt(getComputedStyle(ta).minHeight,10) || 0;
+  ta.style.height = Math.max(min, ta.scrollHeight + 4) + 'px';
+}
+function fmt(v){
+  if(!isFinite(v)) return String(v);
+  return (Math.abs(v-Math.round(v))<1e-9) ? String(Math.round(v)) : v.toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ---- reflection ----
+   A free-text step, scored by keyword groups. No step of this exercise uses
+   it; it is kept because the engine is shared with the other exercises of
+   the course.                                                             */
+function zoneReflect(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const ta=document.createElement('textarea'); ta.id='reflect';
+  ta.placeholder='Two sentences.'; el.zone.appendChild(ta);
+  const row=document.createElement('div'); row.style.marginTop='8px'; row.style.display='flex'; row.style.gap='8px';
+  el.zone.appendChild(row);
+  const b=document.createElement('button'); b.className='btn primary'; b.textContent='SUBMIT';
+  row.appendChild(b);
+  let fails=0;
+
+  function advance(givenAway){
+    reactTo('right'); el.zone.innerHTML='';
+    const tail = `<span class="fx">A model answer, for your notes : ${s.model}</span>`;
+    const head = givenAway
+      ? `Here is the answer I was waiting for. Copy it into your notes and compare it with what you wrote.`
+      : s.right;
+    typeInto(el.dlg, head + tail, 'master', ()=>contButton('Continue', next));
+  }
+  function offerSolution(){
+    if(row.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW A MODEL ANSWER';
+    g.onclick=()=>{ advance(true); };
+    row.appendChild(g);
+  }
+
+  b.onclick=()=>{
+    const t = ta.value.toLowerCase();
+    if(t.trim().length < 40){
+      clearVerdict();
+      verdict('no','Two sentences, please. The Master is not impressed by brevity alone.');
+      reactTo('wrong'); fails++;
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution(); return;
+    }
+    const hits = s.groups.filter(g=>g.some(k=>t.indexOf(k)>=0)).length;
+    if(hits >= s.minGroups){ advance(false); }
+    else {
+      reactTo('wrong'); fails++;
+      clearVerdict();
+      verdict('no', s.wrongHint);
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION) offerSolution();
+    }
+  };
+}
+
+/* ================================================================
+   PASSWORD  —  nonlinear in the finish time, checkable in Excel
+     m    = h*3600 + min*60 + sec
+     code = ( 7919*(m*m mod 1e6) + 104729*m + 31337 )  mod 1e6
+   ================================================================ */
+function makePassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const sq = (m*m) % 1000000;
+  const code = (7919*sq + 104729*m + 31337) % 1000000;
+  return {
+    time: `${hh}h ${mm}min ${ss}s`,
+    // hhmmss, then the nonlinear transformation of that same time
+    code: hh + mm + ss + '-' + String(code).padStart(6,'0')
+  };
+}
+
+function finish(){
+  const pw = makePassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = pw.time;
+  $('#pw-code').textContent = pw.code;
+  $('#endblurb').innerHTML =
+    `You found nine missing years that a change in the way left-handedness was reported could
+     produce on its own. You fitted your first regressions, gave a straight line a fair trial and
+     rejected it when it predicted negative compute, and changed the ruler rather than the data.
+     Then you used the log-linear model to make a conditional 2029 compute prediction, with the
+     extrapolation clearly identified.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU BUILT</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'PLOT. FIT. READ. PREDICT CONDITIONALLY.';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  const txt = $('#pw-code').textContent;
+  const done = ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallbackCopy);
+  } else fallbackCopy();
+  function fallbackCopy(){
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ $('#copymsg').textContent='select and copy manually'; }
+    t.remove();
+  }
+};
+$('#btn-again').onclick = ()=>{ idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  el.doom.classList.remove('struck');
+  setHUD({subject:'—',r:'—',shape:'—'}); el.doom.textContent='CASE OPEN'; show('scr-game'); render(); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE  (also cover for the Pyodide download)
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v2.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "DETECTING CO-PROCESSOR ...... PRESENT",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "CERTAINTY MODULE ............ NOT FOUND",
+  "OPENING CASE FILE V ......... HANDEDNESS / FRONTIER AI",
+  ""
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${l}</span>`:l).join('<br>'); }
+
+(async function start(){
+  show('scr-boot');
+  for(const l of BOOT_LINES){ bootLog(l); await sleep(120); }
+  const st = await Py.boot(bootLog);
+  bootLog("");
+  if(st==='ready'){
+    bootLog("> PYTHON READY. NUMPY LOADED.");
+    bootLog("> TABLES LOADED: 77 COHORTS, 71 MODELS, 321 MODELS.");
+  }
+  else { bootLog("> PYTHON UNAVAILABLE — running in fallback mode."); }
+  bootLog("> PRESS ANY KEY");
+  const go = ()=>{ document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  $('#pystatus').textContent = st==='ready'
+    ? 'Terminal ready — Python 3 with NumPy, pandas-style tables, and the statsmodels workflow. The data are loaded.'
+    : 'Python could not be loaded: ' + (Py.bootError || 'unknown startup error') +
+      ' The exercise will check your code by inspection instead.';
+  $('#btn-begin').disabled = false;
+})();
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+$('#btn-begin').onclick = async ()=>{
+  const v = $('#playername').value.trim();
+  playerName = v || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+  show('scr-game');
+  setHUD({subject:'—',r:'—',shape:'—'});
+  idx=0; render();
+};
+</script>
+</body>
+</html>
