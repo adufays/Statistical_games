@@ -1,1 +1,2200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Exercise 8: The Square Foot Gospel</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EXERCISE 8
+  "The Square Foot Gospel"
+  EDHEC · Statistical Models · Session 8
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine and same characters as exercises 5, 6 and 7.
+
+  HOW THE EXERCISE WORKS
+  ----------------------
+  The game does NOT run Python. Students work in two windows:
+     VS Code    load housing_continuous_no_outliers.xlsx, write and run
+                the analysis;
+     this game  report numbers, choose interpretations, get feedback.
+  Every question has a HINT button. It gives advice and a Python
+  skeleton in which the decisive parts are replaced by ???, so that the
+  student cannot simply copy, paste and run. The questions follow
+  Exercise_MLR_Housing.pdf (1.1 to 3.3), with a warm-up that checks that
+  the data are loaded, and a few extra steps that make the student read
+  what the numbers mean.
+
+  DATA AND SOURCES
+  ----------------
+  housing_continuous_no_outliers.xlsx: 1119 houses sold in Ames, Iowa
+  (two abnormal sales of more than 4600 square feet were removed from the
+  original 1121). Source: Dean De Cock, "Ames, Iowa: Alternative to the
+  Boston Housing Data as an End of Semester Regression Project", Journal
+  of Statistics Education 19(3), 2011.
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---- β with a hat -------------------------------------------------------
+   The combining circumflex is missing from some fonts, so the accent is
+   drawn by CSS: <span class="hat">β</span>₁. Plain-text places (the
+   notebook, the HUD) simply write b1.                                     */
+.hat{position:relative; display:inline-block; padding-top:.34em; line-height:1}
+.hat::after{content:'^'; position:absolute; left:0; width:100%; top:-.05em;
+  text-align:center; font-size:.92em; line-height:1; font-family:inherit}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt.given{background:#7a5200; border-color:#ffcf6b #3a2600 #3a2600 #ffcf6b}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow.given input,.numrow.given select{border-color:var(--amber)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then example Python for VS Code ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+.pyguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.pyguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,var(--navy),var(--navy-lt));
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.pyguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.pyguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.pyguide th,.pyguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.pyguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.pyguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.pyguide td:first-child{width:25%}
+.pyguide td:nth-child(2){width:37%}
+.pyguide td:nth-child(3){width:38%}
+.pyguide .dataset{padding:9px 12px; border-top:1px solid #343458; color:#c7c7df; font-size:13.5px; line-height:1.55}
+.pyguide pre{margin:0 12px 12px; padding:10px 12px; background:#06110a; color:var(--green);
+  font:17px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .pyguide table,.pyguide tbody,.pyguide tr,.pyguide th,.pyguide td{display:block}
+  .pyguide thead{display:none}
+  .pyguide td{border-top:0; padding:3px 10px}
+  .pyguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .pyguide td:nth-child(1)::before{content:'SYNTAX'}
+  .pyguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .pyguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .pyguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EXERCISE VIII</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-pdf>QUESTIONS PDF</button>
+      <button class="toolbtn" data-open-data>DATA (XLSX)</button>
+      <button class="toolbtn" data-python-helper>PYTHON HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE SQUARE FOOT<br>GOSPEL</h1>
+      <h2>Exercise VIII &nbsp;·&nbsp; Statistical Models</h2>
+      <p>Master Scepticus has always believed that a house is worth its square feet. 1,119 houses sold
+      in Ames, Iowa, will test that belief. You will tell a correlation from a covariance, estimate a
+      multiple regression, read two of its coefficients, predict the price of a house, and then check
+      whether the regression deserves to be trusted. A logarithm will be called to the rescue.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · VS CODE</b>Download <code>housing_continuous.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top. Load it, then write and run
+        every line of Python there. Keep your file: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Bring back the numbers, choose the interpretations,
+        and defend them in front of the Master. The game never runs Python.</div>
+      </div>
+      <p>The Master asks the questions of the guidelines one by one, from 1.1 to 3.3. You can read
+      them all with the <strong>QUESTIONS PDF</strong> button. The PDF calls the file
+      <code>Housing_continuous.xlsx</code>: use the file of the <strong>DATA (XLSX)</strong> button
+      instead, from which two abnormal houses have been removed. Stuck ? Every question has a
+      <strong>HINT</strong> button. It gives advice and a Python skeleton in which the decisive parts
+      are replaced by <code>???</code> : completing them is your job. Type numbers with a dot as the
+      decimal separator and without any thousands separator, e.g., <code>-867.43</code> or
+      <code>185530</code>. Three decimals are always enough.</p>
+      <div class="pyguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <p class="guideintro">Start your VS Code file with these lines. Put the Python file in the
+        same folder as <code>housing_continuous_no_outliers.xlsx</code>, or give the full path to the
+        Excel file. The examples below show the syntax on other columns than the ones the questions
+        ask for.</p>
+        <pre>import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+data = pd.read_excel('housing_continuous_no_outliers.xlsx')
+data.head()</pre>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>SYNTAX</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>data['column']</code>, <code>data[['a', 'b']]</code></td><td>Selects one column; or several columns, which gives a table.</td><td><code>data[['GarageArea', 'years_since_remod']]</code></td></tr>
+            <tr><td><code>data.shape</code>, <code>x.mean()</code>, <code>x.min()</code>, <code>x.max()</code></td><td>Number of rows and columns; average, smallest and largest value of a column.</td><td><code>data['GarageArea'].mean()</code></td></tr>
+            <tr><td><code>data['new'] = ...</code></td><td>Creates a new column in the table.</td><td><code>data['garage_m2'] = 0.5 * data['GarageArea']</code></td></tr>
+            <tr><td><code>plt.scatter(x, y)</code></td><td>Draws a scatter plot, x horizontally and y vertically. End with <code>plt.show()</code>.</td><td><code>plt.scatter(data['GarageArea'], data['years_since_remod'])</code></td></tr>
+            <tr><td><code>plt.axhline(0)</code>, <code>plt.xlabel('text')</code></td><td>Draws a horizontal line at height 0 (options: <code>color='red'</code>, <code>linestyle='--'</code>); labels the horizontal axis. <code>plt.ylabel</code> labels the vertical axis.</td><td><code>plt.axhline(0, color='red', linestyle='--')</code></td></tr>
+            <tr><td><code>x.corr(y)</code></td><td>Pearson correlation between two columns.</td><td><code>data['GarageArea'].corr(data['years_since_remod'])</code></td></tr>
+            <tr><td><code>data.corr()</code></td><td>Correlation matrix of all the columns. Add <code>['column']</code> to keep the correlations of one column.</td><td><code>data.corr()['GarageArea']</code></td></tr>
+            <tr><td><code>s.drop('label')</code>, <code>s.abs()</code>, <code>s.idxmax()</code></td><td>For a series <code>s</code>: removes one entry; takes absolute values; gives the label of the largest value.</td><td><code>data.corr()['GarageArea'].drop('GarageArea').abs().idxmax()</code></td></tr>
+            <tr><td><code>x.cov(y)</code></td><td>Covariance between two columns.</td><td><code>data['GarageArea'].cov(data['years_since_remod'])</code></td></tr>
+            <tr><td><code>np.log(x)</code>, <code>np.exp(x)</code></td><td>Natural logarithm and exponential. NumPy calls the logarithm <code>np.log</code>, not <code>np.ln</code>.</td><td><code>np.log(data['GarageArea'] + 1)</code></td></tr>
+            <tr><td><code>sm.add_constant(X)</code></td><td>Adds the column of ones, named <code>const</code>, needed to estimate an intercept.</td><td><code>sm.add_constant(data[['GarageArea']])</code></td></tr>
+            <tr><td><code>sm.OLS(y, X).fit()</code></td><td>Estimates a linear regression by ordinary least squares. The outcome comes first.</td><td><code>model = sm.OLS(data['years_since_remod'], X).fit()</code></td></tr>
+            <tr><td><code>model.summary()</code></td><td>Prints the regression table: coef, std err, t, P&gt;|t|, R-squared.</td><td><code>print(model.summary())</code></td></tr>
+            <tr><td><code>model.params</code>, <code>.pvalues</code>, <code>.tvalues</code>, <code>.rsquared</code></td><td>Coefficients, p-values, t-statistics and R². Add <code>['name']</code> to keep one entry.</td><td><code>model.params['GarageArea']</code></td></tr>
+            <tr><td><code>model.resid</code>, <code>model.fittedvalues</code></td><td>Residuals, i.e., observed minus predicted outcome; and fitted values, i.e., the predicted outcome of each row.</td><td><code>model.resid.mean()</code></td></tr>
+            <tr><td><code>model.predict(x_new)</code></td><td>Prediction for new values. <code>x_new</code> needs the same columns as X, in the same order, the constant included.</td><td><code>model.predict(pd.DataFrame([{'const': 1, 'GarageArea': 400}]))</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>model</span><b id="hud-model">—</b></div>
+            <div class="hudrow"><span>top corr</span><b id="hud-top">—</b></div>
+            <div class="hudrow"><span>R²</span><b id="hud-r2">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Exercise VIII &nbsp;·&nbsp; The Square Foot Gospel</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">FINISHED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, the dash included. The time at which you finished is already
+      inside it, so there is nothing else to report.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the questions of the exercise, opened by the QUESTIONS PDF button */
+  QUESTIONS_PDF: "https://www.dropbox.com/scl/fi/46t3hyfqy8ir6jiignz17/Exercise_MLR_Housing.pdf?rlkey=kgadvrp10drirxtozf7hvgw5t&raw=1",
+  /* the data of the exercise, downloaded by the DATA (XLSX) button */
+  DATA_FILE: "https://www.dropbox.com/scl/fi/d29a4bmpiz0hp8qq4ouiv/housing_continuous_no_outliers.xlsx?rlkey=ydem0k6pautl6uxnsbndfbcl9&raw=1",
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { office:'', lab:'', street:'' },
+  FALLBACK: {
+    office: "linear-gradient(180deg,#140c08,#3a2414 60%,#6b3c1c)",
+    lab:    "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    street: "linear-gradient(180deg,#07100d,#17382c 60%,#2c5a40)"
+  },
+  /* how forgiving the numerical checks are, in absolute terms; each
+     number field picks one of these margins with 'tol'.
+       TOL_INT    targets typed without decimals (dollar amounts)
+       TOL_DEC    targets typed with decimals
+       TOL_SMALL  targets between -1 and 1 (correlations, R², p-values)
+     Counts have tol:0, i.e., they must be exact.                      */
+  TOL_INT: 1,
+  TOL_DEC: 0.05,
+  TOL_SMALL: 0.01,
+  /* failed attempts on one question before SHOW THE ANSWER appears */
+  FAILS_BEFORE_SOLUTION: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 1,119 houses of housing_continuous_no_outliers.xlsx, embedded
+   for the pictures only. The student computes everything in VS Code.
+     P SalePrice · G GrLivArea · B TotalBsmtSF · F 1stFlrSF · A GarageArea
+     Y years_since_remod
+   M1P and M2P are the OLS estimates of Model 1 (price) and Model 2
+   (ln price): c const, g GrLivArea, b TotalBsmtSF, f 1stFlrSF,
+   a GarageArea, y years_since_remod.
+   ================================================================ */
+const DATA = {
+  P:[745000,755000,625000,475000,295000,538000,410000,320000,359100,485000,235000,197000,242000,438780,285000,556581,424870,582933,403000,256000,250000,325000,301000,437154,315000,446261,345000,383970,412500,260000,380000,265979,200000,315000,239000,325000,240000,336000,303477,189000,333168,342643,361919,276000,191000,159500,290000,290000,136000,278000,151400,290000,335000,325000,281213,317000,354000,340000,320000,309000,267000,402000,169000,341000,260000,160000,555000,315750,386250,348000,325300,285000,107500,337000,611657,240000,260000,239000,265000,266500,90000,426000,262280,345000,259500,451950,230000,133900,122500,225000,154300,290000,258000,305000,328000,225000,142953,501837,118500,350000,244000,268000,117500,250000,271900,179500,335000,280000,325624,243000,226000,239686,193500,106000,137900,316600,271000,238000,415298,350000,206900,244000,235000,275500,423000,274300,228000,263000,215000,240000,385000,233000,200000,234000,135000,339750,210000,242000,211000,129500,250000,372500,284000,253293,375000,222500,369900,192000,274725,402861,239500,144000,167500,378500,269790,225000,310000,145000,305900,250000,255000,301500,205000,228500,135000,315000,165000,440000,395000,253000,281000,190000,269500,205000,239799,215000,124500,270000,215000,171000,250000,145000,252000,239000,236000,195000,254900,360000,395192,266000,230500,263435,214000,394617,219500,137000,280000,190000,377426,198500,170000,137000,233230,220000,177000,163000,215000,210000,202900,320000,275000,138000,335000,112000,214900,122000,190000,185000,241500,318061,124900,178000,219210,200000,394432,187000,136900,252678,230000,187000,326000,207000,143000,189000,257000,190000,385000,230000,257500,221000,155000,315000,192140,280000,216837,237000,314813,319000,155000,180500,184000,169500,140000,230000,189000,155000,200100,289000,239900,312500,239000,179000,213500,140000,230000,147000,131500,374000,231500,186500,193000,165150,223500,204750,138887,197900,170000,283463,192500,110000,213000,129900,87000,115000,226700,224900,212000,175000,163000,239000,370878,231500,157000,227875,319900,164000,160000,124000,377500,175000,168000,219500,172500,318000,260000,159000,126000,178000,207500,190000,188000,150900,142600,125000,311872,197000,188000,201000,180000,260400,196500,183500,324000,337500,297000,185000,255500,187500,140000,191000,171000,131000,196500,274900,145000,372402,240000,208500,187000,140000,328900,137500,130000,130000,130000,306000,367294,200000,165500,95000,320000,143900,318000,307000,245350,136500,224500,127000,144000,248328,127500,200000,207500,266000,172500,200500,174000,213250,177000,193500,185000,173000,240000,285000,232000,180000,140000,227000,162900,159000,224900,212000,165500,290000,195000,188700,278000,249700,215000,165400,135000,135000,392500,325000,251000,139000,184000,217500,175000,128000,293077,275000,248900,164000,167000,146500,178000,183000,173000,115000,192000,255000,210000,117000,250000,176500,143000,139000,295493,213000,284000,270000,175500,173000,154000,235000,262000,202500,315500,152000,193000,236500,232000,152000,221500,167900,137450,107400,220000,181000,117000,175900,157000,140000,256300,207500,169000,140000,286000,193000,210000,227000,214000,134432,181000,124000,185900,235128,287090,133000,140200,223500,197000,149000,179200,232000,227000,162900,133000,186700,239000,178000,175900,264561,262500,174500,171000,245000,277500,201000,174000,153500,152000,140000,154000,151000,192500,174000,209500,186500,212900,179900,241000,205000,155000,215200,220000,205000,157500,141500,174000,214000,214000,118964,118858,280000,260000,259000,98000,144500,235000,144000,180000,159434,153000,274000,167000,137500,185000,108000,180000,175000,127000,264132,213490,149500,203000,191000,181000,233170,165000,149000,204000,179400,246578,190000,173900,204900,225000,179665,279500,270000,221000,217000,208900,184000,232600,139500,113000,167000,265900,213000,178900,175000,174000,143000,174000,226000,191000,156500,145000,173500,127000,143000,125000,172500,135000,135000,244600,201000,170000,149900,282922,175000,192000,176000,97500,189000,179540,176000,172785,163990,155835,148500,146000,91500,183900,175000,180500,179900,157900,174000,148500,79000,218000,210000,189000,188500,132000,192000,165000,187100,170000,227680,189950,159500,180500,179600,175500,392000,179900,155000,153900,185500,178000,176500,175000,156932,132500,82500,194201,149500,153575,167500,135500,166000,146000,110000,196000,170000,135000,93000,166000,145250,176000,148000,197500,161000,119500,105000,141000,140000,105000,250580,202500,152000,103600,202665,202500,114504,127500,119000,125000,122500,185850,241500,164900,125500,194700,163000,143000,128000,130000,125500,224000,207000,177000,208900,158000,130000,168500,165000,179000,155000,117000,112000,206300,147000,98000,154900,181134,120000,180000,139000,213500,185000,181000,180000,153500,157000,108000,167900,170000,107000,150750,254000,160000,128000,147000,164500,123000,40000,200141,169990,130000,230000,229456,207500,176432,145000,164990,112000,181000,160000,196000,153000,176485,158000,119500,112000,106000,187750,100000,153000,90000,193879,245500,143500,127000,110000,140000,171500,167000,60000,203000,135000,192000,155000,133000,132000,176000,159895,179900,167500,185000,181500,163000,172500,145000,108959,105000,147500,176000,160000,142000,127000,119000,160000,171900,164700,139000,116000,167240,87000,197000,154000,150000,175500,194000,149700,135000,134450,98600,179900,194500,121600,110000,124000,189000,198900,173733,164500,153337,101800,147400,185000,104900,194000,102000,208300,131000,118000,113000,120000,164000,118500,155000,140000,105000,186000,178000,151000,134000,206000,195400,103000,162000,177500,151000,151000,146000,144152,130500,125000,153900,139000,110000,109900,159500,148000,78000,132500,120000,137500,137500,157000,102776,134900,114500,170000,144000,190000,174900,140000,125000,126175,158000,120000,148000,125500,158500,141000,132500,123500,187500,160200,143000,139950,131400,129000,124000,134000,142500,145000,176000,140000,155000,135000,126000,176000,89471,66500,120000,155000,118000,68400,160000,108000,155000,125000,100000,147000,140000,139000,129000,171000,119900,116000,107000,160000,159000,155000,147000,85000,101000,95000,139000,139400,110500,144000,152000,145000,140000,155000,145000,141000,88000,88000,75000,157000,159950,144900,119200,136000,134000,142125,118000,91000,67000,153500,156000,108480,148000,145000,140000,140000,127500,154500,128000,126500,128000,129900,132000,109000,145000,144000,142000,139400,139000,151000,137500,150000,145500,155000,138500,128900,135000,113000,98300,100000,55993,124500,152000,150500,133700,133000,132250,129500,109900,109500,93500,92900,90000,131500,109000,118500,115000,156000,85000,88000,118400,134500,115000,135000,142500,134500,147000,156000,145000,138000,126000,119000,113000,91000,118000,106000,100000,94500,89500,85400,83000,102000,149900,135500,135000,132000,128500,132500,122000,100000,64500,119900,163500,129000,108500,94750,127000,132500,119750,139000,106500,119500,119000,111000,82000,140000,129000,93000,79500,124000,84900,132000,112500,117500,122900,110000,80000,143000,119500,99500,148000,129000,147000,142000,125000,120000,115000,114500,116000,109008,119000,107900,134800,123000,130000,149900,142500,138500,130000,129000,128200,125000,123000,110000,109500,81000,135000,100000,91300,112500,97000,105000,130000,123000,141000,133500,129900,129000,128500,127500,127000,124500,120500,120500,120000,116050,115000,97000,62383,58500,137000,132000,155900,136500,131500,129500,82000,130000,83000,117000,105500,107500,125000,138000,130500,129900,124500,110000,100000,110000,119000,87000,109500,91000,115000,96500,76000,124900,120500,110000,133900,133000,129500,133000,73000,125000,80000,79900,105900,90350,86000,113000,108000,86000,80000,89000,68500,35311,60000],
+  G:[4476,4316,3627,3608,3493,3279,3238,3222,3194,3140,3112,3082,2978,2945,2872,2868,2828,2822,2794,2792,2784,2775,2730,2728,2727,2713,2704,2696,2668,2646,2643,2640,2634,2630,2624,2622,2614,2612,2610,2601,2599,2596,2576,2574,2555,2554,2531,2526,2526,2524,2521,2520,2519,2504,2482,2473,2468,2466,2462,2452,2452,2448,2447,2418,2417,2414,2402,2398,2392,2392,2376,2374,2372,2365,2364,2358,2353,2345,2344,2340,2337,2332,2329,2324,2320,2296,2291,2291,2290,2287,2274,2270,2263,2262,2260,2243,2240,2234,2230,2224,2223,2217,2210,2198,2196,2192,2184,2172,2161,2158,2157,2149,2142,2138,2136,2132,2127,2127,2121,2113,2112,2110,2108,2098,2097,2097,2097,2094,2093,2090,2084,2084,2082,2080,2080,2078,2073,2069,2060,2058,2057,2046,2046,2042,2036,2031,2028,2022,2021,2020,2020,2020,2019,2018,2013,2008,2007,2002,2000,1992,1989,1987,1986,1982,1981,1980,1977,1976,1973,1971,1970,1969,1968,1964,1962,1961,1960,1959,1959,1959,1958,1958,1953,1950,1949,1948,1947,1944,1940,1939,1936,1935,1933,1932,1928,1928,1924,1923,1922,1922,1920,1920,1919,1915,1913,1912,1911,1908,1908,1905,1904,1904,1902,1902,1894,1889,1888,1876,1872,1869,1869,1868,1863,1861,1856,1855,1855,1852,1852,1851,1850,1848,1846,1845,1844,1844,1842,1840,1839,1839,1839,1838,1838,1836,1836,1829,1828,1826,1826,1824,1820,1812,1812,1811,1804,1803,1802,1801,1801,1800,1800,1800,1797,1796,1795,1795,1795,1792,1792,1792,1790,1790,1786,1786,1784,1779,1779,1776,1776,1776,1775,1774,1774,1771,1768,1768,1768,1768,1768,1767,1766,1764,1762,1761,1752,1752,1750,1750,1746,1743,1742,1740,1739,1734,1734,1734,1734,1732,1728,1728,1728,1728,1728,1728,1726,1725,1724,1721,1721,1720,1720,1720,1719,1718,1718,1718,1717,1717,1717,1716,1716,1716,1714,1713,1712,1710,1710,1710,1710,1710,1709,1709,1709,1709,1708,1704,1702,1700,1700,1699,1698,1696,1694,1694,1694,1694,1692,1691,1690,1689,1689,1688,1686,1684,1683,1682,1682,1680,1680,1679,1674,1671,1670,1668,1668,1668,1668,1665,1664,1664,1661,1661,1661,1660,1660,1660,1659,1656,1656,1656,1656,1656,1652,1652,1652,1652,1651,1647,1647,1647,1646,1646,1646,1646,1644,1644,1641,1640,1640,1639,1638,1636,1635,1635,1634,1632,1632,1632,1630,1630,1629,1629,1626,1626,1626,1625,1624,1621,1620,1620,1617,1616,1616,1616,1614,1611,1608,1605,1604,1604,1604,1603,1601,1601,1600,1600,1600,1595,1593,1593,1590,1588,1588,1588,1586,1584,1582,1580,1578,1578,1577,1576,1576,1576,1575,1574,1573,1573,1573,1572,1571,1571,1569,1567,1566,1564,1564,1563,1561,1560,1560,1559,1558,1558,1556,1556,1555,1555,1554,1553,1552,1552,1550,1548,1548,1547,1541,1541,1539,1539,1537,1536,1535,1535,1535,1533,1530,1530,1529,1526,1525,1524,1523,1520,1520,1518,1516,1513,1511,1510,1509,1509,1507,1506,1506,1505,1504,1504,1504,1502,1502,1502,1501,1501,1500,1500,1500,1498,1496,1496,1494,1494,1494,1494,1493,1490,1489,1489,1487,1486,1484,1484,1484,1484,1484,1482,1481,1479,1479,1478,1477,1476,1475,1473,1472,1471,1470,1469,1468,1466,1466,1466,1464,1464,1459,1458,1458,1456,1456,1456,1456,1456,1456,1456,1456,1456,1452,1446,1442,1442,1442,1441,1441,1440,1437,1436,1434,1432,1432,1431,1431,1430,1430,1428,1426,1426,1425,1422,1422,1419,1416,1416,1416,1414,1414,1414,1412,1412,1412,1411,1402,1400,1396,1394,1393,1392,1392,1392,1391,1389,1389,1387,1385,1383,1382,1382,1381,1378,1376,1376,1375,1375,1374,1372,1370,1370,1369,1368,1368,1368,1367,1367,1365,1365,1364,1363,1363,1363,1362,1362,1362,1362,1360,1360,1358,1358,1357,1352,1352,1352,1350,1350,1349,1348,1348,1346,1344,1344,1344,1343,1340,1340,1339,1339,1338,1337,1337,1337,1337,1336,1336,1334,1328,1328,1327,1324,1324,1324,1322,1320,1319,1317,1316,1316,1316,1314,1314,1314,1314,1314,1310,1310,1309,1308,1306,1306,1302,1302,1302,1302,1302,1301,1301,1297,1296,1294,1288,1285,1285,1284,1283,1279,1277,1276,1274,1271,1269,1269,1268,1268,1266,1266,1265,1264,1262,1262,1261,1258,1258,1258,1258,1256,1253,1252,1252,1252,1252,1251,1250,1250,1250,1250,1248,1248,1247,1246,1244,1242,1240,1236,1236,1236,1235,1234,1232,1230,1230,1229,1228,1226,1224,1224,1224,1224,1223,1221,1221,1220,1220,1218,1218,1218,1218,1217,1216,1216,1215,1214,1214,1212,1212,1212,1211,1208,1208,1208,1204,1200,1200,1200,1200,1200,1200,1200,1199,1196,1196,1196,1194,1194,1192,1190,1183,1181,1180,1178,1178,1176,1176,1173,1167,1166,1165,1164,1164,1163,1158,1158,1155,1154,1152,1150,1148,1148,1146,1145,1144,1144,1144,1144,1144,1142,1141,1138,1137,1136,1135,1134,1134,1132,1131,1131,1130,1128,1128,1128,1126,1126,1125,1125,1123,1122,1121,1121,1120,1118,1118,1118,1117,1116,1114,1114,1113,1112,1111,1111,1109,1108,1103,1099,1097,1097,1095,1094,1092,1092,1092,1092,1092,1090,1086,1086,1082,1080,1080,1078,1077,1077,1077,1074,1073,1073,1072,1072,1072,1069,1069,1068,1067,1065,1063,1060,1057,1057,1056,1056,1056,1056,1056,1054,1054,1053,1053,1052,1052,1050,1048,1048,1048,1047,1044,1041,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1039,1034,1029,1028,1026,1022,1015,1012,1008,1005,1004,1003,999,996,990,990,990,990,988,988,988,987,987,987,987,987,987,987,986,985,980,980,972,971,970,969,968,968,965,964,960,960,960,955,954,954,952,951,950,948,948,944,936,936,936,935,932,930,928,928,925,924,924,924,923,923,918,914,913,912,912,912,912,912,912,910,907,904,901,900,900,899,894,894,894,894,894,894,894,894,894,894,894,893,892,886,882,882,875,874,872,864,864,864,864,864,864,864,864,864,864,864,864,864,864,864,864,860,854,848,848,848,845,841,838,835,833,832,827,825,816,816,816,816,816,816,813,804,803,792,790,789,789,784,780,778,773,768,768,768,767,764,752,747,747,720,694,691,672,672,630,630,616,520,480,438],
+  B:[2396,2444,1930,1107,1470,1650,2033,1673,965,1926,1360,824,710,1410,1683,1992,1466,1734,1462,1510,1392,1237,1502,1848,853,1452,1952,1264,1572,1347,2153,1240,1248,1470,1370,1463,1522,1225,1184,612,1393,1249,1234,1482,588,718,1318,1165,714,2524,942,1203,1210,1122,1094,1143,1136,1580,1392,1117,1028,1629,804,1311,1288,954,3094,1379,2392,1396,1158,1181,994,1252,2330,907,845,952,1264,1152,662,1682,1475,1175,1028,1722,975,1214,777,1304,1105,1152,1141,1482,1306,700,0,2216,795,1462,2223,2217,1008,1145,2158,720,1104,1063,1582,1202,924,1434,896,849,2136,1496,1223,1104,2121,2109,952,2110,1127,1030,2077,1108,1080,912,791,1220,2078,956,1362,1276,1040,1034,1542,585,1151,735,1017,2046,998,2042,2136,1153,1868,1160,868,2006,1128,0,728,2002,1117,896,1017,1001,2000,1053,1065,1986,768,807,1122,1980,816,1976,1935,1113,1085,808,774,803,1391,804,960,1088,847,1907,1026,979,1082,975,1050,847,991,1896,1930,1095,1406,832,894,1932,847,1020,1086,750,1922,0,570,928,1079,908,896,482,777,915,967,1905,1058,1208,1902,0,817,925,1517,901,1845,1869,1088,585,879,916,1856,528,994,900,1004,822,1833,833,1040,1055,1844,1844,1842,944,1477,1195,756,1838,732,1836,1860,941,1822,1814,910,764,1026,864,360,1073,994,1134,793,1501,893,1800,1800,982,939,780,1777,1795,1050,1792,963,936,873,732,920,824,747,866,1763,1732,936,1584,740,952,1095,0,866,884,866,731,880,1064,1766,928,596,874,1752,559,983,636,1746,702,916,800,970,1734,1734,912,0,741,864,864,1728,1728,1728,1728,1726,539,880,928,1461,1720,860,840,1719,1700,1705,832,1709,1156,756,880,858,768,980,1713,1626,1710,1710,856,832,576,1698,970,970,970,976,1704,1702,1682,1398,978,1698,1140,1694,1686,1694,1181,846,1026,815,1689,1436,616,1686,1684,918,804,1304,1650,840,1408,1163,959,1670,1626,1657,840,856,810,832,1004,1649,799,992,1660,831,715,1501,1656,1080,746,660,1656,1600,1652,1494,686,1606,1430,953,806,1638,1594,1638,918,1416,728,728,798,798,1064,943,1623,1065,485,1626,935,1632,1240,1622,1630,3206,1616,764,764,764,1573,1624,1208,1620,780,1604,1595,1616,1149,1614,780,976,840,1604,926,984,761,1271,533,1566,1484,916,940,1593,839,768,1588,1588,0,1362,1584,770,1580,1573,806,972,1324,770,1042,1575,1574,1573,1078,884,1572,1571,799,1386,1520,1566,704,650,1563,1561,1560,684,1559,910,913,727,716,1373,1373,1554,756,1552,713,1092,952,804,756,1541,1541,650,927,1319,1536,1517,0,0,1533,1530,1530,0,1216,1525,874,1193,793,1156,1518,1516,939,802,755,783,1461,1075,1498,1362,1505,1504,1346,1346,1502,602,776,1490,744,1356,1500,750,1498,1496,654,1494,1494,1494,1479,1478,788,1489,778,735,1486,1476,1473,783,1484,742,650,702,1453,1468,1478,861,738,757,1437,702,729,941,756,1468,1466,796,1466,1485,520,1459,729,912,728,728,728,728,728,728,855,855,810,691,729,1424,910,1442,776,855,540,1437,1436,1454,716,264,1431,1099,1413,384,1417,912,690,1425,1422,1422,1419,708,696,876,1414,707,1184,1392,616,780,1386,1258,672,698,384,816,1392,689,1392,1391,1389,651,811,910,1383,1362,1051,1161,689,780,768,780,1367,840,1372,1370,1090,672,1368,1368,684,884,861,765,765,1364,1385,1008,622,1362,1362,796,611,384,803,1358,1358,1019,1352,663,1062,1248,1064,1349,660,884,560,1344,672,624,731,1340,0,1309,1029,1338,1337,1405,1337,1237,1165,637,1350,1350,686,1063,1324,1088,672,855,1164,608,649,1316,1316,926,1314,1300,1314,1314,1314,1310,617,1040,728,1306,992,1302,1302,630,630,630,1293,1145,1297,0,1286,1260,660,672,720,931,1196,1277,1276,1274,720,1256,1269,832,1268,1257,1266,1219,1268,1262,1262,1261,1258,1258,1198,560,1256,1237,600,1252,504,1032,1251,625,625,661,686,1248,912,1247,1246,1244,1242,1240,912,912,1070,1235,1234,1232,747,440,561,1228,1226,612,612,1086,0,600,1221,784,1199,836,1218,735,672,672,626,1216,832,1215,1214,672,1212,1212,506,952,1187,1208,780,1204,1200,600,600,864,600,768,1200,1199,1196,684,1196,655,1194,596,1106,649,1138,700,1176,859,698,816,1053,915,856,1127,1164,1164,1162,1158,862,1109,796,1092,1150,1148,980,868,1145,1144,1144,864,1144,1144,1142,1141,588,1112,1136,560,1010,756,1132,907,676,1120,1120,936,698,1126,0,1125,1041,732,924,1121,1121,1040,1096,793,648,1029,1116,1114,1114,1113,536,530,616,372,637,1103,1099,1040,1097,588,1094,1092,1092,525,546,546,1090,1024,1086,1082,1080,1084,1078,991,1007,961,1056,1073,1073,547,547,547,1069,1069,1059,1067,1065,1056,1040,1057,1057,1056,1056,1056,1056,1056,1054,936,1008,1053,1010,1052,1050,1048,993,0,641,540,1041,1040,1040,1040,1040,1064,1040,0,0,0,0,0,1039,735,1029,1008,1026,1022,768,1012,1008,1005,975,1003,925,936,990,990,990,990,876,988,462,483,483,483,483,483,483,483,960,985,980,980,972,971,970,969,968,656,828,876,960,960,960,955,911,920,952,951,950,948,864,0,936,936,936,742,932,0,928,928,925,672,924,672,923,876,918,870,814,912,912,912,912,912,912,105,907,884,901,900,864,864,894,864,894,894,894,894,894,894,894,894,894,845,892,190,882,0,715,864,858,864,864,864,864,864,864,864,864,864,864,864,864,864,864,864,864,840,832,848,848,848,845,721,816,458,833,832,0,825,816,816,816,816,816,816,813,788,720,768,768,789,768,784,780,740,773,768,768,768,723,680,744,747,600,624,440,691,672,672,630,630,616,520,480,290],
+  F:[2411,2444,1831,1518,1675,1690,2053,1699,1940,1966,1360,1687,1898,1426,2129,1992,1466,1734,1490,1584,1392,1521,1553,1848,1549,1476,2000,1282,1572,1372,2069,1320,1338,1470,1370,1500,1548,1276,1184,990,1422,1249,1264,1482,1423,1576,1328,1203,1664,2524,1291,1214,1238,1134,1133,1143,1136,1580,1392,1132,1210,1686,1699,1325,1301,1766,2402,1383,2392,1407,1158,1234,1378,1268,2364,1307,1153,1170,1277,1188,1422,1742,1532,1182,1436,1728,1005,1260,1246,1304,1105,1164,1165,1482,1306,1122,1120,2234,954,1462,2223,2217,1178,1145,2196,1052,1130,1071,1610,2158,1216,1518,1182,1075,2136,1496,1223,912,2121,2113,1092,2110,1236,1038,2097,1108,1080,912,1236,1220,2084,956,1362,1276,1040,1050,2073,2069,1164,1134,1020,2046,1006,2042,2036,1153,2028,1156,887,2020,1142,2020,1136,2018,1127,1112,1026,1001,2000,1053,1091,1987,1186,1175,1328,1980,1127,1976,1973,1113,1120,1161,774,1098,1391,804,960,1088,847,1959,1026,979,1082,975,1062,847,991,1944,1940,1095,1454,832,894,1932,847,908,1086,1061,1922,495,1222,928,1079,927,1172,1221,1065,933,993,1905,1058,1136,1902,1318,824,964,1888,943,1872,1869,1188,1140,879,920,1856,1094,1216,932,1004,1020,1850,1053,1168,1055,1844,1844,1842,944,1839,1195,1051,1838,734,1836,1836,941,1828,1826,916,1060,1133,876,1032,1811,1028,1803,901,1801,901,1800,1800,1007,939,983,1795,1795,1050,1792,963,962,882,1012,920,905,892,866,1779,1776,936,1776,1006,1022,1095,1771,866,884,866,981,880,1064,1766,928,998,874,1752,1080,983,1089,1746,1041,916,960,983,1734,1734,1085,1302,977,864,864,1728,1728,1728,1728,1726,1040,880,936,1721,1720,860,840,1719,1718,1718,885,1717,1187,961,909,858,1148,980,1713,1712,1710,1710,856,832,902,1709,970,970,970,976,1704,1702,1700,1700,1014,1698,1696,1694,1694,1694,1390,846,1026,815,1689,1689,616,1686,1684,918,804,1682,1680,840,1679,1163,959,1670,1668,1668,840,1112,810,832,1004,1661,827,1661,1660,831,849,1659,1656,1656,760,808,1656,1652,1652,1652,966,1651,1647,953,841,1646,1646,1646,918,1644,888,832,798,798,1166,943,1636,915,1001,1634,955,1632,1632,1630,1630,1629,1629,764,764,764,1625,1624,1621,1620,780,1617,1616,1616,1149,1614,798,1160,840,1604,926,984,810,1601,1021,1600,1600,916,1192,1593,864,786,1588,1588,1120,1586,1584,770,1580,1578,958,972,1072,778,1042,1575,1574,1573,1128,989,1572,1571,799,1569,1567,1566,860,888,1563,1561,1560,684,1559,910,1048,829,716,1555,1555,1554,756,1552,811,1112,952,804,764,1541,1541,958,1067,1537,1536,1535,1535,1535,1533,1530,1530,1088,1526,1525,874,1523,848,1520,1518,1516,939,802,755,807,1509,1507,1506,1506,1505,1504,1504,1504,1502,900,851,1501,757,1500,1500,750,1498,1496,664,1494,1494,1494,1494,1493,788,1489,944,798,1486,1484,1484,783,1484,742,832,702,1479,1479,1478,877,738,925,1473,842,742,997,756,1468,1466,1096,1466,1464,1464,1459,729,912,728,728,728,728,728,728,855,855,1002,713,729,1442,1442,1442,764,855,889,1437,1436,1434,716,768,1431,1431,1430,774,1428,912,698,1425,1422,1422,1419,708,696,876,1414,707,1414,1412,616,825,1411,1402,672,698,754,872,1392,703,1392,1391,1389,707,811,910,1383,1382,1382,1381,689,780,968,780,1375,840,1372,1370,1370,697,1368,1368,684,959,961,765,765,1364,1363,1363,741,1362,1362,796,751,1360,803,1358,1358,1357,1352,663,1352,1350,1350,1349,660,884,796,1344,672,624,820,1340,1340,1339,1339,1338,1337,1337,1337,1337,1336,897,1334,1328,810,1327,1324,1324,757,855,1320,1319,649,1316,1316,926,1314,1314,1314,1314,1314,1310,865,1309,976,1306,1306,1302,1302,630,630,630,1301,1301,1297,1296,1294,1288,1285,1072,720,1283,1279,1277,1276,1274,720,1269,1269,1036,1268,1266,1266,1265,1264,1262,1262,1261,1258,1258,1258,698,1256,1253,624,1252,936,1032,1251,625,625,661,686,1248,912,1247,1246,1244,1242,1240,1236,1236,1236,1235,1234,1232,774,682,561,1228,1226,612,612,1224,1224,520,1221,949,1220,1220,1218,869,672,672,626,1216,832,1215,1214,694,1212,1212,1212,1211,1208,1208,848,1204,1200,600,520,1200,520,768,1200,1199,1196,684,1196,1194,1194,596,1190,679,1181,1180,1178,859,786,816,1173,1167,1166,1165,1164,1164,1163,1158,950,1155,796,1152,1150,1148,1148,1146,1145,1144,1144,1144,1144,1144,1142,1141,1138,1137,1136,575,1134,756,1132,1131,676,1130,1128,1128,698,1126,1126,1125,1125,772,1122,1121,1121,1120,1118,793,734,1117,1116,1114,1114,1113,536,581,616,576,1108,1103,1099,1097,1097,1095,1094,1092,1092,525,546,546,1090,1086,1086,1082,1080,1080,1078,1077,1077,1077,1074,1073,1073,1072,1072,1072,1069,1069,1068,1067,1065,1063,1060,1057,1057,1056,1056,1056,1056,1056,1054,1054,1053,1053,1052,1052,1050,1048,1048,1048,1047,1044,1041,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1040,1039,735,1029,1028,1026,1022,1015,1012,1008,1005,1004,1003,999,996,990,990,990,990,988,988,526,483,483,483,483,483,483,483,986,985,980,980,972,971,970,969,968,968,965,964,960,960,960,955,954,954,952,951,950,948,948,944,936,936,936,779,932,930,928,928,925,672,924,672,923,923,918,914,913,912,912,912,912,912,912,910,907,904,901,900,900,899,894,894,894,894,894,894,894,894,894,894,894,893,892,886,882,882,875,874,872,864,864,864,864,864,864,864,864,864,864,864,864,864,864,864,864,860,854,848,848,848,845,841,838,835,833,832,827,825,816,816,816,816,816,816,813,804,803,792,790,789,789,784,780,778,773,768,768,768,767,764,752,747,747,720,694,691,672,672,630,630,616,520,480,438],
+  A:[813,832,807,840,870,841,666,594,380,820,795,672,564,641,541,716,1052,1020,810,520,564,880,576,706,440,858,538,792,726,656,694,864,968,696,864,712,624,676,550,621,779,840,666,868,672,704,752,844,216,542,576,721,628,656,642,852,872,610,576,691,683,711,336,983,462,520,672,834,968,870,853,656,432,856,820,360,484,360,889,252,560,846,514,736,180,842,429,506,560,667,480,671,420,749,533,746,528,1166,440,738,516,621,205,836,701,240,836,947,789,576,487,670,509,360,528,612,525,833,732,839,576,522,540,878,1134,583,678,615,542,556,1220,618,484,282,504,836,500,505,521,396,180,834,871,1390,513,541,880,505,422,900,466,630,532,746,455,230,812,871,888,648,586,691,486,575,576,770,540,908,895,689,753,534,680,483,868,560,400,1025,434,766,936,492,1043,576,574,434,678,708,606,1053,504,552,668,774,434,440,592,564,676,672,487,400,685,506,342,672,471,493,431,788,736,240,567,539,510,308,578,540,604,617,456,477,660,492,834,512,325,644,660,440,772,370,315,462,620,546,894,622,416,486,442,765,372,862,484,613,774,758,164,520,240,264,672,470,442,484,216,484,800,765,702,463,639,483,534,895,352,874,564,451,588,484,608,684,180,546,454,712,474,888,425,468,779,336,603,543,578,240,320,504,478,470,576,578,576,492,423,240,758,539,424,240,480,928,660,440,539,476,673,572,560,574,576,504,786,550,527,471,440,527,565,440,473,786,826,427,908,400,642,512,490,281,496,856,588,866,550,548,506,480,506,380,380,380,380,772,1052,544,447,420,768,349,818,636,776,576,650,308,225,954,480,603,612,564,440,523,530,583,308,575,396,472,690,702,502,500,271,528,528,420,598,550,377,500,493,240,499,826,528,397,180,506,482,840,499,416,616,621,460,216,800,482,870,240,418,312,546,595,520,240,472,865,440,255,866,462,576,338,860,451,880,808,474,474,474,538,757,440,912,462,533,608,834,216,865,442,216,379,660,470,660,484,478,300,890,319,460,240,682,398,676,825,472,680,435,792,520,830,840,240,312,528,614,225,529,824,544,360,240,995,722,380,660,648,750,234,476,758,556,573,400,812,282,288,441,452,430,660,627,615,782,434,438,672,440,614,532,843,686,576,462,532,532,410,400,576,430,630,240,364,541,315,478,281,364,588,472,180,413,296,393,600,404,592,440,505,478,437,457,644,180,270,577,440,648,570,564,675,474,426,840,481,530,576,508,388,776,240,220,480,472,606,393,487,390,324,343,558,577,442,216,540,336,452,250,440,548,216,898,610,566,528,754,480,527,440,330,410,400,400,429,390,440,440,440,280,506,406,500,719,301,492,440,352,528,484,527,432,360,666,296,605,400,554,216,440,576,626,576,567,776,484,720,494,403,601,576,432,280,544,648,440,384,400,300,458,540,576,530,418,240,256,720,292,884,459,676,360,198,240,544,451,338,529,484,479,300,474,474,216,560,384,440,440,484,439,288,528,460,504,480,502,572,297,484,484,312,466,299,288,520,478,539,453,216,384,784,468,513,186,396,252,484,294,582,531,511,462,405,375,570,630,308,210,624,550,440,240,440,564,270,250,440,397,484,626,552,626,440,294,400,398,484,256,624,756,436,309,264,280,440,572,440,498,516,662,500,528,240,240,506,473,526,350,508,312,430,308,288,244,453,388,502,461,572,460,433,648,528,400,280,276,402,462,528,576,288,461,625,528,552,280,438,160,550,305,336,528,826,923,288,447,480,484,632,305,440,462,472,740,528,528,528,462,480,400,392,632,396,676,440,264,264,288,402,336,297,461,936,460,573,492,322,632,628,539,412,521,480,480,884,480,240,312,530,297,528,440,539,312,189,540,308,588,252,439,384,624,528,528,495,400,490,528,240,220,576,208,576,240,300,300,672,308,438,397,796,456,264,596,336,528,484,264,551,384,576,254,240,451,672,200,720,525,286,528,484,520,430,352,264,528,440,480,544,358,410,440,672,440,576,576,264,336,288,200,288,280,440,352,480,672,264,495,504,299,264,286,286,450,484,490,240,288,484,240,205,210,338,495,515,326,525,525,525,440,440,264,436,461,280,572,576,246,572,576,304,260,308,460,480,750,312,440,288,338,286,280,420,273,504,270,576,484,286,308,648,384,420,625,400,400,420,504,240,261,360,440,280,450,308,240,672,504,588,300,564,576,672,480,299,276,520,297,264,280,264,288,264,264,264,180,328,384,484,240,300,624,440,480,216,300,432,576,308,432,386,576,240,840,327,280,280,248,528,672,308,576,308,306,308,252,288,429,576,280,280,264,264,264,576,240,576,288,336,297,288,275,414,352,180,281,576,288,288,552,440,336,450,450,308,384,600,400,308,1248,576,288,273,461,308,180,288,480,400,338,624,720,288,300,352,463,660,528,288,280,572,576,360,200,528,576,420,420,420,360,294,275,366,326,528,392,720,816,264,308,264,516,288,270,240,360,240,160,250,200,360,352,924,240,396,396,624,367,504,264,220,528,484,352,216,234,240,286,286,205,240,308,246],
+  Y:[14,15,14,17,8,7,14,20,12,1,20,40,3,4,10,4,3,1,14,60,32,10,23,4,16,2,15,3,6,17,4,7,41,12,60,15,13,11,3,12,11,4,4,3,16,12,15,16,60,29,37,15,20,3,4,5,6,5,4,5,11,5,20,16,18,40,2,13,7,12,4,6,45,11,0,13,30,60,13,4,60,2,20,4,8,2,11,12,60,57,50,3,12,7,13,19,31,1,60,5,37,40,60,10,19,13,2,4,3,9,44,7,42,45,59,1,16,19,3,15,41,42,24,5,4,12,17,6,19,14,2,6,7,6,41,2,22,3,21,60,23,2,6,1,45,11,4,33,4,1,15,33,17,1,13,8,2,60,5,6,8,16,20,21,60,5,32,3,4,5,4,33,0,34,4,8,58,4,5,21,5,60,4,12,16,5,5,6,0,4,10,1,3,2,6,60,12,18,4,7,18,60,4,18,60,10,16,15,8,4,5,28,8,32,7,60,8,36,22,3,14,7,4,8,0,16,38,1,10,17,5,10,60,18,4,33,23,9,6,12,44,4,5,5,5,7,3,4,5,60,60,48,14,6,11,10,60,13,5,8,3,10,4,47,8,3,56,6,9,10,11,38,8,13,60,12,36,3,8,52,17,60,60,4,5,7,3,60,40,23,1,13,60,3,5,5,25,19,3,42,24,26,10,3,5,29,33,25,7,6,34,34,45,47,3,31,11,16,17,14,6,6,17,3,2,12,4,19,40,14,48,2,22,5,5,2,5,7,17,60,10,6,4,6,6,2,2,7,51,40,2,48,3,5,2,60,1,60,60,3,54,13,30,5,32,12,40,11,34,12,60,10,4,8,7,7,5,9,34,60,12,14,14,4,8,15,10,4,50,6,23,37,2,3,10,60,24,33,10,60,2,5,3,60,57,15,20,7,6,60,12,4,60,7,4,12,43,22,2,9,6,7,7,6,6,3,15,12,2,41,16,14,5,6,4,46,20,60,4,12,50,18,32,23,3,13,13,10,8,6,2,4,11,51,12,43,6,2,1,60,60,6,4,60,18,4,8,18,15,47,3,16,3,4,2,60,29,3,5,7,5,37,60,60,42,30,4,3,4,4,4,35,3,3,34,1,5,8,8,60,5,7,6,31,31,35,5,6,60,8,10,52,34,10,38,6,46,6,13,60,7,21,50,2,5,57,14,4,4,1,14,10,11,11,4,6,4,4,3,4,3,14,8,13,12,5,4,60,60,11,4,5,3,39,5,22,15,7,10,53,60,5,33,7,16,11,38,15,1,3,21,51,3,11,8,11,60,5,3,5,4,4,4,34,32,60,11,13,20,19,52,10,32,60,6,6,9,5,8,11,48,8,10,2,12,33,46,6,29,3,42,11,60,6,6,8,22,3,60,33,3,32,7,3,55,53,3,42,6,35,18,56,58,50,48,31,4,5,60,60,60,56,60,2,4,34,60,4,4,17,60,60,40,39,5,5,10,60,4,49,15,11,55,15,0,6,4,3,41,52,46,36,9,44,13,10,12,13,60,60,3,4,20,45,9,7,11,17,12,57,60,33,51,60,8,4,45,60,36,44,57,60,3,4,9,2,1,2,4,53,5,60,11,60,5,10,3,19,38,39,40,4,60,20,43,4,14,33,9,60,30,33,40,52,3,60,5,50,60,56,5,3,11,50,4,34,52,3,6,41,60,45,14,10,51,19,60,46,3,3,7,60,4,60,5,16,53,37,4,14,16,14,49,3,3,60,29,30,21,1,1,1,31,48,5,5,60,4,59,1,60,38,37,30,12,60,12,45,60,1,9,15,42,4,3,60,12,15,5,5,12,5,15,60,17,54,10,20,51,51,60,48,8,38,60,10,60,10,60,36,60,5,44,41,60,5,6,60,15,3,6,51,51,58,7,4,51,49,27,54,47,34,5,52,23,45,3,8,60,5,10,60,60,47,56,60,33,7,3,34,60,5,6,47,49,33,60,60,34,48,6,6,3,34,14,60,5,60,30,4,25,15,52,57,46,53,39,40,40,4,44,7,60,52,27,14,60,60,60,35,45,42,5,5,4,33,33,7,15,50,56,34,48,3,55,30,42,5,18,41,47,19,4,39,42,54,54,60,60,15,58,51,14,2,51,47,47,45,60,60,60,60,60,45,60,49,60,5,4,60,60,4,55,33,26,48,18,15,15,15,16,60,56,37,3,40,37,38,39,39,37,60,33,43,33,8,41,47,35,4,3,45,4,40,60,45,44,34,60,59,60,39,56,56,58,30,10,57,50,60,4,10,53,45,4,35,60,30,25,31,14,44,2,14,43,25,46,52,14,53,6,10,10,43,6,38,36,1,7,42,34,44,38,56,48,60,7,43,14,38,54,17,42,39,59,38,52,8,38,51,38,40,40,39,51,40,20,39,45,60,28,9,6,7,7,4,60,10,60,10,56,3,15,7,2,53,28,47,52,5,18,60,4,60,60,60,60,38,55,57,7,3,40,12,6,26,60,57,7,8,60,60,13,8,40,60,60,60,60]
+};
+const M1P = { c:-15068.762741259963, g:79.43452515953065, b:69.27450259119776, f:-6.200407826130071, a:67.08489211933582, y:-867.4315536344297 };
+const M2P = { c:11.18751871133029, g:0.00035900324356499553, b:0.0003220956404439893, f:-3.5421412744176726e-05, a:0.00030085457199776613, y:-0.0057904461349057535 };
+
+/* ================================================================
+   AVATARS — inline SVG, identical to exercises 5, 6 and 7. The mouth is three
+   sibling groups (.mouth-a closed, .mouth-b ajar, .mouth-c open); the
+   flap swaps them by toggling a class on the wrapper.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- robe -->
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <!-- neck -->
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <!-- head -->
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <!-- hair -->
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <!-- beard -->
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <!-- brows -->
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <!-- nose -->
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- mouth (above the beard) -->
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <!-- monocle -->
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from VS Code, or
+              drop-down choices ({kind:'select'})
+
+   A number field is accepted within 'tol' of its target, in absolute
+   terms: one of the margins of CONFIG, or 0 for a count. 'show' is what
+   SHOW THE ANSWER types when it differs from the target.
+   'abs:true' accepts either sign. 'alt' lists common wrong values, each
+   with its own feedback. 'pct:true' catches a proportion typed as a
+   percentage. A field without 'msg' gets a generic message.
+
+   'hint' is advice; 'code' is a Python skeleton for VS Code in which the
+   decisive parts are ???, shown by the HINT button. 'qn' is the question
+   number of Exercise_MLR_Housing.pdf, shown in the case file. 'say' is
+   what the apprentice answers aloud. 'hud' is written into the case file
+   once the step is solved, never before.
+   ================================================================ */
+const B0 = '<span class="hat">β</span>₀', B2 = '<span class="hat">β</span>₂',
+      B3 = '<span class="hat">β</span>₃', B5 = '<span class="hat">β</span>₅';
+
+const STEPS = [
+{ id:'open', type:'info', bg:'office', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · CASE FILE VIII',
+  text:`A house is worth its square feet. Everybody knows that. Estate agents have said it for a
+  century, and they have never been wrong, since nobody ever checks.
+  <span class="fx">He unrolls the plan of a house and holds it flat with two teacups. One of them
+  is still full.</span>
+  Tonight the claim goes to Ames, Iowa. 1,119 houses were sold there, and the file records, for each
+  of them, the price, the living area, the basement, the first floor, the garage, and the years
+  since the last remodelling.
+  I have already thrown out two houses myself : giants of 4,676 and 5,642 square feet that sold for
+  the price of an ordinary house. Two abnormal sales can bend a line more than a hundred ordinary
+  ones.
+  You will question the data in <strong>VS Code</strong>. This window only listens to what you bring
+  back : numbers, choices, verdicts.
+  <span class="fx"><strong>Data:</strong> Dean De Cock, “Ames, Iowa: Alternative to the Boston
+  Housing Data as an End of Semester Regression Project,” <em>Journal of Statistics Education</em>
+  19(3), 2011.</span>`,
+  widget:'table', banner:'CLAIM: A HOUSE IS ITS SQUARE FEET', cont:'Continue' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE LEDGER',
+  text:`First, the ritual. Download <span class="kbd">housing_continuous_no_outliers.xlsx</span> with
+  the DATA (XLSX) button at the top. Open VS Code, create a Python file in the folder that contains
+  it, and load the data with pandas. Careful : the PDF of the questions mentions
+  <span class="kbd">Housing_continuous.xlsx</span>. Ignore that name. The file of this game is the
+  one without the two giants.
+  A file that loads can answer questions that a failed import cannot.
+  <strong>How many houses does the file contain, and what is the average sale price ?</strong>`,
+  q:'Report what your loaded table says.',
+  fields:[
+    {id:'n', label:'Number of houses, i.e., rows', value:1119, tol:0,
+     alt:[{value:6, tol:0, msg:'That is the number of columns. data.shape gives (rows, columns).'},
+          {value:1121, tol:0, msg:'1,121 houses is the old file, with the two giants. Load the file of the DATA (XLSX) button.'}],
+     msg:'Count the rows, not the columns: data.shape gives (rows, columns).'},
+    {id:'mp', label:'Average SalePrice, in dollars', value:185529.62, tol:CONFIG.TOL_INT,
+     alt:[{value:1524.93, tol:1, msg:'That is the average living area. Take the mean of the SalePrice column.'},
+          {value:185.53, tol:0.02, msg:'Type the number without a thousands separator, e.g., 185530.'},
+          {value:185.529, tol:0.02, msg:'Type the number without a thousands separator, e.g., 185530.'}],
+     msg:'Take the mean of the SalePrice column.'}],
+  hint:`If Python answers <b>FileNotFoundError</b>, it cannot see the Excel file. Put the .py file
+  and the Excel file in the same folder and open that folder in VS Code, or give the full path of
+  the file to pd.read_excel.`,
+  code:`import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+data = pd.read_excel('housing_continuous_no_outliers.xlsx')
+print(data.head())
+print(data.shape)          # (rows, columns)
+print(???)                 ## The average of the SalePrice column.`,
+  say:'1,119 houses, and an average price of about 185,530 dollars.',
+  right:`<strong>1,119</strong> houses, and an average price of <strong>$185,530</strong>.
+  <span class="fx">He raises an eyebrow at nobody in particular.</span>
+  Keep another number in mind : the median price is only $164,900. A few palaces drag the average
+  upwards. The data are loaded, so the interrogation can begin.`,
+  note:'1,119 houses; mean SalePrice = $185,530' },
+
+{ id:'t1a', type:'numeric', bg:'lab', who:'master', qn:'1.1',
+  title:'TRIAL II · THE USUAL SUSPECT',
+  text:`Estate agents say “location, location, location”. I say “correlation, correlation,
+  correlation”. Five characteristics are in the file, and one price. Strength is what counts, not the
+  sign of the link.
+  <strong>Which of the five housing characteristics has the largest correlation with SalePrice, and
+  what is that correlation ?</strong>`,
+  q:'Name the suspect and give its correlation.',
+  fields:[
+    {id:'v', kind:'select', label:'Characteristic with the largest correlation with SalePrice', correct:'GrLivArea',
+     options:[['GrLivArea','GrLivArea'],['TotalBsmtSF','TotalBsmtSF'],['1stFlrSF','1stFlrSF'],
+              ['GarageArea','GarageArea'],['years_since_remod','years_since_remod']],
+     msg:'Compute the correlation of SalePrice with each of the five characteristics, and compare them. data.corr() does it in one line.'},
+    {id:'r', label:'Its correlation with SalePrice', value:0.7405, tol:CONFIG.TOL_SMALL,
+     alt:[{value:1, tol:0.0005, msg:'A correlation of exactly 1 is SalePrice with itself. Leave it out and look at the five others.'},
+          {value:0.6646, tol:0.003, msg:'That is the correlation of another characteristic. Compare all five and keep the largest.'},
+          {value:0.6426, tol:0.003, msg:'That is the correlation of another characteristic. Compare all five and keep the largest.'},
+          {value:0.6283, tol:0.003, msg:'That is the correlation of another characteristic. Compare all five and keep the largest.'},
+          {value:0.5221, tol:0.003, msg:'That is the correlation of another characteristic. Compare all five and keep the largest.'}],
+     msg:'Read the correlation of the winning characteristic in the SalePrice column of the correlation matrix.'}],
+  hint:`<b>data.corr()</b> returns the correlation of every column with every other column. Keep the
+  column of SalePrice, remove its correlation with itself (always 1), and find the largest value.`,
+  code:`corr = data.corr()
+row = corr[???]                       ## The correlations with the sale price.
+print(row)
+print(row.drop(???).abs().idxmax())   ## Drop the variable's correlation with itself, then find the label of the largest.`,
+  say:'GrLivArea, with a correlation of about 0.74.',
+  right:`<strong>GrLivArea</strong>, with a correlation of about <strong>0.74</strong>. TotalBsmtSF
+  comes second with 0.66.
+  And note the −0.52 of years_since_remod : the sign gives the direction, houses remodelled long ago
+  sell for less, but the strength is substantial. Only the size of the number, not its sign, tells
+  you how closely two variables move together.
+  <span class="fx">He draws a large house and a larger sum of money next to it. The agent was right
+  about this one. Even a stopped clock is right twice a day.</span>`,
+  widgetAfter:'corr', hud:{top:'GrLivArea .74'},
+  note:'1.1 · largest correlation with SalePrice: GrLivArea, r = 0.74' },
+
+{ id:'t1b', type:'numeric', bg:'lab', who:'master', qn:'1.2',
+  title:'TRIAL III · THE METRIC SYSTEM',
+  text:`Iowa speaks square feet. Europe buys square metres. One square foot is 0.093 square metre.
+  <strong>Build a new column, GrLivArea_sm, i.e., the living area in square metres. Report its
+  average and its correlation with SalePrice, and tell me whether that correlation differs from the
+  one in square feet.</strong>`,
+  q:'Change the unit and look at the correlation.',
+  fields:[
+    {id:'m', label:'Average of GrLivArea_sm', value:141.818, tol:CONFIG.TOL_DEC,
+     alt:[{value:1524.93, tol:1, msg:'That is the average in square feet. Multiply the column by 0.093 first.'}],
+     msg:'GrLivArea_sm is GrLivArea times 0.093. Take its mean.'},
+    {id:'r', label:'Correlation between GrLivArea_sm and SalePrice', value:0.7405, tol:CONFIG.TOL_SMALL,
+     alt:[{value:0.0689, tol:0.002, msg:'You multiplied the correlation by 0.093. Compute it again with .corr() on the new column.'}],
+     msg:'Compute data[\'GrLivArea_sm\'].corr(data[\'SalePrice\']).'},
+    {id:'d', kind:'select', label:'Compared with the correlation in square feet, it is…', correct:'same',
+     options:[['same','…the same: the correlation does not depend on the unit'],
+              ['lower','…lower: the numbers are 0.093 times smaller'],
+              ['higher','…higher: a square metre is a bigger unit than a square foot']],
+     msg:'Compare the correlation of the new column with the 0.74 of the previous trial.'}],
+  hint:`A new column is created by assigning a calculation to a new name between brackets. Then use
+  the same syntax as in the previous trial.`,
+  code:`data['GrLivArea_sm'] = ???     ## The living area in square feet, times 0.093.
+print(data['GrLivArea_sm'].mean())
+print(data['GrLivArea_sm'].corr(???))   ## Correlation with the sale price.`,
+  say:'About 141.8 square metres, and a correlation of 0.74 : the same as in square feet.',
+  right:`<strong>141.8</strong> square metres on average, and a correlation of
+  <strong>0.74</strong>, to the third decimal the same as before.
+  Feet, metres, cubits : the correlation does not care.
+  <span class="fx">He measures his own desk with his hand, then with his forearm, to make a point.
+  The desk remains the same desk.</span>`,
+  widgetAfter:'units', note:'1.2 · living area in m²: correlation with SalePrice is still 0.74' },
+
+{ id:'t1c', type:'numeric', bg:'lab', who:'master', qn:'1.3',
+  title:'TRIAL IV · THE UNIT THAT BITES BACK',
+  text:`The covariance is the correlation’s ruder cousin. Same houses, same prices, same two
+  columns, once in feet and once in metres.
+  <strong>Compute the covariance between SalePrice and GrLivArea, and the one between SalePrice and
+  GrLivArea_sm. Are they equal ?</strong>`,
+  q:'Compare the two covariances.',
+  fields:[
+    {id:'e', kind:'select', label:'The two covariances are…', correct:'diff',
+     options:[['equal','…equal: same houses, same prices'],
+              ['diff','…different: the covariance in square metres is 0.093 times the one in square feet'],
+              ['round','…different, but only because of rounding']],
+     msg:'Divide the second covariance by the first, and compare the result with the 0.093 of the conversion.'}],
+  hint:`Pandas has a .cov() method that works exactly like .corr(). Then divide the second covariance
+  by the first, and compare the ratio with 0.093.`,
+  code:`cov_sf = data['SalePrice'].cov(???)       ## The living area in square feet.
+cov_sm = data['SalePrice'].cov(???)       ## The living area in square metres.
+print(cov_sf, cov_sm)
+print(??? / ???)                          ## Second covariance divided by the first.`,
+  say:'About 30.8 million in square feet, and 2.86 million in square metres. They differ.',
+  right:`About <strong>30,802,961</strong> in square feet and <strong>2,864,675</strong> in square
+  metres, i.e., exactly <strong>0.093</strong> times as much.
+  The same houses, the same prices, and a covariance eleven times smaller. Nobody lied : the unit
+  changed.
+  <span class="fx">He writes “30,802,961 what ?” on the board and does not answer.</span>`,
+  widgetAfter:'cov', note:'1.3 · covariance changes with the unit: 30.8 million (ft) vs 2.86 million (m), ratio 0.093' },
+
+{ id:'t1c2', type:'choice', bg:'lab', who:'master', qn:'1.3',
+  title:'TRIAL IV · WHO IS ALLERGIC TO UNITS ?',
+  text:`The correlation survived the change of unit. The covariance did not.
+  <strong>Which statement explains the difference ?</strong>`,
+  q:'Choose the correct explanation.',
+  options:[
+    {id:'a', label:'The correlation was computed on the wrong column, so it did not change.'},
+    {id:'b', label:'The covariance carries the units of both variables (dollars times square feet), so multiplying a variable by 0.093 multiplies the covariance by 0.093. The correlation divides the covariance by both standard deviations, which removes the units.'},
+    {id:'c', label:'A covariance is always much bigger than a correlation, whatever the units.'},
+    {id:'d', label:'Square metres contain less information than square feet, which shrinks the covariance but not the correlation.'}
+  ], correct:'b',
+  hint:`Look at your two covariances and at their ratio : 0.093 is the conversion factor itself. What
+  does the correlation do with the covariance, to become a pure number ?`,
+  right:`Exactly. The covariance is a number with units. The correlation divides the units away and is
+  always between −1 and 1.
+  That is why we measure the strength of a link with a correlation, never with a covariance. A
+  covariance of 30 million says nothing until you know what was multiplied.`,
+  wrong:{a:`Both correlations were computed on the right columns, and they agree to the third decimal.
+  The question is why the covariances did not.`,
+  c:`Size is not the point. With the same houses, the covariance changes by a factor of 0.093 only
+  because of the unit.`,
+  d:`The two columns contain exactly the same information, written in two languages. Only the
+  covariance reads the language.`},
+  note:'1.3 · covariance has units, correlation is a pure number' },
+
+{ id:'beat1', type:'info', bg:'office', who:'master', mood:'raised', qn:'—',
+  title:'THE AGENT OBJECTS',
+  text:`<span class="fx">The estate agent has come back, with his sunglasses on, in a room that has
+  no sun.</span>
+  “Correlations are for professors,” he says. “I want a price list. How much does one more square
+  foot cost ?”
+  A fair demand. A correlation tells how strongly two things move together. It prices nothing. For
+  prices, we need a regression, with all the characteristics in it at once :
+  <br><span class="kbd">SalePrice = β0 + β1·GrLivArea + β2·TotalBsmtSF + β3·1stFlrSF + β4·GarageArea + β5·years_since_remod + ε</span>`,
+  banner:'SUSPECT 2: THE PRICE LIST', cont:'Draw the price list' },
+
+{ id:'t2a', type:'choice', bg:'street', who:'master', qn:'2.1',
+  title:'TRIAL V · LOOK BEFORE YOU FIT',
+  text:`Before any machinery, a picture. Everybody wants the coefficients first... that is how
+  brochures are written.
+  In VS Code, <strong>draw a scatter plot of SalePrice (vertical axis) against TotalBsmtSF
+  (horizontal axis)</strong>. Then tell me whether you see a linear relationship.`,
+  q:'Which description does your scatter plot support ?',
+  options:[
+    {id:'a', label:'No relationship at all: the points form a shapeless cloud.'},
+    {id:'b', label:'A positive and roughly linear relationship: the larger the basement, the higher the price, with a lot of scatter around the trend.'},
+    {id:'c', label:'A negative relationship: the larger the basement, the lower the price.'},
+    {id:'d', label:'A strongly curved relationship, like a U, which no straight line could follow.'}
+  ], correct:'b',
+  hint:`TotalBsmtSF goes on the x-axis, SalePrice on the y-axis. Then read the plot from left to
+  right : do the points drift up, drift down, bend, or stay level ?`,
+  code:`plt.scatter(???, ???)       ## x-axis first, then y-axis.
+plt.xlabel('TotalBsmtSF')
+plt.ylabel('SalePrice')
+plt.show()`,
+  right:`Uphill, and reasonably straight. Houses with larger basements tend to cost more.
+  <span class="fx">He taps the left edge of the plot with his pen.</span>
+  Look there : a column of 24 houses with a basement of zero square feet, at $112,000 on average.
+  They are not errors, just houses without a basement, and the line will have to live with them.
+  Also look at the right : the cloud is much wider there than on the left. Remember that. It will come
+  back.`,
+  wrong:{a:`Squint less. The points drift upwards from left to right, even if they do it untidily.`,
+  c:`Look at the right of your plot, where the large basements are. Are the points high or low ?`,
+  d:`The cloud is wide, but it does not bend. A straight line follows its centre rather well.`},
+  widgetAfter:'bsmt', note:'2.1 · SalePrice vs TotalBsmtSF: positive, roughly linear, noisy; 24 houses without a basement' },
+
+{ id:'t2b', type:'numeric', bg:'lab', who:'master', qn:'2.2',
+  title:'TRIAL VI · THE PRICE LIST',
+  text:`Now the price list. Estimate by OLS the regression of the agent’s dream :
+  <br><span class="kbd">Model 1 : SalePrice = β0 + β1·GrLivArea + β2·TotalBsmtSF + β3·1stFlrSF + β4·GarageArea + β5·years_since_remod + ε</span>
+  <br>Careful : the five explanatory variables are the five housing characteristics. The column in
+  square metres you built is not one of them, and neither is the price itself.
+  <strong>Report the intercept, ${B2} (TotalBsmtSF), ${B5} (years_since_remod) and the R-squared.</strong>`,
+  q:'Report what Model 1 says.',
+  fields:[
+    {id:'b0', label:`Intercept ${B0}`, value:-15068.76, tol:CONFIG.TOL_INT,
+     alt:[{value:-15070, tol:0.2, msg:'That is the intercept as the summary rounds it, i.e., -1.507e+04. Print M1.params to read it in full.'}],
+     msg:'The intercept is the coef of the const row. If there is no const row, you forgot sm.add_constant. The summary rounds it, so read it in M1.params.'},
+    {id:'b2', label:`Coefficient ${B2} of TotalBsmtSF`, value:69.2745, tol:CONFIG.TOL_DEC,
+     alt:[{value:79.4345, tol:0.3, msg:'That is the coefficient of GrLivArea, i.e., the first one. β2 belongs to TotalBsmtSF.'},
+          {value:67.0849, tol:0.3, msg:'That is the coefficient of GarageArea. β2 belongs to TotalBsmtSF.'},
+          {value:132.94, tol:0.5, msg:'That is the slope of the simple regression of the price on the basement alone. Use all five characteristics at once.'},
+          {value:5.05, tol:0.05, msg:'That is the standard error. Read the coef column.'}],
+     msg:'Read the coef of the TotalBsmtSF row in the summary of Model 1.'},
+    {id:'b5', label:`Coefficient ${B5} of years_since_remod`, value:-867.432, tol:CONFIG.TOL_DEC,
+     alt:[{value:62.06, tol:0.5, msg:'That is the standard error. Read the coef column.'},
+          {value:-13.98, tol:0.05, msg:'That is the t-statistic. Read the coef column.'}],
+     msg:'Read the coef of the years_since_remod row, the last one in the summary of Model 1.'},
+    {id:'r2', label:'R² of Model 1', value:0.7777, tol:CONFIG.TOL_SMALL, pct:true,
+     msg:'Read R-squared in the summary, or print M1.rsquared.'}],
+  hint:`The model needs an intercept, so add a constant with <b>sm.add_constant</b> before calling
+  <b>sm.OLS</b>. The outcome comes first. Select the five characteristics by name, in a double
+  bracket.`,
+  code:`X = sm.add_constant(data[[???]])    ## The five housing characteristics, by name.
+M1 = sm.OLS(???, X).fit()           ## The outcome comes first.
+print(M1.summary())
+print(M1.params)                    # The coefficients in full: the summary rounds the large ones.`,
+  say:`${B2} ≈ 69.27, ${B5} ≈ −867.4, and an R² of 0.778.`,
+  right:`${B2} ≈ <strong>69.27</strong>, ${B5} ≈ <strong>−867.4</strong>, and an R² of
+  <strong>0.778</strong>, i.e., about 78% of the variation in prices is accounted for. The intercept,
+  ${B0} ≈ −15,069, says that a house with no living area, no basement, no garage and a remodel this very
+  year costs minus fifteen thousand dollars.
+  <span class="fx">He lets the sentence hang in the air. Nobody has ever sold such a house.</span>
+  The intercept is the anchor of the line, not a house that exists. Which is why I do not interpret
+  it.`,
+  widgetAfter:'coefs', hud:{model:'M1', r2:'0.778'},
+  note:'2.2 · Model 1: b2 = 69.27 (TotalBsmtSF), b5 = -867.4 (years_since_remod), R2 = 0.778' },
+
+{ id:'t2b2', type:'choice', bg:'lab', who:'master', qn:'2.2',
+  title:'TRIAL VII · THE PRICE OF A BASEMENT',
+  text:`${B2} ≈ 69.27 sits in front of TotalBsmtSF. The agent writes it on a brochure at once :
+  “every square foot of basement is worth $69.27”.
+  <strong>What does the coefficient really say ?</strong>`,
+  q:'Choose the correct reading.',
+  options:[
+    {id:'a', label:'One extra square foot of basement raises the price by 69.27%.'},
+    {id:'b', label:'Basements account for 69.27% of the price of a house.'},
+    {id:'c', label:'Holding GrLivArea, 1stFlrSF, GarageArea and years_since_remod fixed, a house with one more square foot of basement has an expected price that is $69.27 higher.'},
+    {id:'d', label:'One extra square foot of basement is worth $69.27 regardless of the other characteristics: it is the slope of the scatter plot of Trial V.'}
+  ], correct:'c',
+  hint:`In a multiple regression, each coefficient compares houses that are identical in the other
+  explanatory variables. Read the unit of SalePrice, and the unit of TotalBsmtSF.`,
+  right:`Exactly. A coefficient is a price per unit, with <em>everything else fixed</em> attached to it.
+  Without that sentence, the number is only half a statement.
+  In the cloud, a larger basement also means a larger house and a larger garage. The regression keeps the others
+  fixed and gives the basement only its own share : $69.
+  <span class="fx">The agent crosses out his brochure. The second version is longer, and truer.</span>`,
+  wrong:{a:`The price is measured in dollars, the basement in square feet. The coefficient is a number of
+  dollars per square foot, not a percentage.`,
+  b:`A coefficient is not a share of anything. It is the expected change in the outcome for one more
+  unit of the variable.`,
+  d:`The line of Trial V asked $133 per square foot, about twice as much. In the multiple regression,
+  the other characteristics take their share, because larger basements come with larger houses.`},
+  note:'2.2 · b2: +1 sq ft of basement = +$69.27, the four other variables held fixed' },
+
+{ id:'t2b3', type:'choice', bg:'lab', who:'master', qn:'2.2',
+  title:'TRIAL VII · THE PRICE OF TIME',
+  text:`${B5} ≈ −867.4 sits in front of years_since_remod.
+  <strong>Which statement is correct ?</strong>`,
+  q:'Choose the correct reading.',
+  options:[
+    {id:'a', label:'Every year since the remodelling lowers the price of every house by exactly $867.'},
+    {id:'b', label:'Holding the four other characteristics fixed, each additional year since the remodelling goes with an expected price that is about $867 lower.'},
+    {id:'c', label:'The price falls by $867 in total, after which the remodelling no longer matters.'},
+    {id:'d', label:'The coefficient of years_since_remod (−867) is much larger than the one of GrLivArea (79), so the remodelling matters ten times more than the living area.'}
+  ], correct:'b',
+  hint:`Same sentence as for the basement : a unit of the variable, an expected change of the price, and
+  everything else fixed. A regression speaks about averages, not about every house.`,
+  right:`Exactly. About <strong>$867 less per year</strong> since the last remodelling, on average, with
+  the rest fixed. Ten years of neglect are worth about $8,700.
+  And no, the size of a coefficient is not its importance. A year and a square foot are not the same
+  kind of unit. Never compare the coefficients of variables that are measured in different units.
+  <span class="fx">He puts a tiny ruler next to a huge one and asks which is longer. Nobody
+  answers.</span>`,
+  wrong:{a:`The model describes averages. Houses differ, and the residual ε is not zero for any particular
+  house.`,
+  c:`The coefficient is a price per year, in every year. The loss does not stop after one year.`,
+  d:`A coefficient depends on the unit of its variable. A year is a big unit and a square foot a small
+  one, so their coefficients cannot be compared like that.`},
+  note:'2.2 · b5: +1 year since remodelling = -$867, the four other variables held fixed' },
+
+{ id:'t2c', type:'numeric', bg:'street', who:'master', qn:'2.3',
+  title:'TRIAL VIII · THE HOUSE ON ELM STREET',
+  text:`The agent hands me a file for a house on Elm Street : GrLivArea = 1155, TotalBsmtSF = 1008,
+  1stFlrSF = 894, GarageArea = 600, years_since_remod = 44.
+  <strong>What price does Model 1 predict for this house ?</strong>
+  The error term cannot be predicted, and it is zero on average, so it does not enter the
+  prediction.`,
+  q:'Predict the price.',
+  fields:[
+    {id:'p', label:'Predicted price, in dollars', value:143047.59, tol:CONFIG.TOL_INT,
+     alt:[{value:143046.34, tol:0.3, msg:'Close, but you used the intercept as the summary rounds it, i.e., -1.507e+04. Use M1.params, or let M1.predict do the sum.'},
+          {value:158116.4, tol:300, msg:'You forgot the intercept. The prediction is β0 + β1·1155 + … + β5·44.'},
+          {value:143.0476, tol:0.3, msg:'Type the price in dollars, not in thousands of dollars.'}],
+     msg:'Evaluate the regression line at the characteristics of the house: the intercept plus each coefficient times the corresponding value.'}],
+  hint:`Build a one-row table with the same columns as X, in the same order, the constant included : the
+  constant is a column of ones, so its value is 1. Then ask Model 1 to predict.`,
+  code:`x_new = pd.DataFrame([{'const': 1, 'GrLivArea': ???, 'TotalBsmtSF': ???, '1stFlrSF': ???,
+                       'GarageArea': ???, 'years_since_remod': ???}])
+print(M1.predict(???))`,
+  say:'About 143,050 dollars.',
+  right:`About <strong>$143,048</strong>, well below the average price of $185,530 : a modest house,
+  untouched for 44 years.
+  One caution. That number is the average price of houses like this one, not the price this house
+  will fetch. The scatter around the line is huge. How huge, and whether it is the same for cheap and
+  expensive houses, is the next question.`,
+  note:'2.3 · Model 1 predicts $143,048 for the house on Elm Street' },
+
+{ id:'beat2', type:'info', bg:'lab', who:'master', mood:'angry', qn:'—',
+  title:'THE REFEREE',
+  text:`You have a price list and a prediction. Now the question the agent never asks : <em>can we
+  trust the list ?</em>
+  A regression is a contract with clauses. Two of them can be inspected with a single picture, the
+  <strong>diagnostic plot</strong> : the residuals on the vertical axis, the fitted values on the
+  horizontal axis.
+  <strong>Linearity :</strong> if the line is right, the residuals have no pattern, and their
+  average stays around zero all along the fitted values.
+  <strong>Homoskedasticity :</strong> if the errors are equally uncertain everywhere, the cloud has
+  the same thickness from left to right.
+  <span class="fx">He lowers the monocle. This is the part of the course where models go to be
+  judged.</span>`,
+  banner:'SUSPECT 3: THE RESIDUALS', cont:'Open the autopsy' },
+
+{ id:'t3a', type:'numeric', bg:'lab', who:'master', qn:'3.1',
+  title:'TRIAL IX · THE AUTOPSY',
+  text:`A residual is what the model misses : the observed price minus the fitted price.
+  In VS Code, extract the residuals and the fitted values of Model 1, and
+  <strong>draw the diagnostic plot</strong>. Before the verdict, a number to check that you have the
+  right residuals. <strong>Report the smallest and the largest residual of Model 1, in dollars.</strong>`,
+  q:'Report the two extreme residuals.',
+  fields:[
+    {id:'mn', label:'Smallest residual of Model 1', value:-151172.89, show:-151173, tol:CONFIG.TOL_INT,
+     alt:[{value:237181, tol:4800, msg:'That is the largest residual. The smallest is the most negative one.'}],
+     msg:'Print M1.resid.min(). Residuals are in dollars.'},
+    {id:'mx', label:'Largest residual of Model 1', value:237181.11, show:237181, tol:CONFIG.TOL_INT,
+     alt:[{value:-151173, tol:3100, msg:'That is the smallest residual. The largest is the most positive one.'}],
+     msg:'Print M1.resid.max(). Residuals are in dollars.'}],
+  hint:`The fitted model keeps its residuals and its fitted values in two attributes. Put the fitted
+  values on the x-axis and the residuals on the y-axis, and add a dashed line at zero to guide the
+  eye.`,
+  code:`res = M1.???               ## The residuals: observed minus predicted.
+fit = M1.???               ## The fitted values: the predicted prices.
+print(res.min(), res.max())
+
+plt.scatter(???, ???)      ## Fitted values on the x-axis, residuals on the y-axis.
+plt.axhline(0, color='red', linestyle='--')
+plt.xlabel('Fitted values')
+plt.ylabel('Residuals')
+plt.show()`,
+  say:'The smallest residual is about −151,000 dollars, and the largest about +237,000.',
+  right:`<strong>−$151,173</strong> and <strong>+$237,181</strong>. One house sold for a quarter of a
+  million dollars more than the model expected.
+  Note the asymmetry : the biggest misses are on the positive side, and the expensive houses are the
+  usual suspects. Keep your plot on the screen for the next question.`,
+  note:'3.1 · Model 1 residuals range from -$151,173 to +$237,181' },
+
+{ id:'t3a2', type:'numeric', bg:'lab', who:'master', qn:'3.1',
+  title:'TRIAL IX · THE VERDICT ON MODEL 1',
+  text:`Read your own diagnostic plot, from left to right.
+  <strong>Do the linearity and the homoskedasticity clauses hold for Model 1 ?</strong>`,
+  q:'Give the verdict on each clause.',
+  fields:[
+    {id:'lin', kind:'select', label:'Linearity', correct:'no',
+     options:[['yes','Holds: the residuals show no pattern around the zero line'],
+              ['no','Violated: the residuals follow a curved pattern, with a U shape'],
+              ['cant','Cannot be read from this plot']],
+     msg:'Follow the centre of the cloud from left to right. Does it stay on the dashed zero line ?'},
+    {id:'hom', kind:'select', label:'Homoskedasticity', correct:'no',
+     options:[['yes','Holds: the thickness of the cloud is the same everywhere'],
+              ['no','Violated: the cloud gets thicker as the fitted values grow'],
+              ['cant','Cannot be read from this plot']],
+     msg:'Compare the vertical thickness of the cloud at the left and at the right of the plot.'}],
+  hint:`Two questions, two looks. For linearity : does the centre of the cloud stay on the dashed
+  line, or does it drift above and below it ? For homoskedasticity : is the cloud as thick at the
+  left as at the right ?`,
+  say:'Neither clause holds : the cloud curves, and it fans out.',
+  right:`Neither clause holds. The cloud is a smile : the residuals are mostly positive for the
+  cheapest and the most expensive houses, and negative in the middle, so a straight line is wrong at
+  both ends. And the cloud fans out like a funnel : the residuals of the cheapest fifth of fitted
+  values have a standard deviation of about $22,000, those of the dearest fifth about $64,000.
+  The consequences are real. The prediction of Trial VIII is right on average, but its precision is
+  not the same for a $100,000 house and for a $400,000 house, and the standard errors printed by the
+  summary cannot be trusted.`,
+  widgetAfter:'resid1', note:'3.1 · Model 1: U-shaped residuals and a funnel: linearity and homoskedasticity fail' },
+
+{ id:'t3b', type:'numeric', bg:'lab', who:'master', qn:'3.2',
+  title:'TRIAL X · THE LOGARITHMIC REPAIR',
+  text:`A classic repair when the errors grow with the price : measure the price in logs. Same five
+  explanatory variables, only the outcome changes.
+  <br><span class="kbd">Model 2 : ln(SalePrice) = β0 + β1·GrLivArea + β2·TotalBsmtSF + β3·1stFlrSF + β4·GarageArea + β5·years_since_remod + ε</span>
+  <br>Create the log price with <span class="kbd">np.log</span>, estimate Model 2 and extract its
+  residuals. <strong>Report ${B5} of years_since_remod, the R-squared of Model 2 and its smallest
+  residual.</strong>`,
+  q:'Report what Model 2 says.',
+  fields:[
+    {id:'b5', label:`Coefficient ${B5} of years_since_remod in Model 2`, value:-0.00579, tol:0.0005,
+     alt:[{value:-867.43, tol:2, msg:'That is the coefficient of Model 1. Model 2 has ln(SalePrice) as outcome.'},
+          {value:-0.579, tol:0.002, msg:'That is 100 times the coefficient. Report the coefficient as printed, about -0.006.'},
+          {value:0.000278, tol:0.00002, msg:'That is the standard error. Read the coef column.'}],
+     msg:'Fit Model 2 with ln(SalePrice) as outcome, then read the coef of the years_since_remod row.'},
+    {id:'r2', label:'R² of Model 2', value:0.805, tol:CONFIG.TOL_SMALL, pct:true,
+     alt:[{value:0.7777, tol:0.002, msg:'That is the R² of Model 1. Model 2 has ln(SalePrice) as outcome.'}],
+     msg:'Read R-squared in the summary of Model 2, or print M2.rsquared.'},
+    {id:'mn', label:'Smallest residual of Model 2', value:-0.9775, tol:CONFIG.TOL_SMALL,
+     alt:[{value:-151173, tol:3100, msg:'That is the smallest residual of Model 1, in dollars. The residuals of Model 2 are in log points.'}],
+     msg:'Print M2.resid.min(). The residuals of Model 2 are in log points, i.e., small numbers.'}],
+  hint:`Create the log column first, then fit a regression with the same X as Model 1 and the new
+  outcome. If you get the same numbers as Model 1, you used the wrong outcome.`,
+  code:`data['lnPrice'] = ???              ## Natural logarithm of SalePrice.
+M2 = sm.OLS(???, X).fit()          ## Same X as Model 1, new outcome.
+print(M2.summary())
+print(M2.resid.min())`,
+  say:`${B5} ≈ −0.0058, R² ≈ 0.805, and the smallest residual is about −0.98.`,
+  right:`${B5} ≈ <strong>−0.0058</strong>, R² ≈ <strong>0.805</strong>, smallest residual ≈
+  <strong>−0.98</strong>.
+  A word of caution about that R². It is higher than the 0.778 of Model 1, but the two models explain
+  different outcomes : the variation of prices in dollars, and the variation of prices in logs. That
+  R² race is not a fair race, and its winner proves nothing.
+  A residual of −0.98 is a house sold for only 38% of what the model expected (e<sup>−0.98</sup> ≈
+  0.38). One lonely house.`,
+  hud:{model:'M2 (log)', r2:'0.805'},
+  note:'3.2 · Model 2 (ln price): b5 = -0.0058, R2 = 0.805, smallest residual = -0.98' },
+
+{ id:'t3b2', type:'numeric', bg:'lab', who:'master', qn:'3.2',
+  title:'TRIAL XI · THE VERDICT ON MODEL 2',
+  text:`Draw the diagnostic plot of Model 2, with the same recipe : fitted values on the horizontal
+  axis, residuals on the vertical axis, a dashed line at zero.
+  <strong>Do linearity and homoskedasticity hold now ?</strong>`,
+  q:'Give the verdict on each clause.',
+  fields:[
+    {id:'lin', kind:'select', label:'Linearity', correct:'yes',
+     options:[['yes','Holds: the residuals show no clear pattern around the zero line'],
+              ['no','Violated: the residuals still follow a curved pattern']],
+     msg:'Follow the centre of the cloud from left to right. Does it stay close to the dashed zero line ?'},
+    {id:'hom', kind:'select', label:'Homoskedasticity', correct:'yes',
+     options:[['yes','Holds, at least roughly: the cloud has about the same thickness everywhere'],
+              ['no','Violated: the cloud still fans out as the fitted values grow']],
+     msg:'Compare the vertical thickness of the cloud at the left and at the right of the plot.'}],
+  hint:`Compare with the plot of Model 1 : same recipe, a different outcome. Is the centre of the
+  cloud still curved ? Is the cloud still a funnel ?`,
+  code:`plt.scatter(M2.???, M2.???)     ## Fitted values on the x-axis, residuals on the y-axis.
+plt.axhline(0, color='red', linestyle='--')
+plt.xlabel('Fitted values')
+plt.ylabel('Residuals')
+plt.show()`,
+  say:'Both clauses hold now : no pattern, and a band of constant thickness.',
+  right:`Both clauses are respectable now. The cloud is a flat band around zero, with about the same
+  thickness from the cheapest to the most expensive house : the standard deviation of the residuals
+  is about 0.19, 0.16, 0.16, 0.17 and 0.19 across the five fifths of the fitted values, instead of
+  going from $22,000 to $64,000.
+  Honesty requires two caveats. A plot is a judgement, not a theorem : the band is a little wider at
+  both ends. And a handful of houses sold for far less than predicted, the one at −0.98 above all.
+  A good model is not a perfect one. It is one whose defects you have looked at.`,
+  widgetAfter:'resid2', note:'3.2 · Model 2: residuals show no pattern and a band of constant thickness' },
+
+{ id:'t3b3', type:'choice', bg:'lab', who:'master', qn:'3.2',
+  title:'TRIAL XI · WHY DID THE LOG WORK ?',
+  text:`The same houses, the same explanatory variables, and the funnel is gone.
+  <strong>Which statement best explains why the log repaired Model 1 ?</strong>`,
+  q:'Choose the best explanation.',
+  options:[
+    {id:'a', label:'The logarithm makes the prices smaller, and small numbers have small errors.'},
+    {id:'b', label:'Prices behave in proportions: a $40,000 mistake on a $400,000 house is as normal as a $10,000 mistake on a $100,000 house. In logs, proportional mistakes become mistakes of similar size, so the spread stops growing with the price.'},
+    {id:'c', label:'The logarithm removes the expensive houses from the sample.'},
+    {id:'d', label:'A logarithm is required whenever the price is the outcome of a regression.'}
+  ], correct:'b',
+  hint:`Look again at the funnel of Model 1 : the spread of the errors grows with the price. What does
+  the logarithm do to a ratio of two prices ?`,
+  right:`Exactly. The log turns a ratio into a difference. Instead of asking “how many dollars off ?”,
+  the model now asks “how many percent off ?”, and that question has about the same answer for a
+  cheap house and for a palace.
+  <span class="fx">A logarithm does not shrink the problem. It changes the question.</span>
+  It is not a law either : it is a repair that you test with a diagnostic plot, as you just did.`,
+  wrong:{a:`The log changes the scale of the prices, but a number does not become less uncertain because
+  it is smaller. The gain comes from turning proportions into differences.`,
+  c:`All 1,119 houses are still in Model 2. Check the number of observations in the summary.`,
+  d:`No rule is that simple. You use a logarithm because a diagnostic plot asks for it, not because the
+  outcome is a price.`},
+  note:'3.2 · the log turns proportional errors into errors of constant size' },
+
+{ id:'t3b4', type:'choice', bg:'lab', who:'master', qn:'3.2',
+  title:'TRIAL XI · PERCENT, NOT DOLLARS',
+  text:`The outcome of Model 2 is a log, so its coefficients speak a different language. In a model
+  where the outcome is in logs and the variable is in levels, a coefficient multiplied by 100 is
+  about the <strong>percentage change</strong> of the outcome for one more unit of the variable.
+  Now read ${B5} ≈ −0.0058. <strong>Which statement is correct ?</strong>`,
+  q:'Choose the correct reading.',
+  options:[
+    {id:'a', label:'Holding the four other characteristics fixed, each additional year since the remodelling goes with an expected price that is about 0.58% lower.'},
+    {id:'b', label:'Each additional year lowers the expected price by $0.0058.'},
+    {id:'c', label:'Each additional year lowers the expected price by 0.0058%.'},
+    {id:'d', label:'The coefficient is almost zero, so the remodelling year hardly matters.'}
+  ], correct:'a',
+  hint:`Multiply the coefficient by 100 to get percent. And do not forget the sentence of the previous
+  trials : everything else fixed.`,
+  right:`Exactly. −0.0058 × 100 = <strong>−0.58%</strong> per year, with the rest fixed. Ten years of
+  neglect cost about 5.6% of the price.
+  For a house at the average price of $185,530, that is about $1,000 a year, the same order of
+  magnitude as the $867 of Model 1. The two models tell the same story, in two languages : dollars
+  for the first, percent for the second.
+  <span class="fx">He nods. For once, the translation was faithful.</span>`,
+  wrong:{b:`The outcome is the log of the price, not the price. A coefficient of −0.0058 cannot be a number
+  of dollars.`,
+  c:`Careful with the multiplication : −0.0058 × 100 = −0.58, i.e., 0.58%, not 0.0058%.`,
+  d:`A coefficient near zero can matter a lot when its variable ranges over decades. Convert it into
+  percent and into years.`},
+  note:'3.2 · Model 2: +1 year since remodelling = about -0.58% on the price' },
+
+{ id:'t3c', type:'numeric', bg:'lab', who:'master', qn:'3.3',
+  title:'TRIAL XII · THE USELESS FLOOR',
+  text:`Last trial. Model 2 has five explanatory variables, and each has a t-test of the Null
+  hypothesis that its parameter is zero.
+  <strong>Which variable is not significant at a 95% confidence level, i.e., for which one do we
+  not reject the Null hypothesis ? Report its p-value, and the number of explanatory variables that
+  are significant.</strong>`,
+  q:'Name the variable and count the survivors.',
+  fields:[
+    {id:'v', kind:'select', label:'Variable that is not significant in Model 2', correct:'1stFlrSF',
+     options:[['GrLivArea','GrLivArea'],['TotalBsmtSF','TotalBsmtSF'],['1stFlrSF','1stFlrSF'],
+              ['GarageArea','GarageArea'],['years_since_remod','years_since_remod']],
+     msg:'Print the p-values of Model 2 and look for the one that is larger than 0.05.'},
+    {id:'p', label:'Its p-value in Model 2', value:0.1843, tol:CONFIG.TOL_SMALL,
+     alt:[{value:0.298, tol:0.004, msg:'That is the p-value of the same variable in Model 1. Use Model 2.'},
+          {value:-1.328, tol:0.01, msg:'That is the t-statistic. The p-value is in the P>|t| column.'}],
+     msg:'Read the P>|t| column of the Model 2 summary, or print M2.pvalues.'},
+    {id:'k', label:'Number of explanatory variables that are significant (the constant excluded)', value:4, tol:0,
+     alt:[{value:5, tol:0, msg:'You counted the constant. The model has five explanatory variables, and the constant is not one of them.'},
+          {value:1, tol:0, msg:'You counted the variable that is not significant. Count the others.'}],
+     msg:'Count the explanatory variables whose p-value is below 0.05. The constant is not an explanatory variable.'}],
+  hint:`The p-values of all the coefficients are stored in an attribute of the fitted model. Compare
+  them with the significance level, and do not count the constant.`,
+  code:`print(M2.???)                 ## The p-values of the t-tests of H0 : coefficient = 0.
+print(M2.pvalues < ???)       ## Which ones are below the significance level ?`,
+  say:'1stFlrSF, with a p-value of about 0.18. The four others are significant.',
+  right:`<strong>1stFlrSF</strong>, with a p-value of about <strong>0.18</strong>, far above 5%.
+  The other four are significant, with p-values that are zero to many decimals.`,
+  widgetAfter:'tstats', note:'3.3 · Model 2: only 1stFlrSF is not significant (p = 0.18)' },
+
+{ id:'t3c2', type:'choice', bg:'lab', who:'master', qn:'3.3',
+  title:'TRIAL XII · THE INNOCENT SUSPECT',
+  text:`Remember Trial II : 1stFlrSF had a correlation of 0.64 with SalePrice, higher than the garage
+  and the remodelling year. And now the t-test says it is not significant.
+  <strong>What does the test really say ?</strong>`,
+  q:'Choose the correct reading.',
+  options:[
+    {id:'a', label:'The first floor has no influence whatsoever on the price of a house.'},
+    {id:'b', label:'Once the living area, the basement, the garage and the remodelling year are in the model, the first-floor area adds no detectable information. It moves together with them: its correlation with TotalBsmtSF is 0.82.'},
+    {id:'c', label:'There is an 18% probability that the coefficient of 1stFlrSF is zero.'},
+    {id:'d', label:'The model is invalid and must be thrown away.'}
+  ], correct:'b',
+  hint:`The test is conditional : it compares houses identical in the four other variables. Compute
+  the correlation between 1stFlrSF and TotalBsmtSF. How much room is left for the first floor to
+  say something new ?`,
+  code:`print(data['1stFlrSF'].corr(???))     ## The correlation of the first floor with the basement.`,
+  right:`Exactly. In a multiple regression, significance is <em>conditional</em> : does this variable
+  add something that the others do not already say ? The first floor and the basement are almost the
+  same footprint, so the first floor adds nothing that the basement and the living area have not
+  said.
+  And failing to reject is not proving. The data cannot distinguish its effect from zero, which is
+  not the same as showing that it is zero.
+  <span class="fx">A variable can be famous on its own and redundant in company.</span>`,
+  wrong:{a:`Failing to reject is not accepting. The first floor may matter alone, but once the others are
+  in the model, the data cannot detect any extra effect.`,
+  c:`The p-value is computed assuming that the coefficient is zero. It is not the probability that
+  the coefficient is zero.`,
+  d:`One redundant variable does not invalidate a model. The other four are highly significant, and
+  the diagnostic plot is decent.`},
+  note:'3.3 · 1stFlrSF is redundant once TotalBsmtSF and GrLivArea are in (corr with basement 0.82)' },
+
+{ id:'close', type:'info', bg:'office', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`The agent was right about size, and wrong about almost everything else.
+  <span class="fx">He rolls up the plan of the house, slowly, like a man putting away a flag.</span>
+  Living area is the best single suspect, with a correlation of 0.74. But a house is not its square
+  feet. Each year since the last remodelling costs about $867, or 0.6% of the price, with the rest
+  fixed. And the first floor, so popular in brochures, adds nothing once the basement and the living
+  area have spoken.
+  A model that predicts is not a model that is right. The first one was wrong at both ends, and wrong
+  about its own precision. A logarithm repaired it, and a picture proved it.
+  Five rules leave with you.
+  <strong>One.</strong> A correlation has no unit. A covariance has all of them.
+  <strong>Two.</strong> A coefficient is a price with “everything else fixed” attached. Read the
+  sentence, not only the number.
+  <strong>Three.</strong> Plot the residuals before you trust the price list : look for a pattern,
+  and look for a funnel.
+  <strong>Four.</strong> When the errors grow with the price, change the question : a logarithm turns
+  dollars into percent.
+  <strong>Five.</strong> Not significant means “nothing to add here”, not “useless”.
+  <span class="fx">The next time an agent tells you that “it is all about the square feet”, ask him
+  for the residuals.</span>`,
+  banner:'CORRELATE. FIT. READ. INSPECT. DOUBT.', cont:'Collect the password', final:true }
+];
+
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), hudModel:$('#hud-model'), hudTop:$('#hud-top'), hudR2:$('#hud-r2'),
+  doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  el.note.innerHTML = notes.map(n=>'▸ '+escapeHtml(n)).join('<br>');
+}
+
+/* ---- HUD: filled only by solved steps, so it never gives an answer away ---- */
+const HUD0 = {model:'—', top:'—', r2:'—'};
+function setHUD(h){
+  if(!h) return;
+  if(h.model!==undefined) el.hudModel.textContent = h.model;
+  if(h.top!==undefined)   el.hudTop.textContent   = h.top;
+  if(h.r2!==undefined)    el.hudR2.textContent    = h.r2;
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+
+/* ================================================================
+   WIDGETS — pictures shown after an answer, drawn from the embedded
+   data. Points are never connected; dark marks on a pale ground.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18', faint:'#8d8a7c'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series, plus optional lines, curves, rings and labels */
+function panelSVG(o){
+  const W=o.W||700, H=o.H||300, L=o.L||84, R=W-16, T=44, B=o.B||(H-64);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||3.4}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.8}"/>`;
+    }
+  });
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}"
+      x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2.5}"${l.dash ? ` stroke-dasharray="${l.dash}"` : ''}/>`;
+  });
+  (o.curves||[]).forEach(c=>{
+    const d = c.pts.map((p,i)=>(i?'L':'M')+px(p[0]).toFixed(1)+' '+py(p[1]).toFixed(1)).join(' ');
+    lines += `<path d="${d}" fill="none" stroke="${c.color||PLOT.fit}" stroke-width="${c.w||2.5}"/>`;
+  });
+  let rings='';
+  (o.rings||[]).forEach(g=>{
+    rings += `<circle cx="${px(g.x).toFixed(1)}" cy="${py(g.y).toFixed(1)}" r="${g.r||9}"
+      fill="${g.fill||'none'}" stroke="${g.color||PLOT.fit}" stroke-width="2.5"/>`;
+  });
+  let pins='';
+  (o.pins||[]).forEach(p=>{
+    pins += TXT((px(p.x)+(p.dx||0)).toFixed(1), (py(p.y)+(p.dy===undefined?-12:p.dy)).toFixed(1), p.label,
+      {col:p.col||PLOT.fit, anchor:p.anchor, sz:p.sz||17});
+  });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${marks}${lines}${rings}${pins}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="16" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 16 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+/* two panels side by side; they stack when the window is narrow */
+function pairHTML(a, b){
+  const small = o => Object.assign({W:380, H:292, L:60}, o);
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:4px">
+    ${panelSVG(small(a))}${panelSVG(small(b))}</div>`;
+}
+const CLOUD = { r:2.7, alpha:0.42 };
+
+/* ---- what the two estimated models imply for each house ---- */
+const FIT1 = DATA.P.map((_,i)=> M1P.c + M1P.g*DATA.G[i] + M1P.b*DATA.B[i] + M1P.f*DATA.F[i]
+                              + M1P.a*DATA.A[i] + M1P.y*DATA.Y[i]);
+const RES1 = DATA.P.map((v,i)=> v - FIT1[i]);
+const LNP  = DATA.P.map(Math.log);
+const FIT2 = DATA.P.map((_,i)=> M2P.c + M2P.g*DATA.G[i] + M2P.b*DATA.B[i] + M2P.f*DATA.F[i]
+                              + M2P.a*DATA.A[i] + M2P.y*DATA.Y[i]);
+const RES2 = LNP.map((v,i)=> v - FIT2[i]);
+const THOUSAND = v => v/1000;
+
+/* the average residual in each of k equal-sized slices of the fitted values */
+function binnedCurve(fit, res, k, scale){
+  const order = fit.map((_,i)=>i).sort((a,b)=>fit[a]-fit[b]);
+  const n = order.length, pts = [];
+  for(let g=0; g<k; g++){
+    const part = order.slice(Math.floor(g*n/k), Math.floor((g+1)*n/k));
+    const mx = part.reduce((s,i)=>s+fit[i],0)/part.length;
+    const my = part.reduce((s,i)=>s+res[i],0)/part.length;
+    pts.push([mx/scale, my/scale]);
+  }
+  return pts;
+}
+
+/* ---- the cold open: the first rows of the ledger ---- */
+function playTable(host){
+  const cols=[70,175,290,395,500,625];
+  const head=['SalePrice','GrLivArea','TotalBsmtSF','1stFlrSF','GarageArea','years_since_remod'];
+  const keys=['P','G','B','F','A','Y'];
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=108+i*24;
+    keys.forEach((k,j)=>{ rows += TXT(cols[j],y,DATA[k][i],{sz:19}); });
+  }
+  const heads = head.map((h,j)=>TXT(cols[j],70,h,{sz:16,col:PLOT.ink})).join('');
+  const svg=`<svg viewBox="0 0 700 262" style="width:100%;height:auto;display:block">
+    <rect width="700" height="262" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'HOUSING_CONTINUOUS_NO_OUTLIERS.XLSX · THE FIRST FIVE OF 1,119 HOUSES',{sz:18,anchor:'start'})}
+    ${heads}
+    <line x1="30" y1="80" x2="670" y2="80" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(350,230,'price in dollars · areas in square feet · years since the last remodelling',{sz:16})}
+    ${TXT(350,252,'Ames, Iowa · one row is one house sold',{sz:16,col:PLOT.second})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE LEDGER', svg, 'The file has six columns and no missing value.');
+  return 600;
+}
+
+/* ---- 1.1: the five correlations with the price ---- */
+function playCorr(host){
+  const items=[['GrLivArea',0.7405],['TotalBsmtSF',0.6646],['1stFlrSF',0.6426],
+               ['GarageArea',0.6283],['years_since_remod',-0.5221]];
+  const L=230, scale=400;
+  let bars='';
+  items.forEach((it,i)=>{
+    const y=62+i*34, col = i===0 ? PLOT.fit : (it[1]<0 ? PLOT.second : PLOT.ink);
+    bars += TXT(L-12,y+15,it[0],{sz:18,anchor:'end',col:PLOT.label})
+          + `<rect x="${L}" y="${y}" width="${(Math.abs(it[1])*scale).toFixed(1)}" height="22" fill="${col}"/>`
+          + TXT(L+Math.abs(it[1])*scale+8,y+16,(it[1]<0?'−':'')+Math.abs(it[1]).toFixed(2),{sz:19,anchor:'start',col:col});
+  });
+  const svg=`<svg viewBox="0 0 700 250" style="width:100%;height:auto;display:block">
+    <rect width="700" height="250" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'CORRELATION OF EACH CHARACTERISTIC WITH SALEPRICE',{sz:18,anchor:'start'})}
+    ${bars}
+    <line x1="${L}" y1="52" x2="${L}" y2="232" stroke="${PLOT.axis}"/>
+    ${TXT(L+scale/2,244,'length of the bar = strength of the link, whatever the sign',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE LINE-UP', svg,
+    'The strongest link is the living area. The only negative one, the years since the remodelling, is not a weak one.');
+  return 800;
+}
+
+/* ---- 1.2: the same cloud under two rulers ---- */
+function playUnits(host){
+  const price = DATA.P.map(THOUSAND);
+  const a = { series:[Object.assign({x:DATA.G, y:price}, CLOUD)],
+    xmin:0, xmax:4600, ymin:0, ymax:800, xticks:[0,1000,2000,3000,4000], yticks:[0,200,400,600,800],
+    title:'Square feet, r = 0.740', xlab:'GrLivArea (square feet)', ylab:'SalePrice (thousand dollars)' };
+  const b = { series:[Object.assign({x:DATA.G.map(v=>v*0.093), y:price}, CLOUD, {color:PLOT.second})],
+    xmin:0, xmax:430, ymin:0, ymax:800, xticks:[0,100,200,300,400], yticks:[0,200,400,600,800],
+    title:'Square metres, r = 0.740', xlab:'GrLivArea_sm (square metres)', ylab:'SalePrice (thousand dollars)' };
+  host.innerHTML = plotFrame('EVIDENCE · SAME CLOUD, TWO RULERS', pairHTML(a, b),
+    'Only the labels of the horizontal axis changed. The shape of the cloud, and its correlation, did not.');
+  return 900;
+}
+
+/* ---- 1.3: covariances and correlations in both units ---- */
+function playCov(host){
+  const card=(x,title,l1,big,l2,col)=>`
+    <rect x="${x}" y="52" width="200" height="164" fill="#fbfaf4" stroke="${col}" stroke-width="2"/>
+    ${TXT(x+100,82,title,{sz:21,col:col})}
+    ${TXT(x+100,108,l1,{sz:16})}
+    ${TXT(x+100,160,big,{sz:28,col:col})}
+    ${TXT(x+100,198,l2,{sz:17})}`;
+  const svg=`<svg viewBox="0 0 700 236" style="width:100%;height:auto;display:block">
+    <rect width="700" height="236" fill="${PLOT.paper}"/>
+    ${TXT(30,32,'THE SAME HOUSES, TWO UNITS',{sz:18,anchor:'start'})}
+    ${card(30,'SQUARE FEET','covariance','30,802,961','correlation 0.740',PLOT.ink)}
+    ${card(250,'SQUARE METRES','covariance','2,864,675','correlation 0.740',PLOT.second)}
+    ${card(470,'RATIO','metres / feet','0.093','the conversion factor',PLOT.fit)}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · WHAT THE UNIT CHANGED', svg,
+    'The covariance followed the conversion factor. The correlation did not move.');
+  return 1000;
+}
+
+/* ---- 2.1: price against basement, with the line of the simple regression ---- */
+function playBsmt(host){
+  const rest = DATA.B.map((_,i)=>i).filter(i=>DATA.B[i]>0), none = DATA.B.map((_,i)=>i).filter(i=>DATA.B[i]===0);
+  const price = DATA.P.map(THOUSAND);
+  const o = {
+    series:[Object.assign({x:rest.map(i=>DATA.B[i]), y:rest.map(i=>price[i])}, CLOUD),
+            {x:none.map(i=>DATA.B[i]), y:none.map(i=>price[i]), r:3.6, alpha:0.85, color:PLOT.second}],
+    lines:[{x1:0, y1:43.181, x2:3200, y2:43.181+0.13294*3200}],
+    pins:[{x:0, y:470, label:none.length+' houses without a basement', anchor:'start', dx:12, dy:0, col:PLOT.second},
+          {x:3350, y:55, label:'line of the basement alone : +$133 per sq ft', anchor:'end', dy:0}],
+    xmin:0, xmax:3400, ymin:0, ymax:800, xticks:[0,500,1000,1500,2000,2500,3000], yticks:[0,200,400,600,800],
+    H:330, title:'SalePrice against TotalBsmtSF, 1,119 houses',
+    xlab:'TotalBsmtSF (square feet)', ylab:'SalePrice (thousand dollars)'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE BASEMENT', panelSVG(o),
+    'Uphill and roughly straight. The orange points are houses without a basement. The cloud widens to the right.');
+  return 900;
+}
+
+/* ---- 2.2: the price list of Model 1 ---- */
+function playCoefs(host){
+  const rows=[['const','−15,069','the anchor of the line'],
+              ['GrLivArea','79.43','dollars per square foot'],
+              ['TotalBsmtSF','69.27','dollars per square foot'],
+              ['1stFlrSF','−6.20','dollars per square foot'],
+              ['GarageArea','67.08','dollars per square foot'],
+              ['years_since_remod','−867.43','dollars per year']];
+  let body='';
+  rows.forEach((r,i)=>{
+    const y=84+i*30, hot = (i===2 || i===5);
+    if(hot) body += `<rect x="24" y="${y-19}" width="652" height="26" fill="${PLOT.fit}" fill-opacity=".14"/>`;
+    body += TXT(40,y,r[0],{sz:19,anchor:'start',col:hot?PLOT.fit:PLOT.ink})
+          + TXT(380,y,r[1],{sz:21,anchor:'end',col:hot?PLOT.fit:PLOT.ink})
+          + TXT(410,y,r[2],{sz:17,anchor:'start'})
+          + (hot ? TXT(660,y,i===2?'b2':'b5',{sz:19,anchor:'end',col:PLOT.fit}) : '');
+  });
+  const svg=`<svg viewBox="0 0 700 280" style="width:100%;height:auto;display:block">
+    <rect width="700" height="280" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'MODEL 1 · THE PRICE LIST',{sz:18,anchor:'start'})}
+    ${TXT(40,58,'variable',{sz:16,anchor:'start',col:PLOT.faint})}
+    ${TXT(380,58,'coef',{sz:16,anchor:'end',col:PLOT.faint})}
+    ${TXT(410,58,'unit of the coefficient',{sz:16,anchor:'start',col:PLOT.faint})}
+    <line x1="30" y1="64" x2="670" y2="64" stroke="${PLOT.axis}"/>
+    ${body}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · MODEL 1', svg,
+    'Each coefficient is the expected change of the price for one more unit of its variable, the others held fixed.');
+  return 900;
+}
+
+/* ---- 3.1 and 3.2: residuals against fitted values ---- */
+function playResid(host, which){
+  let o;
+  if(which===1){
+    o = { series:[Object.assign({x:FIT1.map(THOUSAND), y:RES1.map(THOUSAND)}, {r:3, alpha:0.42})],
+      lines:[{x1:0, y1:0, x2:560, y2:0, color:PLOT.second, w:2, dash:'6 5'}],
+      curves:[{pts:binnedCurve(FIT1, RES1, 10, 1000), color:PLOT.fit, w:3}],
+      xmin:0, xmax:560, ymin:-170, ymax:260, xticks:[0,100,200,300,400,500], yticks:[-100,0,100,200],
+      H:330, title:'Model 1: residuals against fitted values, 1,119 houses',
+      xlab:'fitted values, i.e., predicted price (thousand dollars)', ylab:'residuals (thousand dollars)' };
+    host.innerHTML = plotFrame('EVIDENCE · THE DIAGNOSTIC PLOT OF MODEL 1', panelSVG(o),
+      'The red curve is the average residual in each tenth of the fitted values : a smile, not a flat line. And the cloud fans out.');
+  } else {
+    o = { series:[Object.assign({x:FIT2, y:RES2}, {r:3, alpha:0.42})],
+      lines:[{x1:11, y1:0, x2:13.8, y2:0, color:PLOT.second, w:2, dash:'6 5'}],
+      curves:[{pts:binnedCurve(FIT2, RES2, 10, 1), color:PLOT.fit, w:3}],
+      xmin:11, xmax:13.8, ymin:-1.1, ymax:0.8, xticks:[11.5,12,12.5,13,13.5], yticks:[-1,-0.5,0,0.5],
+      H:330, title:'Model 2: residuals against fitted values, 1,119 houses',
+      xlab:'fitted values, i.e., predicted ln(price)', ylab:'residuals (log points)' };
+    host.innerHTML = plotFrame('EVIDENCE · THE DIAGNOSTIC PLOT OF MODEL 2', panelSVG(o),
+      'The red curve, i.e., the average residual in each tenth of the fitted values, stays close to zero, and the band keeps its thickness.');
+  }
+  return 900;
+}
+
+/* ---- 3.3: the t-statistics of Model 2 against the 5% threshold ---- */
+function playTstats(host){
+  const items=[['GrLivArea',27.78],['TotalBsmtSF',14.24],['1stFlrSF',-1.33],
+               ['GarageArea',8.47],['years_since_remod',-20.84]];
+  const L=230, R=670, lo=-25, hi=30, px=v=>L+(v-lo)/(hi-lo)*(R-L);
+  let bars='';
+  items.forEach((it,i)=>{
+    const y=62+i*34, x0=px(0), x1=px(it[1]), col = Math.abs(it[1])<1.96 ? PLOT.fit : PLOT.ink;
+    bars += TXT(L-12,y+15,it[0],{sz:18,anchor:'end'})
+          + `<rect x="${Math.min(x0,x1).toFixed(1)}" y="${y}" width="${Math.abs(x1-x0).toFixed(1)}" height="22" fill="${col}"/>`
+          + TXT(it[1]>=0 ? x1+8 : px(1.96)+8, y+16, it[1].toFixed(2).replace('-','−'), {sz:19, anchor:'start', col:col});
+  });
+  let ticks='';
+  [-20,-10,0,10,20,30].forEach(v=>{
+    ticks += `<line x1="${px(v)}" y1="232" x2="${px(v)}" y2="237" stroke="${PLOT.axis}"/>` + TXT(px(v),252,v,{sz:15});
+  });
+  const svg=`<svg viewBox="0 0 700 262" style="width:100%;height:auto;display:block">
+    <rect width="700" height="262" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'MODEL 2 · t-STATISTIC OF EACH COEFFICIENT (H0 : COEFFICIENT = 0)',{sz:18,anchor:'start'})}
+    <rect x="${px(-1.96)}" y="50" width="${px(1.96)-px(-1.96)}" height="182" fill="${PLOT.fit}" fill-opacity=".2"/>
+    ${bars}
+    <line x1="${px(0)}" y1="50" x2="${px(0)}" y2="232" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="232" x2="${R}" y2="232" stroke="${PLOT.axis}"/>
+    ${ticks}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · WHO SURVIVES THE t-TEST', svg,
+    'The red band is the zone between −1.96 and +1.96 : a coefficient whose t-statistic falls inside it is not significant at 95%.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='corr')    return playCorr(host);
+  if(name==='units')   return playUnits(host);
+  if(name==='cov')     return playCov(host);
+  if(name==='bsmt')    return playBsmt(host);
+  if(name==='coefs')   return playCoefs(host);
+  if(name==='resid1')  return playResid(host, 1);
+  if(name==='resid2')  return playResid(host, 2);
+  if(name==='tstats')  return playTstats(host);
+  return 0;
+}
+
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>buildZone(s));
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then example Python to run in VS Code ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE PYTHON · COPY IT INTO VS CODE AND RUN IT THERE</span>
+        <button class="toolbtn" data-copy>COPY CODE</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY CODE',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+
+  function advance(givenAway){
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);
+    const label = s.options.find(o=>o.id===s.correct).label;
+    conclude(s, givenAway ? `<em>“…the answer was : ${label}”</em>` : `<em>“${label}”</em>`, mySeq);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE ANSWER';
+    b.onclick=()=>{
+      const good = box.querySelector(`[data-oid="${s.correct}"]`);
+      if(good) good.classList.add('given');
+      setTimeout(()=>{ if(mySeq===seq) advance(true); }, 500);
+    };
+    bar.appendChild(b);
+  }
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      advance(false);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+        offerSolution();
+        verdict('give','Two attempts. You may take the answer and keep going — the reasoning matters more than the guess.');
+      }
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+
+  function advance(givenAway){
+    inputs().forEach(b=>b.disabled=true);
+    box.querySelectorAll('label').forEach(l=>{
+      if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add(givenAway?'given':'right');
+    });
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 700);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      inputs().forEach(b=>{ b.checked = s.correct.indexOf(b.value)>=0; });
+      advance(true);
+    };
+    bar.appendChild(g);
+  }
+  submit.onclick=()=>{
+    if(chosen() === wanted){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    clearVerdict();
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer and keep going.');
+    }
+  };
+}
+
+/* ---- numeric: numbers brought back from VS Code, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/\s+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+function tolerance(f){ return f.tol || 0; }
+/* true when v is the target rounded or cut to fewer digits than the margin allows */
+function tooRounded(f, v){
+  const top = Math.pow(10, Math.floor(Math.log10(Math.abs(f.value))));
+  for(let p=top; p>=1e-6; p/=10){
+    const q = f.value/p;
+    if(Math.abs(Math.round(q)*p - v) < p*1e-6 || Math.abs(Math.trunc(q)*p - v) < p*1e-6) return true;
+  }
+  return false;
+}
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, with a dot as decimal separator and no thousands separator, e.g., 1234.5.';
+  const tol = tolerance(f);
+  const diff = f.abs ? Math.abs(Math.abs(v)-Math.abs(f.value)) : Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){ if(Math.abs(v-a.value) <= a.tol) return a.msg; }
+  if(tol>0 && tooRounded(f, v)) return 'You rounded “' + plainLabel(f) + '” too much. Type more digits: the answer must be within ' + tol + ' of the exact value.';
+  if(!f.abs && Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in VS Code.');
+}
+function shownValue(f){
+  if(f.kind==='select') return f.correct;
+  return String(f.show !== undefined ? f.show : f.value);
+}
+
+function zoneNumeric(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  function advance(givenAway){
+    rows.forEach(r=>{ r.input.disabled=true; });
+    const line = givenAway ? `<em>“…the answer was : ${s.say}”</em>` : `<em>“${s.say}”</em>`;
+    setTimeout(()=>{ if(mySeq===seq) conclude(s, line, mySeq); }, givenAway ? 900 : 350);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      rows.forEach(r=>{ r.input.value = shownValue(r.f); r.row.classList.remove('bad','good'); r.row.classList.add('given'); });
+      clearVerdict();
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      reactTo('wow');
+      advance(true);
+    };
+    bar.appendChild(g);
+  }
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      advance(false);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. You may take the answer and keep going — but check it in VS Code first, the next question builds on it.');
+    }
+  };
+}
+
+
+/* ================================================================
+   PYTHON HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openPythonHelper(){
+  const guide=document.querySelector('.pyguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelper8',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Exercise VIII</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .pyguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference syntax only. Run your code in VS Code; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-python-helper]').forEach(b=>b.onclick=openPythonHelper);
+document.querySelectorAll('[data-open-pdf]').forEach(b=>b.onclick=()=>window.open(CONFIG.QUESTIONS_PDF,'housingGuidelines'));
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>window.open(CONFIG.DATA_FILE,'housingData'));
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+
+/* ================================================================
+   PASSWORD  —  Session 8 formula, nonlinear in the finish time
+     m    = h*3600 + min*60 + sec
+     a    = m^3 mod 1000033
+     b    = (a*a + 8*a*m + 88*m) mod 999979
+     c    = (b*(a + m) + 31*b) mod 1000003
+     code = (59047*c + 28657*b + 10007*a + 123457*m + 80801) mod 1e6
+   Every intermediate value stays below 2^53, so the arithmetic is exact.
+   Checked by check_password_S8.py.
+   ================================================================ */
+function makePassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const a = (m*m*m) % 1000033;
+  const b = (a*a + 8*a*m + 88*m) % 999979;
+  const c = (b*(a + m) + 31*b) % 1000003;
+  const code = (59047*c + 28657*b + 10007*a + 123457*m + 80801) % 1000000;
+  return {
+    time: `${hh}h ${mm}min ${ss}s`,
+    // hhmmss, then the nonlinear transformation of that same time
+    code: hh + mm + ss + '-' + String(code).padStart(6,'0')
+  };
+}
+
+function finish(){
+  const pw = makePassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = pw.time;
+  $('#pw-code').textContent = pw.code;
+  $('#endblurb').innerHTML =
+    `You told a correlation from a covariance by changing the unit, priced a basement and a year of
+     neglect with everything else held fixed, and predicted the price of a house on Elm Street. Then
+     you questioned the residuals : you caught the smile and the funnel in the first model, repaired
+     them with a logarithm, read a coefficient in percent, and found the one variable whose first
+     floor adds nothing once the others have spoken.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: A HOUSE IS ITS SQUARE FEET';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  copyText($('#pw-code').textContent,
+    ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); },
+    ()=>{ $('#copymsg').textContent='select and copy manually'; });
+};
+$('#btn-again').onclick = ()=>{ idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  el.doom.classList.remove('struck'); el.doom.textContent='CASE OPEN';
+  setHUD(HUD0); show('scr-game'); render(); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v8.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "LOCATING IOWA ............... FOUND, AMONG THE CORN",
+  "COUNTING SQUARE FEET ........ ALL OF THEM",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "PYTHON INTERPRETER .......... NOT HERE. USE VS CODE.",
+  "OPENING CASE FILE VIII ...... HOUSING_CONTINUOUS_NO_OUTLIERS.XLSX, 1119 HOUSES",
+  "",
+  "> KEEP VS CODE AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  const v = $('#playername').value.trim();
+  playerName = v || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+  idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  setHUD(HUD0);
+  show('scr-game');
+  render();
+};
+</script>
+</body>
+</html>
