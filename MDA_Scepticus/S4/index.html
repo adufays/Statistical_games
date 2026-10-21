@@ -1,1 +1,1527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 4: Like Father, Like Son?</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 4
+  "Like Father, Like Son?"
+  EDHEC · Multivariate Data Analysis · Empirical Session 4
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine as Empirical Exercises 2 and 3, without checkpoints or
+  passwords: this exercise is not graded.
+
+  HOW THE EXERCISE WORKS
+  ----------------------
+  The game does NOT compute anything. Students work in two windows:
+     Excel      open Galton_in_cm.xlsx and compute every number;
+     this game  report numbers, choose interpretations, get feedback.
+  There is no questions PDF: Master Scepticus asks the questions one
+  after the other. Every question has a HINT button. No answer is ever
+  shown: there is no SHOW THE ANSWER button.
+
+  THE STATISTICAL CONTENT
+  -----------------------
+  The students' first statistical test. At this point of the course only
+  the test based on the standard normal distribution has been covered:
+  no Student t distribution, no p-value, no confidence interval. Excel
+  prints a "t Stat", computed with the estimated error variance; with
+  1078 observations the t distribution is practically N(0, 1), so the
+  ratio is treated as a Z-statistic and compared with 1.96. The Master
+  says so in one step, and one question checks that the students can
+  justify it. The two hypotheses are tested separately (no joint test).
+  Tests are phrased with the confidence level (95%), which the course
+  stresses at this stage; the link with the significance level, alpha =
+  5%, is stated in the crash course and recalled in the dismissal.
+
+  DATA
+  ----
+  Galton_in_cm.xlsx: 1078 pairs. Column A: father's height (cm),
+  column B: son's height (cm), names in row 1, data in rows 2 to 1079.
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE IV</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="galton">DATA (XLSX)</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>LIKE FATHER,<br>LIKE SON ?</h1>
+      <h2>Empirical Exercise IV &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus is sure that sons are, on average, exactly as tall as their fathers. The
+      heights of 1078 fathers and sons, collected by Francis Galton, will judge him. You will compute
+      a correlation, estimate a regression, and run your first statistical tests on its
+      coefficients.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>Galton_in_cm.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and open it in Excel. Compute every number
+        there, and keep your workbook: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, choose the interpretations, and defend them in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example Excel formula, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers with a dot or a comma as the decimal separator, e.g., <code>0.514</code> or
+      <code>0,514</code>, and with three decimals.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">In the file, column <code>A</code> holds the height of the father and
+        column <code>B</code> the height of his son, in centimetres. Row 1 holds the names; rows 2 to
+        1079 hold the 1078 pairs. English Excel separates the arguments of a function with a comma;
+        French Excel uses a semicolon, e.g., <code>=COEFFICIENT.CORRELATION(A2:A1079;B2:B1079)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code></td><td><code>=NB(plage)</code></td><td>Counts the cells that contain numbers.</td><td><code>=COUNT(A2:A1079)</code></td></tr>
+            <tr><td><code>=CORREL(r1, r2)</code></td><td><code>=COEFFICIENT.CORRELATION(r1; r2)</code></td><td>Empirical correlation.</td><td><code>=CORREL(A2:A1079, B2:B1079)</code></td></tr>
+            <tr><td>Data → Data Analysis → Regression</td><td>Données → Utilitaire d’analyse → Régression</td><td>Full regression output. The table at the bottom gives, for each coefficient, its <b>Coefficients</b> (estimate), <b>Standard Error</b> and <b>t Stat</b>. If it is missing: File → Options → Add-ins → Analysis ToolPak.</td><td>Y range: B1:B1079, X range: A1:A1079, tick Labels</td></tr>
+            <tr><td><code>=NORM.S.INV(p)</code></td><td><code>=LOI.NORMALE.STANDARD.INVERSE.N(p)</code></td><td>Quantile of the standard normal distribution N(0, 1), i.e., a critical value.</td><td><code>=NORM.S.INV(0.95)</code></td></tr>
+            <tr><td><code>=ABS(x)</code></td><td><code>=ABS(x)</code></td><td>Absolute value, to compare a Z-statistic with a critical value.</td><td><code>=ABS(-2.5)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>correlation</span><b id="hud-r">—</b></div>
+            <div class="hudrow"><span>intercept</span><b id="hud-b1">—</b></div>
+            <div class="hudrow"><span>slope</span><b id="hud-b2">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise IV &nbsp;·&nbsp; Like Father, Like Son ?</h2>
+      <p id="endblurb"></p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button */
+  DATA_FILES: {
+    galton: "https://www.dropbox.com/scl/fi/njku61j8vhbuosxi9onwt/Galton_in_cm.xlsx?rlkey=srcyup41np69xb9a79dazvhm2&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { study:'', lab:'', court:'' },
+  FALLBACK: {
+    study:"linear-gradient(180deg,#120d08,#33261a 60%,#5c4430)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted, unless the
+     field is marked 'strict', in which case its own 'tol' applies.   */
+  RTOL: 0.02,
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 1078 pairs of Galton_in_cm.xlsx (cm, rounded to 0.01),
+   embedded for the pictures only. The student computes everything in
+   Excel.
+   ================================================================ */
+const DATA = {
+  FATHER:[165.22,160.66,164.99,167.01,155.29,160.08,166.04,164.4,167.81,170.1,149.88,159.85,161.72,162.75,164.31,165.49,168.59,166.57,171.11,169.57,172.21,176.62,158.85,162.08,163.72,165.01,164.35,166.98,166.37,166.51,169.93,169.1,168.99,172.48,173.46,172.06,173.91,176.23,182.42,158.54,163.81,163.8,162.36,166.23,165.18,166.8,174.4,169.03,164.74,176.8,164.63,165.93,167.21,167.22,166.53,167.31,167.06,170.41,169.2,171.22,170.88,169.19,173.16,172.23,173.55,172.92,175.18,175.07,176.81,178.71,177.82,184.8,159.57,159.69,162.34,163.93,163.88,167.71,167.16,167.69,166.47,166.96,169.61,169.36,170.12,170.03,169.79,170.49,172.06,173.41,171.72,173.86,171.85,174.53,176.07,174.6,175.6,176.15,174.32,176.74,178.8,180.83,179.89,182.0,186.13,160.12,161.71,166.07,164.09,168.67,167.06,166.79,167.79,169.03,169.09,169.29,172.01,173.96,172.28,171.6,172.92,175.68,174.48,174.29,174.37,174.29,178.73,177.83,178.16,178.33,181.05,180.1,183.36,190.4,164.8,166.5,166.77,167.46,167.49,171.29,171.41,171.74,173.87,173.98,172.99,176.49,175.45,176.26,176.39,176.58,178.19,177.47,178.93,179.97,181.1,183.24,183.36,191.6,163.88,168.56,166.54,169.65,169.96,173.16,171.45,172.3,175.14,175.92,174.61,177.15,178.56,177.91,178.4,180.04,180.82,183.83,185.5,190.01,171.18,170.98,172.16,176.12,174.56,177.77,177.17,179.47,180.62,184.1,184.1,171.51,173.33,174.75,177.54,181.58,179.74,182.66,160.23,173.31,177.95,179.93,184.33,172.55,171.55,184.91,159.19,173.21,165.28,186.51,159.87,158.84,177.55,180.52,180.62,176.49,178.27,166.27,157.58,161.55,166.64,172.8,157.01,162.02,164.82,167.11,168.72,174.77,156.88,163.33,161.77,165.09,165.99,164.62,166.92,167.72,170.3,172.15,175.39,157.95,159.42,162.27,166.14,164.14,166.74,168.05,167.63,167.13,171.27,170.48,171.02,172.37,173.52,172.63,174.46,180.8,158.57,159.73,162.75,162.27,164.66,166.11,164.52,174.41,165.6,163.39,167.85,175.3,163.83,167.83,166.97,168.8,166.7,168.64,171.04,169.77,169.41,171.06,171.08,172.56,172.13,173.01,173.37,174.84,176.3,176.07,179.02,177.96,179.42,158.52,160.41,161.33,162.34,164.13,164.75,167.42,168.15,168.81,166.38,169.87,170.38,169.75,170.64,168.95,170.06,169.26,173.19,171.72,173.43,172.67,175.26,176.05,174.97,175.13,176.33,176.52,178.68,177.61,179.55,179.24,183.92,184.09,159.31,162.31,163.84,164.64,166.05,167.2,168.39,167.16,169.69,170.6,170.96,171.57,172.39,173.61,171.72,173.95,174.16,175.45,174.16,175.65,174.26,174.1,176.92,178.86,177.74,178.48,181.14,181.08,184.39,163.58,164.88,168.52,167.75,166.86,169.46,169.29,173.56,172.58,172.64,173.42,174.63,175.4,175.28,176.26,177.2,176.9,178.95,177.54,180.3,180.9,181.49,181.89,185.94,162.28,167.62,167.75,171.39,169.38,173.41,172.03,173.44,173.72,175.59,175.54,177.14,177.8,176.69,177.74,180.05,179.44,183.55,181.62,185.46,168.15,170.85,172.23,175.47,176.15,176.78,178.03,178.27,181.02,183.08,183.74,170.35,172.36,175.44,176.78,177.13,179.17,183.92,184.88,172.98,174.27,181.08,183.12,189.72,180.75,173.5,153.46,162.42,160.19,162.51,187.69,182.97,155.0,166.11,182.79,181.09,165.5,175.01,163.71,162.55,168.81,170.5,158.19,162.18,166.21,166.68,168.07,171.77,152.94,160.0,161.47,165.48,165.44,164.59,168.27,168.22,169.18,172.7,175.38,157.81,160.43,163.72,161.94,164.18,164.06,167.79,167.6,166.78,170.47,170.98,170.59,173.7,171.81,171.59,174.08,177.87,155.13,159.32,163.29,162.84,161.76,164.3,164.26,172.61,164.11,167.84,165.74,176.97,165.96,166.48,167.92,168.22,167.66,167.72,167.5,170.43,170.15,171.17,171.22,170.97,173.41,173.57,171.62,173.31,175.45,174.68,179.05,177.82,176.58,156.23,159.86,162.82,162.18,165.32,164.15,167.36,168.26,166.78,167.78,168.42,170.57,169.95,169.91,169.08,170.78,170.32,172.58,172.57,172.32,172.51,174.34,174.26,175.36,175.34,175.58,174.09,178.42,177.4,177.55,181.58,183.82,182.74,154.99,160.05,164.03,166.11,164.72,166.49,166.53,167.89,171.21,169.12,171.22,170.73,173.31,172.42,172.76,171.94,174.89,174.58,175.44,174.75,174.75,176.08,176.81,177.19,178.21,178.11,180.61,181.46,182.25,163.46,165.51,167.88,167.1,166.47,169.46,170.62,170.61,172.87,172.36,173.22,176.01,174.86,175.72,174.49,176.42,177.92,177.02,178.32,179.81,180.03,181.12,183.71,184.87,163.58,164.82,167.25,171.08,171.32,172.38,172.53,173.99,171.72,176.21,176.15,176.49,178.36,177.85,177.39,176.79,181.61,183.31,183.92,184.21,164.26,169.63,172.3,173.12,175.75,174.92,178.08,178.1,180.43,181.44,183.0,184.75,172.79,175.39,174.91,176.87,180.95,182.77,185.17,167.29,173.96,179.65,183.76,184.4,174.83,186.69,177.95,172.54,164.26,154.38,190.35,179.45,154.72,165.83,181.26,182.04,159.23,181.34,169.07,170.66,158.83,164.73,170.03,158.4,161.5,166.23,165.11,168.75,169.34,151.1,160.02,162.79,162.75,163.88,165.59,168.42,167.72,169.75,173.22,174.4,155.69,160.68,162.21,162.89,164.62,163.98,168.13,168.91,168.74,170.95,171.11,170.92,171.95,173.69,172.13,176.01,176.95,152.49,157.82,161.65,162.11,163.74,164.43,166.19,165.29,176.01,171.91,164.95,176.48,165.25,165.13,166.67,167.51,166.85,167.33,167.42,171.25,169.01,171.25,170.74,171.04,173.01,172.77,172.79,173.61,174.76,176.51,178.38,177.09,178.22,155.13,159.18,163.38,163.25,165.0,164.52,168.24,167.91,168.73,168.22,167.32,170.26,171.41,169.51,169.4,170.99,170.49,172.28,173.83,172.07,172.96,172.0,175.24,175.89,175.98,175.93,174.64,176.85,176.83,177.67,179.3,183.75,181.77,185.28,160.88,163.44,165.46,165.72,167.4,167.61,166.55,167.2,169.89,170.14,171.24,172.55,172.16,173.86,173.54,173.61,174.59,175.2,176.07,174.76,175.02,177.3,176.95,178.77,178.56,180.41,181.06,182.96,160.69,164.79,166.95,167.99,168.88,167.8,169.51,170.49,171.63,173.18,173.58,173.09,175.69,175.71,174.06,174.88,177.03,177.46,179.04,180.75,179.3,179.18,183.86,185.89,162.87,164.16,166.99,170.47,169.71,173.69,173.58,173.36,173.65,174.44,174.51,175.38,178.24,177.47,178.2,178.41,181.4,179.48,183.96,185.53,164.31,170.43,172.21,173.67,175.75,174.23,177.47,178.26,179.12,180.36,182.45,184.94,172.6,172.25,176.09,178.95,181.33,183.67,182.58,164.12,172.09,177.55,180.01,184.7,175.36,184.01,175.44,178.25,183.83,151.48,186.12,173.04,160.41,167.65,181.49,173.09,165.75,178.86,173.7,157.2,165.06,168.2,151.09,159.45,162.22,163.99,166.63,168.36,179.2,157.85,163.52,163.45,164.88,165.94,165.55,167.9,167.77,171.15,172.31,178.49,160.51,161.72,162.88,164.37,165.47,167.5,166.82,167.52,170.96,169.4,169.08,169.7,173.33,171.54,173.78,175.5,179.86,156.67,160.13,163.45,162.29,166.32,164.4,164.21,171.38,169.59,165.05,176.24,161.83,164.17,167.64,167.55,168.9,168.33,166.82,169.85,169.51,169.0,170.31,170.31,171.6,171.66,171.5,173.04,174.18,174.05,175.78,177.18,177.59,179.08,159.6,160.64,163.69,163.37,164.43,164.4,167.58,166.72,167.22,167.31,169.19,169.57,169.6,170.72,170.41,170.01,172.82,172.68,173.36,173.38,173.26,174.09,174.0,175.6,175.82,176.13,176.31,178.44,177.0,179.1,181.09,183.39,183.74,159.81,162.4,164.08,166.3,167.29,168.42,167.07,168.87,170.99,171.19,170.33,173.87,171.97,172.93,171.68,172.22,175.92,175.39,174.52,175.33,175.13,174.79,177.59,178.94,177.71,177.18,181.31,180.55,184.78,165.78,167.68,166.41,166.68,167.44,170.46,169.92,172.57,172.03,171.58,172.62,174.83,176.38,174.14,175.53,179.02,177.62,177.91,176.7,180.37,179.39,181.52,181.92,187.65,165.11,168.41,167.3,169.84,170.59,172.9,171.64,171.79,176.31,174.93,175.46,177.32,177.84,176.7,178.45,179.53,180.03,184.03,185.53,189.0,171.2,168.99,172.84,174.82,176.1,178.68,178.24,179.85,179.59,183.79,183.81,170.63,172.31,175.02,178.75,180.81,181.39,182.14,184.41,171.64,174.14,180.21,182.87,190.94,185.6,177.61,166.48,184.31,183.26,160.58,186.09,167.16,171.97,170.17,181.18,182.33,179.68,178.58],
+  SON:[151.84,160.56,160.89,159.49,163.27,163.18,162.77,162.55,164.12,162.51,165.72,165.99,166.83,166.21,165.85,164.57,165.15,166.49,165.31,166.34,165.44,166.4,169.12,168.6,168.02,167.57,167.54,168.79,167.0,167.57,167.4,167.41,168.84,167.01,168.52,167.86,168.35,168.51,168.7,170.75,171.36,170.16,169.59,170.27,169.78,176.02,175.49,156.63,166.95,175.21,171.13,170.62,170.35,170.93,171.77,171.4,169.98,171.66,170.72,169.71,170.8,171.48,171.63,170.62,171.55,171.12,171.7,170.82,169.74,169.49,170.0,171.83,172.83,173.96,172.84,173.6,173.58,173.52,173.19,174.02,173.03,173.52,172.84,174.28,172.57,172.93,173.65,172.34,173.22,172.77,173.32,172.46,174.31,172.67,173.4,172.57,174.3,173.33,174.21,172.89,173.69,172.11,174.24,172.5,172.31,174.69,176.8,177.02,176.31,177.01,175.79,176.42,176.77,175.97,176.59,174.61,176.05,175.83,175.87,176.51,175.56,175.1,176.42,175.96,175.84,174.51,176.14,174.93,176.03,175.66,176.85,175.54,175.5,175.34,177.44,177.96,177.54,178.47,179.14,179.14,177.26,178.73,177.74,177.38,179.58,178.23,178.1,177.68,178.59,177.31,177.72,177.65,177.13,178.01,177.83,179.45,177.83,178.03,181.21,179.87,181.48,180.81,182.02,181.34,179.67,181.0,180.46,181.0,180.07,181.15,181.76,180.79,180.43,181.29,181.98,180.65,180.13,182.03,183.88,182.57,183.76,183.32,184.2,182.85,183.76,184.03,183.56,182.8,183.34,184.88,185.53,185.11,185.86,187.03,185.12,185.88,188.78,188.99,187.37,187.76,187.34,191.93,192.28,196.12,155.67,188.68,180.16,191.38,156.94,162.56,158.66,187.21,168.53,158.0,166.17,162.54,159.47,161.35,161.29,159.76,161.87,161.88,163.57,161.8,163.7,163.27,165.57,165.36,166.53,164.96,165.46,165.53,166.58,166.71,164.77,166.16,164.4,167.25,167.06,169.35,169.03,168.74,168.48,168.27,168.65,169.4,168.2,168.74,169.31,167.05,168.17,168.41,167.18,168.52,169.88,169.71,171.1,171.92,170.69,170.86,171.33,175.16,157.51,162.83,167.66,167.08,170.04,169.7,170.22,171.29,169.78,170.82,171.51,170.63,171.72,169.92,169.54,170.61,170.79,169.56,169.67,171.42,170.46,170.34,170.03,171.57,169.82,171.98,172.42,174.41,174.2,173.85,173.77,173.85,173.69,172.54,173.49,172.66,173.18,174.19,174.17,172.26,172.41,173.3,172.75,172.34,172.21,174.24,172.94,172.41,173.94,174.24,172.92,172.93,172.04,173.77,174.23,173.44,172.88,173.77,176.2,175.27,176.21,174.99,176.21,176.13,175.18,176.78,175.88,176.99,175.02,175.44,175.34,175.72,176.89,174.82,175.87,175.52,175.22,176.06,175.78,175.1,176.19,174.53,174.64,176.16,176.35,176.58,175.84,177.67,177.6,177.75,177.15,177.35,177.55,178.56,177.39,177.67,178.5,179.52,178.79,178.75,179.34,178.23,177.42,178.39,178.52,178.66,177.33,179.19,177.72,177.13,177.45,180.01,181.27,180.82,179.71,179.65,181.16,180.06,180.11,180.03,180.84,181.15,180.92,181.25,181.87,180.27,180.82,181.36,181.34,180.05,181.04,183.14,182.96,182.87,182.18,182.7,183.4,183.63,184.37,183.0,182.39,182.38,185.59,186.55,185.91,186.37,185.99,185.12,184.86,186.11,187.86,189.59,187.77,189.45,188.75,190.75,195.97,154.39,158.4,168.66,148.61,177.8,180.33,165.01,179.01,175.85,164.85,174.69,177.44,158.81,160.75,161.36,159.7,162.35,163.38,163.13,164.07,163.29,162.02,166.79,164.61,166.71,164.46,164.57,165.38,166.5,165.86,165.46,165.34,164.63,167.51,168.59,168.62,168.45,167.16,167.88,168.89,168.47,169.16,167.66,168.8,167.66,168.82,168.6,168.52,168.44,169.22,169.65,171.54,170.58,169.62,170.83,169.65,169.88,173.0,161.58,160.48,166.81,170.77,171.22,171.65,170.7,170.43,169.69,170.42,169.96,169.61,170.12,171.87,171.76,171.88,171.01,170.29,170.09,170.36,170.61,171.4,171.88,169.84,170.29,172.02,174.07,172.4,172.33,173.4,173.19,174.14,172.14,172.54,172.02,172.69,172.89,172.14,173.0,173.14,174.27,173.45,173.69,174.3,173.43,172.57,171.98,173.61,173.09,172.65,173.32,172.86,173.99,174.22,172.06,174.49,174.33,173.68,175.55,176.16,176.56,175.54,176.89,176.29,175.73,174.77,175.56,175.33,175.4,175.63,174.58,175.21,175.14,175.68,174.79,174.59,175.26,175.98,176.22,175.03,176.08,176.88,176.37,175.21,176.64,174.59,175.77,178.72,178.06,178.8,177.9,177.2,178.79,177.89,178.46,177.47,179.57,178.45,177.08,178.61,177.69,177.11,178.38,177.85,178.61,178.81,177.24,177.19,179.17,177.89,179.3,180.68,180.73,180.42,180.19,179.8,181.63,181.79,179.92,180.24,181.75,180.55,181.6,181.28,181.61,180.37,181.93,181.27,180.94,180.09,181.69,184.0,184.4,182.35,182.9,182.92,184.02,182.7,183.11,184.34,184.23,182.33,184.34,185.59,185.9,186.42,186.37,187.14,185.03,185.41,189.68,187.58,188.87,187.96,187.77,192.22,193.31,198.75,157.22,177.45,158.16,181.38,181.89,166.4,182.54,180.76,163.91,165.74,176.86,165.36,155.03,160.33,161.54,161.24,162.13,163.03,164.26,162.72,163.53,164.09,164.64,165.68,166.68,166.69,164.74,166.75,166.85,166.58,165.33,164.78,166.85,169.02,168.23,167.41,168.4,168.49,168.12,167.96,168.13,167.19,169.2,168.79,168.29,169.0,168.36,167.39,169.21,169.15,170.96,171.23,171.49,170.03,170.47,170.16,170.03,172.9,171.4,160.04,171.2,174.64,169.95,170.9,170.59,170.5,170.37,170.63,169.54,169.72,171.29,171.13,170.08,171.2,169.97,170.0,169.63,169.63,170.57,171.32,171.93,170.53,171.72,172.63,174.39,173.81,172.75,174.29,174.01,172.15,172.97,173.21,174.11,174.23,174.38,173.74,174.1,174.23,172.41,172.84,172.63,174.12,172.92,172.55,174.22,172.49,174.34,174.37,173.75,173.22,173.58,173.05,172.2,173.34,172.63,172.79,172.92,175.85,175.84,175.02,176.1,176.61,175.32,175.93,176.67,176.19,175.17,176.1,175.52,176.0,175.92,174.53,176.49,176.48,174.96,174.84,176.34,174.81,175.44,175.73,175.95,174.85,175.55,176.27,174.5,178.8,179.06,178.1,177.17,178.44,178.53,177.08,178.15,178.86,177.59,177.24,177.57,178.54,178.31,178.89,178.82,179.47,177.11,178.95,179.13,178.96,179.12,178.45,178.63,181.35,180.43,181.9,180.09,181.28,181.51,180.92,181.85,181.98,181.2,180.67,181.67,180.23,181.56,179.97,181.4,181.12,180.91,181.48,179.73,184.55,182.79,183.66,183.5,183.85,182.99,182.31,184.27,184.34,182.64,184.46,183.95,185.77,186.96,186.09,185.62,187.19,186.96,185.09,187.71,188.78,187.65,188.49,189.17,190.69,193.93,199.05,155.5,184.49,164.95,185.5,182.41,165.84,154.71,183.21,180.31,156.72,171.49,163.52,160.74,161.24,161.7,162.42,162.4,162.43,162.77,164.31,163.53,162.33,164.7,165.94,165.7,166.3,165.51,166.01,166.61,164.34,164.51,166.52,166.18,169.03,166.88,167.95,168.32,169.05,168.72,168.93,168.34,168.71,168.3,167.97,169.0,168.47,167.94,167.33,166.9,167.9,171.63,171.29,170.2,170.71,170.67,171.18,171.32,173.2,159.36,168.53,166.88,173.64,171.51,170.81,170.73,171.33,170.01,171.92,170.11,169.5,169.55,171.28,170.0,171.43,170.03,170.26,169.97,170.12,170.56,171.53,171.51,170.89,171.63,172.1,172.99,173.98,174.21,172.35,174.26,173.21,173.38,173.11,173.19,173.13,174.27,173.59,174.39,174.04,172.01,172.64,172.09,172.97,174.36,173.31,173.18,173.1,173.07,172.98,174.07,173.68,173.17,172.07,172.54,173.38,173.57,173.42,176.74,174.5,175.08,174.72,175.42,175.24,175.25,174.6,176.46,175.47,175.44,176.84,176.17,175.67,174.79,175.14,176.47,176.66,176.25,176.71,176.2,175.06,174.53,175.94,174.61,174.79,176.47,177.02,176.92,178.99,177.82,179.37,179.1,177.73,177.6,178.99,177.59,177.09,179.35,178.33,178.5,178.27,179.1,179.07,178.41,177.8,178.35,178.32,177.74,178.73,178.79,178.27,178.39,179.68,181.56,181.4,180.85,180.03,181.01,181.4,180.95,180.73,180.86,180.3,181.25,180.88,181.85,181.0,181.69,180.16,181.73,180.53,179.99,184.59,182.3,184.51,184.1,182.65,183.35,184.28,183.74,183.06,183.66,183.01,184.79,184.89,186.71,187.16,184.9,186.46,185.47,185.95,189.21,187.48,187.49,187.52,187.5,191.96,196.18,152.55,195.12,169.49,149.34,172.45,155.07,151.94,179.71,173.4,176.04,176.03,170.22]
+};
+/* the fitted line, for the pictures */
+const FIT = { b1:86.071975, b2:0.514093, xmin:149.88, xmax:191.60 };
+const sonAt = f => FIT.b1 + FIT.b2*f;
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   A number field is accepted within CONFIG.RTOL of its target or within
+   its own 'tol', whichever is larger; 'strict:true' keeps 'tol' alone.
+   'alt' lists common wrong values, each with its own feedback.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const B1 = 'β<sub>1</sub>', B2 = 'β<sub>2</sub>', H0 = 'H<sub>0</sub>', H1 = 'H<sub>1</sub>';
+
+const STEPS = [
+{ id:'open', type:'info', bg:'study', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE IV',
+  text:`Tall fathers have tall sons. Short fathers have short sons. Like father, like son : a son is,
+  on average, exactly as tall as his father.
+  <span class="fx">The Master straightens up to his full height, and glances at the portrait of his
+  own father.</span>
+  In 1886, Francis Galton measured fathers and their grown sons to settle exactly this kind of
+  question. The file contains <strong>1078 pairs of heights</strong>, converted to centimetres.
+  Today you will run your first statistical tests. Not on a coin, not on a die : on the coefficients
+  of a regression line.
+  <span class="fx">As in the previous sessions, the Master gives hints, never answers.</span>`,
+  widget:'table', banner:'CLAIM: LIKE FATHER, LIKE SON', cont:'Open the file' },
+
+{ id:'t1', type:'numeric', bg:'lab', who:'master', qn:'1',
+  title:'TRIAL I · DO THEY MOVE TOGETHER ?',
+  text:`Download <span class="kbd">Galton_in_cm.xlsx</span> with the DATA (XLSX) button. Column A
+  holds the height of the father and column B the height of his son, in centimetres, with the names
+  in row 1.
+  <strong>Count the pairs, and compute the correlation between the two heights.</strong> Then tell
+  me what it says.`,
+  q:'Describe the relationship.',
+  fields:[
+    {id:'n', label:'Number of father–son pairs', value:1078, tol:0, strict:true,
+     alt:[{value:1079, tol:0, msg:'Row 1 holds the names, not a pair. Count the numbers only, i.e., =COUNT(A2:A1079).'},
+          {value:2156, tol:0, msg:'That counts both columns. Each pair has one father: count one column.'}],
+     msg:'Use =COUNT(A2:A1079).'},
+    {id:'r', label:'Correlation between the heights of fathers and sons', value:0.5013, tol:0.002, strict:true,
+     alt:[{value:0.2513, tol:0.002, msg:'That is the squared correlation. Report the correlation itself.'}],
+     msg:'Use =CORREL(A2:A1079, B2:B1079).'},
+    {id:'read', kind:'select', label:'This correlation describes…', correct:'moderate',
+     options:[['moderate','…a positive, moderate linear relationship: tall fathers tend to have tall sons, with a lot of scatter'],
+              ['perfect','…an almost perfect linear relationship: the father’s height determines the son’s'],
+              ['none','…no linear relationship between the two heights'],
+              ['neg','…a negative relationship: tall fathers tend to have short sons']],
+     msg:'A correlation lies between −1 and 1. Where does yours sit between 0 and 1?'}],
+  hint:`<b>COUNT</b> counts the cells that contain numbers, and <b>CORREL</b> gives the correlation of
+  two columns. The pairs run from row 2 to row 1079.`,
+  code:`=COUNT(A2:A1079)
+=CORREL(A2:A1079, ???)`,
+  say:'1078 pairs, and a correlation of about 0.50 : positive, moderate, and noisy.',
+  right:`<strong>1078</strong> pairs and r ≈ <strong>0.50</strong>. Tall fathers do tend to have tall
+  sons. But 0.50 is far from 1 : for a given father’s height, the sons spread over more than twenty
+  centimetres.
+  A correlation tells you that the two heights move together. It does not tell you by how much the
+  son’s height moves when the father’s does. For that, we need a line.`,
+  widgetAfter:'scatter', hud:{r:'0.501'}, note:'1078 pairs; corr(father, son) = 0.501' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'2',
+  title:'TRIAL II · THE LINE OF THE SONS',
+  text:`Estimate the simple linear regression
+  <br><span class="kbd">Son<sub>i</sub> = ${B1} + ${B2} · Father<sub>i</sub> + ε<sub>i</sub></span><br>
+  The son’s height is the dependent variable (Y), the father’s height the explanatory variable (X).
+  Use Data → Data Analysis → Regression : you will need more than the two coefficients in a
+  moment.
+  <strong>Report the estimates of ${B1} and ${B2}.</strong>`,
+  q:'Read the Coefficients column.',
+  fields:[
+    {id:'b1', label:`Estimate of the intercept ${B1}, in cm`, value:86.072, tol:0.02, strict:true,
+     alt:[{value:86.633, tol:0.02, msg:'You swapped Y and X: that regression explains the father with the son. Y is the son, column B.'},
+          {value:0.5141, tol:0.002, msg:'That is the slope. The intercept is in the Intercept row.'},
+          {value:4.654, tol:0.01, msg:'That is the standard error of the intercept. Read the Coefficients column.'},
+          {value:18.493, tol:0.03, msg:'That is the t Stat of the intercept. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Intercept row.'},
+    {id:'b2', label:`Estimate of the slope ${B2}`, value:0.5141, tol:0.002, strict:true,
+     alt:[{value:0.4889, tol:0.002, msg:'You swapped Y and X: that regression explains the father with the son. Y is the son, column B.'},
+          {value:0.02705, tol:0.001, msg:'That is the standard error of the slope. Read the Coefficients column.'},
+          {value:19.006, tol:0.03, msg:'That is the t Stat of the slope. Read the Coefficients column.'},
+          {value:86.072, tol:0.02, msg:'That is the intercept. The slope is in the row of the father’s height.'}],
+     msg:'Read the Coefficients column, in the row of the father’s height.'}],
+  hint:`Data → Data Analysis → Regression. Input Y Range : B1:B1079 (son). Input X Range : A1:A1079
+  (father). Tick <b>Labels</b>, because row 1 holds the names. The estimates are in the
+  <b>Coefficients</b> column of the last table. If Data Analysis is missing, activate the Analysis
+  ToolPak (File → Options → Add-ins).`,
+  code:`Data → Data Analysis → Regression
+   Input Y Range:  B1:B1079     ← son
+   Input X Range:  A1:A1079     ← father
+   [x] Labels`,
+  say:`${B1} is estimated at 86.07 cm and ${B2} at 0.514.`,
+  right:`An intercept of <strong>86.07 cm</strong> and a slope of <strong>0.514</strong>.
+  <span class="fx">The Master frowns. His theory said 0 and 1.</span>
+  If sons were, on average, exactly as tall as their fathers, the line would be
+  <span class="kbd">Son = 0 + 1 × Father</span>, i.e., ${B1} = 0 and ${B2} = 1. Our estimates are far
+  from that. But estimates move from one sample to another. Far, compared with what ?`,
+  widgetAfter:'fit', hud:{b1:'86.07', b2:'0.514'}, note:'Son = 86.07 + 0.514 x Father' },
+
+{ id:'beat', type:'info', bg:'court', who:'master', qn:'—',
+  title:'THE MASTER’S CRASH COURSE',
+  text:`The idea of the lecture, in four lines.
+  Under the four assumptions of the statistical framework, the OLS estimator is normally distributed
+  around the true parameter. Standardize the estimate with the value stated by the null hypothesis :
+  <br><span class="kbd">Z = (estimate − value under ${H0}) / standard error</span><br>
+  If ${H0} is true, Z is a draw from N(0, 1) : 95% of the time between −1.96 and 1.96. Outside that
+  range, we reject ${H0} at the 95% confidence level.
+  You will also meet the significance level, written α : the probability left in the two tails.
+  For a two-sided test, α = 1 − confidence level, so a 95% confidence level corresponds to a 5%
+  significance level, with 2.5% in each tail.
+  <span class="fx">One detail. Excel computes the standard error with an <em>estimate</em> of the
+  variance of the error term, and calls the ratio a “t Stat”. Strictly, that ratio follows a
+  Student t distribution, which you will meet later. With 1078 observations, the difference is
+  invisible : the t distribution is practically N(0, 1). So the t-test is, here, a z-test, and we
+  use 1.96. Ignore the P-value and the Lower 95% / Upper 95% columns for now.</span>
+  My claim, like father like son, is <span class="kbd">${B1} = 0</span> and
+  <span class="kbd">${B2} = 1</span>. We shall test each of them, at the 95% confidence level.`,
+  widget:'normal', banner:'H0: INTERCEPT 0, SLOPE 1', cont:'Understood' },
+
+{ id:'t2b', type:'choice', bg:'court', who:'master', mood:'raised', qn:'z',
+  title:'TRIAL III · WHY 1.96 ?',
+  text:`Before you use a rule, make sure you can defend it. Excel prints a column called
+  <strong>t Stat</strong>, and I tell you to compare it with 1.96, a quantile of the normal
+  distribution.
+  <strong>Why is that acceptable here ?</strong>`,
+  q:'Choose the justification.',
+  options:[
+    {id:'a', label:'Because the sample is large (1078 pairs): estimating the variance of the error term then changes almost nothing, and the standardized estimate is, in practice, a draw from N(0, 1).'},
+    {id:'b', label:'Because 1.96 is the right critical value in any sample, however small.'},
+    {id:'c', label:'Because heights are normally distributed, so no assumption is needed.'},
+    {id:'d', label:'Because Excel’s t Stat has already been divided by 1.96.'}
+  ], correct:'a',
+  hint:`What would change if you had 10 pairs instead of 1078 ? Think about how precisely the variance
+  of the error term would be estimated.`,
+  right:`Exactly. With 1078 observations, the variance of the error term is estimated so precisely
+  that it might as well be known. The t-test becomes, for all practical purposes, a z-test. For the
+  record, the exact critical value of the t distribution here, at the 95% confidence level, is
+  1.962, against 1.960.
+  With ten pairs, the shortcut would be wrong. Keep the reason, not only the number.`,
+  wrong:{b:`In small samples, estimating the variance of the error term adds uncertainty, and the
+  critical value is larger than 1.96. The shortcut needs a large sample.`,
+  c:`The normality of the estimator rests on the assumptions of the model, and the ratio still uses
+  an estimated variance. The size of the sample is what makes the approximation harmless.`,
+  d:`The t Stat is the estimate divided by its standard error, nothing more.`},
+  note:'large sample (N = 1078): the t-test is a z-test; critical value 1.96 at 95% confidence' },
+
+{ id:'t3', type:'numeric', bg:'court', who:'master', qn:'3',
+  title:'TRIAL IV · IS THE INTERCEPT ZERO ?',
+  text:`First hypothesis : <span class="kbd">${H0} : ${B1} = 0</span> against
+  <span class="kbd">${H1} : ${B1} ≠ 0</span>, at the 95% confidence level.
+  <strong>Report the standard error of the intercept, the Z-statistic, the critical value and your
+  decision.</strong>`,
+  q:'Run the test.',
+  fields:[
+    {id:'se', label:`Standard error of the estimate of ${B1}`, value:4.654, tol:0.01, strict:true,
+     alt:[{value:6.189, tol:0.005, msg:'That is the Standard Error of the regression, in the Regression Statistics table. Use the Standard Error column of the coefficients table, Intercept row.'},
+          {value:0.02705, tol:0.001, msg:'That is the standard error of the slope. Use the Intercept row.'},
+          {value:86.072, tol:0.02, msg:'That is the estimate itself. Its standard error is in the next column.'}],
+     msg:'Read the Standard Error column of the coefficients table, Intercept row.'},
+    {id:'z', label:'Z-statistic', value:18.493, tol:0.03, strict:true,
+     alt:[{value:19.006, tol:0.03, msg:'That is the t Stat of the slope. Use the intercept: its estimate and its standard error.'},
+          {value:3182.1, tol:5, msg:'You divided by the standard error of the slope. Use the standard error of the intercept.'},
+          {value:13.908, tol:0.03, msg:'You divided by the Standard Error of the regression. Use the standard error of the intercept.'}],
+     msg:'Z = (estimate − 0) / standard error, with the Intercept row.'},
+    {id:'crit', label:'Critical value of a two-sided test at 95% confidence level', value:1.96, tol:0.005, strict:true,
+     alt:[{value:1.645, tol:0.003, msg:'That is the critical value of a two-sided test at the 90% confidence level, or of a one-sided test at 95%. A two-sided test at 95% leaves 2.5% in each tail.'},
+          {value:2.576, tol:0.003, msg:'That is the critical value of a two-sided test at the 99% confidence level. The level here is 95%.'},
+          {value:-1.96, tol:0.005, msg:'Report the positive critical value: we reject when the absolute value of Z is larger than it.'}],
+     msg:'Use =NORM.S.INV(0.975): 2.5% in each tail.'},
+    {id:'d', kind:'select', label:'Decision at the 95% confidence level', correct:'reject',
+     options:[['reject',`Reject H₀: β₁ = 0`],['fail','Fail to reject H₀'],['accept','Accept H₀: the intercept is zero']],
+     msg:'Compare the absolute value of Z with the critical value. Outside ±1.96, the data are too surprising for H₀.'}],
+  hint:`The standard error is in the <b>Standard Error</b> column of the coefficients table, not in the
+  Regression Statistics table at the top. Then standardize : (estimate − 0) / standard error. A
+  two-sided test at the 95% confidence level leaves 2.5% in each tail, so the critical value is the
+  97.5% quantile of N(0, 1).`,
+  code:`=(??? - 0) / ???          ← (estimate − value under H0) / standard error
+=NORM.S.INV(0.975)        ← critical value, two-sided test, 95% confidence`,
+  say:`Standard error ≈ 4.65, so Z ≈ 18.5, far beyond 1.96. We reject H₀ : β₁ = 0.`,
+  right:`Z ≈ <strong>18.5</strong>. If ${B1} were 0, our standardized estimate would be a draw from
+  N(0, 1) lying more than eighteen units from its centre. That does not happen. We reject
+  ${H0} at the 95% confidence level.
+  Notice that, for this hypothesis, Excel’s t Stat is exactly your Z : Excel always tests the value
+  0. For the next hypothesis, it will not help you.`,
+  widgetAfter:'z1', note:'H0: b1 = 0: Z = 18.49 > 1.96, reject at 95% confidence' },
+
+{ id:'t4', type:'numeric', bg:'court', who:'master', qn:'4',
+  title:'TRIAL V · IS THE SLOPE ONE ?',
+  text:`Second hypothesis : <span class="kbd">${H0} : ${B2} = 1</span> against
+  <span class="kbd">${H1} : ${B2} ≠ 1</span>, at the 95% confidence level.
+  Careful : Excel’s t Stat tests ${B2} = 0, not 1. This time you must standardize yourself.
+  <strong>Report the standard error of the slope, the Z-statistic and your decision.</strong>`,
+  q:'Run the test.',
+  fields:[
+    {id:'se', label:`Standard error of the estimate of ${B2}`, value:0.02705, tol:0.0003, strict:true,
+     alt:[{value:4.654, tol:0.01, msg:'That is the standard error of the intercept. Use the row of the father’s height.'},
+          {value:6.189, tol:0.005, msg:'That is the Standard Error of the regression, in the Regression Statistics table. Use the Standard Error column of the coefficients table.'},
+          {value:0.5141, tol:0.002, msg:'That is the estimate itself. Its standard error is in the next column.'}],
+     msg:'Read the Standard Error column of the coefficients table, in the row of the father’s height.'},
+    {id:'z', label:'Z-statistic', value:-17.964, tol:0.03, strict:true,
+     alt:[{value:19.006, tol:0.03, msg:'That is Excel’s t Stat: it tests β₂ = 0. Subtract 1 from the estimate before dividing.'},
+          {value:17.964, tol:0.03, msg:'Check the order: estimate − 1, i.e., 0.514 − 1, is negative.'},
+          {value:-0.1044, tol:0.002, msg:'You divided by the standard error of the intercept. Use the standard error of the slope.'}],
+     msg:'Z = (estimate − 1) / standard error, with the row of the father’s height.'},
+    {id:'d', kind:'select', label:'Decision at the 95% confidence level', correct:'reject',
+     options:[['reject',`Reject H₀: β₂ = 1`],['fail','Fail to reject H₀'],['accept','Accept H₀: the slope is one']],
+     msg:'Compare the absolute value of Z with 1.96.'}],
+  hint:`Same recipe, new value under ${H0} : (estimate − 1) / standard error. The critical value has not
+  changed : the test is still two-sided, at the 95% confidence level.`,
+  code:`=(??? - 1) / ???          ← (estimate − value under H0) / standard error`,
+  say:`Standard error ≈ 0.027, so Z ≈ −18.0, far beyond −1.96. We reject H₀ : β₂ = 1.`,
+  right:`Z ≈ <strong>−18.0</strong>. The estimate 0.514 lies eighteen standard errors below 1. We
+  reject ${H0} : ${B2} = 1.
+  <span class="fx">The Master’s theory has just failed twice, once on each parameter.</span>
+  Now the important part : what does a slope below one mean for fathers and sons ?`,
+  widgetAfter:'z2', banner:'BOTH HYPOTHESES REJECTED',
+  note:'H0: b2 = 1: Z = (0.514 - 1)/0.027 = -17.96, |Z| > 1.96, reject at 95% confidence' },
+
+{ id:'t5', type:'choice', bg:'study', who:'master', qn:'5',
+  title:'TRIAL VI · WHAT GALTON SAW',
+  text:`Use the fitted line : a father of 190 cm is expected to have a son of about 183.7 cm, and a
+  father of 155 cm a son of about 165.8 cm.
+  <strong>What do the two rejections tell us ?</strong>`,
+  q:'Choose the conclusion.',
+  options:[
+    {id:'a', label:'Sons do not simply reproduce their father’s height: with a slope well below one, the sons of very tall fathers are, on average, shorter than their fathers, and the sons of very short fathers taller. Heights regress towards the average.'},
+    {id:'b', label:'Height is not transmitted from father to son at all.'},
+    {id:'c', label:'There is a 95% probability that the Master’s claim is false.'},
+    {id:'d', label:'The true slope is exactly 0.514.'}
+  ], correct:'a',
+  hint:`Compare each predicted son with his father : 183.7 cm against 190 cm, and 165.8 cm against
+  155 cm.`,
+  right:`Exactly. Galton called it “regression towards mediocrity”, and that is where the word
+  regression comes from. Height is transmitted, the slope is clearly positive, but only partly : the
+  sons of extreme fathers are, on average, less extreme than their fathers.
+  <span class="fx">The Master sits down. It makes him look less tall, which seems appropriate.</span>`,
+  wrong:{b:`The slope is 0.514, and Excel’s t Stat for ${B2} = 0 is about 19. Height is transmitted,
+  only not one for one.`,
+  c:`A test does not give the probability that ${H0} is true. It says that, if ${H0} were true, a
+  Z-statistic as extreme as yours would be extremely unlikely.`,
+  d:`0.514 is the estimate. Another sample would give another number. The test only says that 1 is
+  not compatible with the data.`},
+  widgetAfter:'galton', note:'slope < 1: sons of extreme fathers are less extreme (regression to the mean)' },
+
+{ id:'close', type:'info', bg:'study', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`Like father, like son... but only halfway. My claim is dead, and Galton buried it in 1886.
+  Four rules leave with you.
+  <strong>One.</strong> A correlation says that two variables move together. The slope says by how
+  much.
+  <strong>Two.</strong> To test ${H0} : β = value, standardize : Z = (estimate − value) / standard
+  error, and compare |Z| with the critical value, 1.96 at the 95% confidence level, i.e., a
+  significance level α of 5%.
+  <strong>Three.</strong> Excel’s t Stat always tests the value 0. For any other value, compute Z
+  yourself.
+  <strong>Four.</strong> With a large sample, the t-test is a z-test. With a small one, wait for the
+  Student distribution.`,
+  banner:'STANDARDIZE. COMPARE. DECIDE.', cont:'Finish', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {r:'—', b1:'—', b2:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the 1078 pairs, the "son = father" diagonal of the
+   Master's claim, the fitted line, and the standard normal distribution
+   with its 5% rejection region. Points are never connected.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* ---- the cold open: the first rows of the file ---- */
+function playTable(host){
+  const cols=[200,500];
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=108+i*24;
+    rows += TXT(cols[0],y,DATA.FATHER[i].toFixed(2),{sz:19}) + TXT(cols[1],y,DATA.SON[i].toFixed(2),{sz:19});
+  }
+  const svg=`<svg viewBox="0 0 700 250" style="width:100%;height:auto;display:block">
+    <rect width="700" height="250" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'GALTON_IN_CM.XLSX · THE FIRST FIVE OF 1078 PAIRS',{sz:18,anchor:'start'})}
+    ${TXT(cols[0],70,'Father in cm (A)',{sz:19,col:PLOT.ink})}${TXT(cols[1],70,'Son in cm (B)',{sz:19,col:PLOT.ink})}
+    <line x1="80" y1="80" x2="620" y2="80" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(350,236,'heights of grown sons and of their fathers, in centimetres',{sz:16})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · GALTON’S NOTEBOOK', svg, 'Francis Galton, 1886. Heights converted from inches to centimetres.');
+  return 600;
+}
+
+/* ---- the 1078 pairs, the Master's diagonal, and optionally the fitted line ---- */
+function playScatter(host, mode){
+  const W=700, H=340, L=70, R=684, T=40, B=280, xmin=145, xmax=200, ymin=145, ymax=200;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L), py=v=>B-(v-ymin)/(ymax-ymin)*(B-T);
+  let marks='';
+  for(let i=0;i<DATA.FATHER.length;i++){
+    marks += `<circle cx="${px(DATA.FATHER[i]).toFixed(1)}" cy="${py(DATA.SON[i]).toFixed(1)}" r="2.4"
+      fill="${PLOT.ink}" fill-opacity=".45"/>`;
+  }
+  let ticks='';
+  [150,160,170,180,190,200].forEach(v=>{
+    ticks += `<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>` + TXT(px(v),B+21,v,{sz:15})
+           + `<line x1="${L-5}" y1="${py(v)}" x2="${L}" y2="${py(v)}" stroke="${PLOT.axis}"/>` + TXT(L-9,py(v)+5,v,{sz:15,anchor:'end'});
+  });
+  let extra = `<line x1="${px(147)}" y1="${py(147)}" x2="${px(198)}" y2="${py(198)}" stroke="${PLOT.second}" stroke-width="2" stroke-dasharray="7 6"/>`
+    + TXT(px(196),py(196)-10,'son = father (the claim)',{sz:16,col:PLOT.second,anchor:'end'});
+  let title = 'Height of the son against height of the father, r = 0.501';
+  if(mode!=='scatter'){
+    extra += `<line x1="${px(FIT.xmin)}" y1="${py(sonAt(FIT.xmin))}" x2="${px(FIT.xmax)}" y2="${py(sonAt(FIT.xmax))}" stroke="${PLOT.fit}" stroke-width="2.5"/>`;
+    if(mode==='fit') extra += TXT(px(198),py(150),'solid line: fitted, Son = 86.07 + 0.514 × Father',{sz:16,col:PLOT.fit,anchor:'end'});
+    title = 'Son = 86.07 + 0.514 × Father';
+  }
+  if(mode==='galton'){
+    /* the two examples, labelled in the empty corners of the panel */
+    [[155,'father 155 cm → son 165.8 cm', px(147), py(196), 'start'],
+     [190,'father 190 cm → son 183.7 cm', px(198), py(150), 'end']].forEach(([f,lab,lx,ly,anchor])=>{
+      extra += `<line x1="${px(f)}" y1="${py(f)}" x2="${px(f)}" y2="${py(sonAt(f))}" stroke="${PLOT.fit}" stroke-width="2"/>
+        <circle cx="${px(f)}" cy="${py(sonAt(f))}" r="6" fill="${PLOT.fit}" stroke="${PLOT.paper}" stroke-width="2"/>
+        <circle cx="${px(f)}" cy="${py(f)}" r="6" fill="${PLOT.paper}" stroke="${PLOT.second}" stroke-width="2.5"/>`
+        + TXT(lx, ly, lab, {sz:17,col:PLOT.fit,anchor:anchor});
+    });
+    title = 'Regression towards the mean';
+  }
+  const svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,24,title,{sz:17,anchor:'start'})}
+    ${marks}${extra}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2,H-12,'Height of the father (cm)',{sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">Height of the son (cm)</text>
+  </svg>`;
+  const titles = {scatter:'EVIDENCE · 1078 FATHERS AND SONS', fit:'EVIDENCE · THE FITTED LINE', galton:'EVIDENCE · WHAT GALTON SAW'};
+  const feet = {
+    scatter:'One point is one father and his son. If sons were as tall as their fathers, the cloud would follow the dashed diagonal.',
+    fit:'The fitted line is much flatter than the diagonal of the claim: slope 0.514 instead of 1.',
+    galton:'Open circle: the father. Filled circle: the expected height of his son. Both sons are pulled towards the average.'};
+  host.innerHTML = plotFrame(titles[mode], svg, feet[mode]);
+  return 900;
+}
+
+/* ---- N(0, 1), its 5% rejection region, and where the Z-statistic falls ---- */
+function playNormal(host, z, hyp){
+  const W=700, H=250, L=30, R=670, T=44, B=196, xmin=-4.5, xmax=4.5, ymax=0.42;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L), py=v=>B-v/ymax*(B-T);
+  const pdf=x=>Math.exp(-x*x/2)/Math.sqrt(2*Math.PI);
+  let curve='';
+  for(let x=xmin;x<=xmax+1e-9;x+=0.05) curve+=(curve?'L':'M')+px(x).toFixed(1)+' '+py(pdf(x)).toFixed(1)+' ';
+  const tail=(a,b)=>{
+    let p=`M${px(a).toFixed(1)} ${B} `;
+    for(let x=a;x<=b+1e-9;x+=0.05) p+=`L${px(x).toFixed(1)} ${py(pdf(x)).toFixed(1)} `;
+    return `<path d="${p}L${px(b).toFixed(1)} ${B} Z" fill="${PLOT.fit}" fill-opacity=".28"/>`;
+  };
+  let ticks='';
+  [-4,-3,-2,-1,0,1,2,3,4].forEach(v=>{ ticks+=`<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>`+TXT(px(v),B+21,v,{sz:15}); });
+  let mark='';
+  if(z!==undefined){
+    const right = z>0, xe = right ? R-4 : L+4;
+    mark = `<line x1="${right?px(3.2):px(-3.2)}" y1="${T+40}" x2="${xe}" y2="${T+40}" stroke="${PLOT.second}" stroke-width="3" marker-end="url(#zarrow)"/>`
+      + TXT(right?px(3.1):px(-3.1), T+30, 'Z = ' + z.toFixed(2) + ', far off the chart', {sz:18,col:PLOT.second,anchor:right?'end':'start'});
+  }
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <defs><marker id="zarrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="${PLOT.second}"/></marker></defs>
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,hyp || 'If H0 is true, Z is a draw from N(0, 1)',{sz:17,anchor:'start'})}
+    ${tail(xmin,-1.96)}${tail(1.96,xmax)}
+    <path d="${curve}" fill="none" stroke="${PLOT.ink}" stroke-width="2"/>
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT(px(-1.96)-8,B-10,'reject',{sz:15,col:PLOT.fit,anchor:'end'})}
+    ${TXT(px(1.96)+8,B-10,'reject',{sz:15,col:PLOT.fit,anchor:'start'})}
+    ${TXT(px(0),py(0.2),'95%',{sz:20,col:PLOT.ink})}
+    ${TXT(px(-1.96),B+40,'-1.96',{sz:16,col:PLOT.fit})}${TXT(px(1.96),B+40,'1.96',{sz:16,col:PLOT.fit})}
+    ${mark}
+  </svg>`;
+  host.innerHTML = plotFrame(z===undefined ? 'THE RULE · A TWO-SIDED TEST AT 95% CONFIDENCE' : 'EVIDENCE · WHERE YOUR Z FALLS', svg,
+    z===undefined ? '95% in the middle, 2.5% in each shaded tail. A standardized estimate in a tail is too surprising for H0.'
+                  : 'The axis stops at ±4.5. Your Z-statistic lies about eighteen units from the centre.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='scatter') return playScatter(host, 'scatter');
+  if(name==='fit')     return playScatter(host, 'fit');
+  if(name==='galton')  return playScatter(host, 'galton');
+  if(name==='normal')  return playNormal(host);
+  if(name==='z1')      return playNormal(host, 18.493, 'H0: intercept = 0');
+  if(name==='z2')      return playNormal(host, -17.964, 'H0: slope = 1');
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your workbook step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+function tolerance(f){
+  const abs = f.tol || 0;
+  if(f.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(f.value));
+}
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){ if(Math.abs(v-a.value) <= a.tol) return a.msg; }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE4',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise IV</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+/* two data files: the button names its file in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — no password: this exercise is not graded
+   ================================================================ */
+function finish(){
+  $('#endblurb').innerHTML =
+    `You measured how strongly the heights of fathers and sons move together, estimated the line of
+     the sons, and ran your first statistical tests: you standardized each estimate with the value
+     of the null hypothesis, justified the critical value 1.96 by the size of the sample, and
+     rejected both an intercept of zero and a slope of one. Galton would recognize his regression
+     towards the mean.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: LIKE FATHER, LIKE SON';
+  show('scr-end');
+}
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v4.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE IV ........ GALTON, 1886",
+  "DATA ........................ 1078 FATHERS AND SONS",
+  "STATISTICAL TESTS ........... ARMED",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
