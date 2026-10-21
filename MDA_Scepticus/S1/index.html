@@ -1,1 +1,1820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 1: The Basket on Trial</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 1
+  "The Basket on Trial"
+  EDHEC · Multivariate Data Analysis · Empirical Session 1
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine and same characters as the Statistical Models exercises.
+
+  HOW THE EXERCISE WORKS
+  ----------------------
+  The game does NOT compute anything. Students work in two windows:
+     Excel      open IBM_APPLE_returns_2000_Jan_to_2017_June.xlsx and
+                compute every number there;
+     this game  report numbers, choose interpretations, get feedback.
+  There is no questions PDF: Master Scepticus asks the questions one
+  after the other. Every question has a HINT button that shows an
+  example Excel formula. The EXCEL HELPER button lists the functions,
+  with their English and French names.
+
+  DATA
+  ----
+  161 monthly returns of IBM (column A) and Apple (column B), in
+  percent, from February 2004 to June 2017 (lecture slides, Section 1
+  - Covariance). The file name says 2000; the data start in 2004.
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt.given{background:#7a5200; border-color:#ffcf6b #3a2600 #3a2600 #ffcf6b}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow.given input,.numrow.given select{border-color:var(--amber)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+.xlguide pre{margin:0 12px 12px; padding:10px 12px; background:#06110a; color:var(--green);
+  font:17px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE I</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data>DATA (XLSX)</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE BASKET<br>ON TRIAL</h1>
+      <h2>Empirical Exercise I &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus’s nephew wants to put all his savings into Apple. Master Scepticus has a
+      better idea, and a theory about risk. 161 months of IBM and Apple returns will judge both of
+      them. You will use averages, standard deviations, a covariance, a correlation and a portfolio
+      of two assets.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>IBM_APPLE_returns_2000_Jan_to_2017_June.xlsx</code>
+        with the <strong>DATA (XLSX)</strong> button at the top and open it in Excel. Compute every
+        number there. Keep your workbook: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, choose the interpretations, and defend them in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p>Stuck ? Every question has a <strong>HINT</strong> button. It shows an example Excel formula,
+      sometimes with <code>???</code> for you to fill in. Type numbers with a dot or a comma as the
+      decimal separator, e.g., <code>-20.51</code> or <code>-20,51</code>. Returns stay in percent
+      unless a question says otherwise. Three significant digits are always enough, e.g.,
+      <code>0.417</code>, <code>19.3</code> or <code>0.00193</code>.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">In the file, column <code>A</code> holds the returns of IBM and column
+        <code>B</code> those of Apple. Row 1 holds the names; rows 2 to 162 hold the 161 months, in
+        percent. English Excel separates the arguments of a function with a comma; French Excel uses a
+        semicolon, e.g., <code>=COEFFICIENT.CORRELATION(A2:A162;B2:B162)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code></td><td><code>=NB(plage)</code></td><td>Counts the cells that contain numbers.</td><td><code>=COUNT(A2:A162)</code></td></tr>
+            <tr><td><code>=MIN(range)</code>, <code>=MAX(range)</code></td><td><code>=MIN</code>, <code>=MAX</code></td><td>Smallest and largest value of a range.</td><td><code>=MIN(A2:A162)</code></td></tr>
+            <tr><td><code>=AVERAGE(range)</code></td><td><code>=MOYENNE(plage)</code></td><td>Sample average.</td><td><code>=AVERAGE(B2:B162)</code></td></tr>
+            <tr><td><code>=STDEV.S(range)</code></td><td><code>=ECARTYPE.STANDARD(plage)</code></td><td>Empirical standard deviation, dividing by N − 1. The one used in the lecture.</td><td><code>=STDEV.S(B2:B162)</code></td></tr>
+            <tr><td><code>=VAR.S(range)</code></td><td><code>=VAR.S(plage)</code></td><td>Empirical variance, dividing by N − 1.</td><td><code>=VAR.S(B2:B162)</code></td></tr>
+            <tr><td><code>=COVARIANCE.S(r1, r2)</code></td><td><code>=COVARIANCE.STANDARD(r1; r2)</code></td><td>Empirical covariance, dividing by N − 1. Careful: <code>COVAR</code> and <code>COVARIANCE.P</code> divide by N.</td><td><code>=COVARIANCE.S(A2:A162, B2:B162)</code></td></tr>
+            <tr><td><code>=CORREL(r1, r2)</code></td><td><code>=COEFFICIENT.CORRELATION(r1; r2)</code></td><td>Empirical correlation.</td><td><code>=CORREL(A2:A162, B2:B162)</code></td></tr>
+            <tr><td><code>=SQRT(x)</code>, <code>x^2</code></td><td><code>=RACINE(x)</code>, <code>x^2</code></td><td>Square root and square.</td><td><code>=SQRT(J10)</code></td></tr>
+            <tr><td><code>$J$1</code></td><td><code>$J$1</code></td><td>Absolute reference: it stays fixed when you copy the formula down.</td><td><code>=$J$1*B2 + $J$2*A2</code></td></tr>
+            <tr><td>Copy a formula down</td><td>Recopier vers le bas</td><td>Select the cell, then double-click the small square at its bottom-right corner.</td><td>From G2 down to G162</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>avg A · I</span><b id="hud-avg">—</b></div>
+            <div class="hudrow"><span>sd A · I</span><b id="hud-sd">—</b></div>
+            <div class="hudrow"><span>correlation</span><b id="hud-corr">—</b></div>
+            <div class="hudrow"><span>portfolio</span><b id="hud-port">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise I &nbsp;·&nbsp; The Basket on Trial</h2>
+      <p id="endblurb"></p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data of the exercise, downloaded by the DATA (XLSX) button */
+  DATA_FILE: "https://www.dropbox.com/scl/fi/2w0a91vrye3n6a0mdxoni/IBM_APPLE_returns_2000_Jan_to_2017_June.xlsx?rlkey=sptnnrntptff2nx05sxeykbft&raw=1",
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { floor:'', lab:'', vault:'' },
+  FALLBACK: {
+    floor:"linear-gradient(180deg,#06120d,#123326 60%,#1e5a40)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    vault:"linear-gradient(180deg,#120d05,#3a2c10 60%,#6b5220)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted, unless the
+     field is marked 'strict', in which case its own 'tol' applies.   */
+  RTOL: 0.02,
+  /* failed attempts on one question before SHOW THE ANSWER appears */
+  FAILS_BEFORE_SOLUTION: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 161 monthly returns of the Excel file, in percent,
+   rounded to 3 decimals and embedded for the pictures only. The
+   student computes everything in Excel. Summary statistics below are
+   computed on the unrounded file (divisor N - 1).
+   ================================================================ */
+const DATA = {
+  IBM:[-2.751,-4.829,-3.996,0.476,-0.497,-1.225,-2.733,1.24,4.677,5.003,4.605,-5.234,-0.899,-1.296,-16.415,-1.087,-1.787,12.48,-3.403,-0.496,2.069,8.574,-7.537,-1.095,-1.304,2.779,-0.158,-2.963,-3.855,0.768,4.599,1.198,12.68,-0.444,5.69,2.059,-6.263,1.42,8.434,4.295,-1.266,5.131,5.459,0.951,-1.426,-9.421,2.776,-0.916,6.302,1.124,4.829,7.233,-8.422,7.973,-4.884,-3.919,-20.511,-12.23,3.137,8.9,0.415,5.281,6.523,2.975,-1.75,12.938,0.102,1.321,0.836,4.759,3.601,-6.501,3.897,0.857,0.585,-2.899,-1.421,3.984,-4.104,8.942,7.052,-1.49,3.747,10.384,-0.074,0.735,4.605,-0.967,1.551,6.004,-5.466,1.722,5.581,1.825,-2.191,4.742,2.144,6.059,-0.752,-6.848,1.389,0.205,-0.577,6.467,-6.228,-2.293,0.779,6.014,-1.103,6.209,-5.045,2.706,-8.129,2.056,-6.547,1.597,-3.224,0.262,4.391,-5.806,4.805,3.953,2.068,-6.164,-1.676,5.737,0.329,-1.284,-13.396,-1.356,-1.067,-4.444,5.629,-0.889,6.723,-0.957,-4.12,-0.412,-8.704,-1.974,-3.373,-0.471,-1.291,-9.323,5,15.584,-3.638,5.345,-1.275,5.824,-1.083,-0.019,-3.248,5.55,2.324,5.139,3.037,-3.159,-7.953,-4.779,0.786],
+  AAPL:[6.028,13.044,-4.66,8.844,15.966,-0.615,6.648,12.351,35.226,27.958,-3.952,19.41,16.671,-7.111,-13.463,10.261,-7.42,15.865,9.941,14.331,7.424,17.763,6.001,5.035,-9.297,-8.425,12.229,-15.087,-4.183,18.666,-0.162,13.456,5.326,13.049,-7.441,1.049,-1.306,9.81,7.416,21.433,0.701,7.965,5.1,10.825,23.77,-4.069,8.704,-31.664,-7.639,14.782,21.22,8.508,-11.29,-5.07,6.656,-32.956,-5.34,-13.867,-7.899,5.6,-0.91,17.702,19.701,7.931,4.874,14.716,2.95,10.19,1.699,6.053,5.412,-8.86,6.54,14.847,11.102,-1.612,-2.083,2.274,-5.5,16.722,6.072,3.379,3.667,5.196,4.093,-1.331,0.465,-0.657,-3.496,16.329,-1.447,-0.912,6.152,-5.578,5.965,12.711,18.831,10.528,-2.597,-1.07,1.085,4.582,8.92,0.28,-10.76,-1.686,-9.074,-14.409,-3.093,0.285,0.027,1.57,-11.829,14.123,7.666,-2.149,9.638,6.384,0.89,-10.77,5.122,1.995,9.94,7.272,2.766,2.873,7.218,-1.707,7.196,10.12,-7.189,6.142,9.645,-3.137,0.579,4.099,-3.723,-3.293,-7.04,-2.182,8.341,-1.004,-11.023,-7.524,-0.668,12.721,-13.992,6.529,-4.266,9.006,1.814,6.55,0.433,-2.66,4.796,4.775,12.888,4.869,-0.007,6.342,-5.721]
+};
+const STATS = { mI:0.417399, mA:3.308950, vI:28.647407, vA:96.044330, cov:19.305115 };
+const MONTHS = ['Feb 2004','Mar 2004','Apr 2004','May 2004','Jun 2004'];
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the Statistical Models games.
+   The mouth is three sibling groups (.mouth-a closed, .mouth-b ajar,
+   .mouth-c open); the flap swaps them by toggling a class.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <!-- robe -->
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <!-- neck -->
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <!-- head -->
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <!-- hair -->
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <!-- beard -->
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <!-- brows -->
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <!-- nose -->
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- mouth (above the beard) -->
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <!-- monocle -->
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   A number field is accepted within CONFIG.RTOL of its target or within
+   its own 'tol', whichever is larger; 'strict:true' keeps 'tol' alone.
+   'abs:true' accepts either sign. 'alt' lists common wrong values, each
+   with its own feedback. 'pct:true' catches a proportion typed as a
+   percentage. A field without 'msg' gets a generic message.
+
+   'hint' is advice; 'code' is an example Excel formula, shown by the
+   HINT button. 'qn' is the question number, shown in the case file.
+   'say' is what the apprentice answers aloud. 'hud' is written into the
+   case file once the step is solved, never before.
+   ================================================================ */
+const MU_A = 'μ<sub>A</sub>', MU_I = 'μ<sub>I</sub>';
+
+const STEPS = [
+{ id:'open', type:'info', bg:'floor', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE I',
+  text:`My nephew Lucius has inherited some money, and a plan. He will put all of it into Apple.
+  <span class="fx">The Master taps a printout of share prices with his monocle.</span>
+  His argument : Apple went up by about 3% a month, IBM by almost nothing. Why would anybody buy
+  IBM ?
+  Before anybody buys anything, you will question the data. The file contains <strong>161 monthly
+  returns</strong> of IBM and Apple, from February 2004 to June 2017, in percent : 6.03 means that
+  the stock gained 6.03% in that month.
+  You will work in <strong>Excel</strong>. This window only listens to what you bring back :
+  numbers, choices, verdicts.`,
+  widget:'table', banner:'CLAIM: ALL IN APPLE', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE LEDGER',
+  text:`First, the ritual. Download the Excel file with the DATA (XLSX) button at the top and open
+  it. Column A holds IBM, column B holds Apple, and row 1 holds the names.
+  A file that you have looked at can answer questions. A file that you have only downloaded cannot.
+  <strong>How many months does the file contain, and what was the worst monthly return of
+  IBM ?</strong>`,
+  q:'Report what your workbook says.',
+  fields:[
+    {id:'n', label:'Number of months, i.e., of returns per stock', value:161, tol:0, strict:true,
+     alt:[{value:162, tol:0, msg:'Row 1 holds the names, not a return. Count the numbers only, i.e., =COUNT(A2:A162).'},
+          {value:322, tol:0, msg:'That counts both columns. Each stock has one return per month: count one column.'}],
+     msg:'Count the numbers in column A with =COUNT(A2:A162).'},
+    {id:'worst', label:'Worst monthly return of IBM, in %', value:-20.511, tol:0.02, strict:true,
+     alt:[{value:-32.956, tol:0.02, msg:'That is the worst month of Apple. IBM is in column A.'},
+          {value:15.584, tol:0.02, msg:'That is the best month of IBM. The worst one is the minimum.'},
+          {value:-0.20511, tol:0.0005, msg:'The file is already in percent: report −20.51, not −0.2051.'}],
+     msg:'Use =MIN(A2:A162).'}],
+  hint:`<b>COUNT</b> counts the cells that contain numbers. <b>MIN</b> returns the smallest value of a
+  range. The data run from row 2 to row 162. In French Excel, COUNT is called NB, and the arguments
+  are separated by a semicolon.`,
+  code:`=COUNT(A2:A162)
+=MIN(A2:A162)`,
+  say:'161 months, and IBM’s worst month was −20.51%.',
+  right:`<strong>161</strong> months, i.e., more than thirteen years. IBM’s worst month :
+  <strong>−20.51%</strong>. Lose a fifth of your money in one month, and you will remember the word
+  risk.
+  <span class="fx">He writes 161 on the blackboard and underlines it twice.</span>
+  Every number you compute today comes from these 161 months, and only from them. Keep that in
+  mind.`,
+  note:'161 months, Feb 2004 to Jun 2017; worst IBM month = -20.51%' },
+
+{ id:'t1a', type:'numeric', bg:'floor', who:'master', qn:'1.a',
+  title:'TRIAL II · WHAT LUCIUS SAW',
+  text:`Lucius looked at one number per stock. So will you, to begin with.
+  <strong>Compute the average monthly return of IBM and the average monthly return of
+  Apple.</strong>
+  Keep the units of the file : type 3.5 for 3.5%, not 0.035.`,
+  q:'Report the two averages, in percent.',
+  fields:[
+    {id:'mI', label:'Average monthly return of IBM, in %', value:0.4174, tol:0.005, strict:true,
+     alt:[{value:0.004174, tol:0.0001, msg:'You divided by 100. The file is already in percent: report 0.417, not 0.00417.'},
+          {value:3.3089, tol:0.005, msg:'That is the average of Apple. IBM is in column A.'},
+          {value:0.3287, tol:0.003, msg:'That is the median of IBM. Use AVERAGE, not MEDIAN.'}],
+     msg:'Use =AVERAGE(A2:A162).'},
+    {id:'mA', label:'Average monthly return of Apple, in %', value:3.3089, tol:0.005, strict:true,
+     alt:[{value:0.033089, tol:0.0002, msg:'You divided by 100. The file is already in percent: report 3.31, not 0.0331.'},
+          {value:0.4174, tol:0.005, msg:'That is the average of IBM. Apple is in column B.'},
+          {value:4.0991, tol:0.005, msg:'That is the median of Apple. Use AVERAGE, not MEDIAN.'}],
+     msg:'Use =AVERAGE(B2:B162).'}],
+  hint:`<b>AVERAGE</b> takes a range of cells. Type the formula in any empty cell, for instance in
+  column J, next to the data. In French Excel, it is called MOYENNE.`,
+  code:`=AVERAGE(A2:A162)     ← IBM
+=AVERAGE(???)         ← Apple, column B`,
+  say:'IBM : 0.42% a month. Apple : 3.31% a month.',
+  right:`IBM : <strong>0.42%</strong> a month. Apple : <strong>3.31%</strong> a month. Eight times
+  more.
+  <span class="fx">Lucius, somewhere, is already choosing the colour of his new car.</span>
+  Not so fast. These two numbers describe 161 months that are over. Lucius wants to invest in months
+  that have not happened yet. So what, exactly, have you just computed ?`,
+  hud:{avg:'3.31 · 0.42'}, note:'1.a · average monthly return: IBM 0.42%, Apple 3.31%' },
+
+{ id:'t1b', type:'choice', bg:'lab', who:'master', mood:'raised', qn:'1.b',
+  title:'TRIAL II · THE NUMBER AND THE PARAMETER',
+  text:`Remember the two worlds of the lecture. The <strong>real world</strong> holds the sample : 161
+  numbers and their summary statistics. The <strong>statistical world</strong> holds the
+  assumptions : each monthly return of Apple is a random variable, independent of the others, with
+  the same normal distribution, of expectation ${MU_A} and variance σ²<sub>A</sub>.
+  <strong>Seen from the statistical world, what is 3.31% ?</strong>`,
+  q:'Choose the link between the two worlds.',
+  options:[
+    {id:'a', label:`It is ${MU_A}, the expected monthly return of Apple, now known exactly.`},
+    {id:'b', label:`It is one realization of the sample average, an estimator of the unknown expectation ${MU_A}. In other words, it is an estimate of ${MU_A}.`},
+    {id:'c', label:'It is the return that Apple will deliver next month.'},
+    {id:'d', label:'It has no link with the statistical world: it only describes the past.'}
+  ], correct:'b',
+  hint:`Imagine another 161 months, drawn from the same distribution. Would their average be exactly
+  3.31% again ? Would ${MU_A} change ?`,
+  right:`Exactly. Another 161 months would give another average. 3.31% is one realization of a random
+  variable, the sample average, and the expectation of that random variable is ${MU_A} : the sample
+  average is an unbiased estimator.
+  So 3.31% is an <em>estimate</em> of the expected return, not the expected return itself. And
+  certainly not a promise for next month.
+  <span class="fx">He crosses out “3.31% guaranteed” in Lucius’s business plan.</span>`,
+  wrong:{a:`${MU_A} is a parameter of the statistical world. Nobody observes it. Another sample would
+  give another average, but ${MU_A} would not move.`,
+  c:`Under the assumptions, next month is a new independent draw. It will land above or below
+  ${MU_A}, and often far from it.`,
+  d:`That is the whole point of the statistical world : under the assumptions, the past average tells
+  us something about the expectation of future returns.`},
+  note:'1.b · 3.31% is an estimate of the expected return mu_A, not mu_A itself' },
+
+{ id:'t1c', type:'numeric', bg:'floor', who:'master', qn:'1.c',
+  title:'TRIAL III · THE OTHER HALF OF THE STORY',
+  text:`Under the normal assumption, the distribution of a return has two parameters : the expectation
+  and the variance. Lucius looked at one of them.
+  <strong>Compute the empirical standard deviation of the monthly returns of IBM and of
+  Apple.</strong> Use the formula of the lecture, which divides by N − 1.`,
+  q:'Report the two standard deviations, in percent.',
+  fields:[
+    {id:'sI', label:'Standard deviation of IBM, in %', value:5.3523, tol:0.006, strict:true,
+     alt:[{value:5.3357, tol:0.005, msg:'That is STDEV.P, which divides by N. The lecture divides by N − 1: use STDEV.S.'},
+          {value:28.647, tol:0.05, msg:'That is the variance. The standard deviation is its square root.'},
+          {value:9.8002, tol:0.006, msg:'That is the standard deviation of Apple. IBM is in column A.'},
+          {value:0.053523, tol:0.0002, msg:'You divided by 100. Stay in percent: report 5.35.'}],
+     msg:'Use =STDEV.S(A2:A162).'},
+    {id:'sA', label:'Standard deviation of Apple, in %', value:9.8002, tol:0.006, strict:true,
+     alt:[{value:9.7697, tol:0.005, msg:'That is STDEV.P, which divides by N. The lecture divides by N − 1: use STDEV.S.'},
+          {value:96.044, tol:0.1, msg:'That is the variance. The standard deviation is its square root.'},
+          {value:5.3523, tol:0.006, msg:'That is the standard deviation of IBM. Apple is in column B.'},
+          {value:0.098002, tol:0.0003, msg:'You divided by 100. Stay in percent: report 9.80.'}],
+     msg:'Use =STDEV.S(B2:B162).'}],
+  hint:`Excel has two standard deviations. <b>STDEV.S</b> divides by N − 1, <b>STDEV.P</b> divides by
+  N. The lecture uses N − 1. With N = 161 the two are close, but not equal. In French Excel,
+  STDEV.S is called ECARTYPE.STANDARD.`,
+  code:`=STDEV.S(A2:A162)     ← IBM
+=STDEV.S(???)         ← Apple`,
+  say:'IBM : 5.35%. Apple : 9.80%.',
+  right:`IBM : <strong>5.35%</strong>. Apple : <strong>9.80%</strong>.
+  The same logic as before : the empirical variance is an unbiased estimator of σ², and its square
+  root is our estimate of σ.
+  Apple’s monthly returns swing almost twice as far from their average as IBM’s. Plus 35% in its best
+  month, minus 33% in its worst.`,
+  hud:{sd:'9.80 · 5.35'}, note:'1.c · standard deviation (N - 1): IBM 5.35%, Apple 9.80%' },
+
+{ id:'t1d', type:'choice', bg:'floor', who:'master', qn:'1.d',
+  title:'TRIAL III · NO FREE LUNCH',
+  text:`Put the four estimates side by side. Apple : 3.31% expected, 9.80% standard deviation. IBM :
+  0.42% and 5.35%.
+  <strong>Which statement do these estimates support ?</strong>`,
+  q:'Choose the correct reading.',
+  options:[
+    {id:'a', label:'Apple dominates IBM: a higher expected return and a lower risk.'},
+    {id:'b', label:'IBM dominates Apple: a lower risk and a higher expected return.'},
+    {id:'c', label:'Neither dominates: Apple offers a higher estimated expected return, but with a higher risk. The choice depends on how much risk the investor accepts.'},
+    {id:'d', label:'The standard deviation is irrelevant: only the expected return matters to an investor.'}
+  ], correct:'c',
+  hint:`Compare the two stocks twice : once on the average, once on the standard deviation. Does one
+  stock win both comparisons ?`,
+  right:`Exactly. Apple pays more on average, and makes you pay for it with violent months.
+  Under the normal assumption, about 95% of the months fall within μ ± 1.96σ. With our estimates,
+  that is from about −15.9% to +22.5% in a single month for Apple, and from −10.1% to +10.9% for
+  IBM.
+  <span class="fx">Lucius’s car has just lost a wheel.</span>`,
+  wrong:{a:`Look at the standard deviations again. Apple’s is almost twice IBM’s.`,
+  b:`IBM has the lower risk, yes. But 0.42% is not a higher expected return than 3.31%.`,
+  d:`Ask somebody who held Apple during its −33% month. Two stocks with the same expectation can have
+  very different ranges of outcomes.`},
+  note:'1.d · Apple: higher return, higher risk. Neither stock dominates.' },
+
+{ id:'t2a', type:'numeric', bg:'lab', who:'master', qn:'2.a',
+  title:'TRIAL IV · DO THEY MOVE TOGETHER ?',
+  text:`Two stocks are not two strangers. Both are tech companies, both live in the same economy. When
+  the market falls, do they fall together ?
+  The lecture gives two numbers for that question : the empirical covariance and the empirical
+  correlation.
+  <strong>Compute both, between the monthly returns of IBM and Apple, in percent.</strong>`,
+  q:'Report the covariance and the correlation.',
+  fields:[
+    {id:'cov', label:'Empirical covariance between IBM and Apple', value:19.3051, tol:0.02, strict:true,
+     alt:[{value:19.1852, tol:0.02, msg:'That covariance divides by N: COVARIANCE.P, or the old COVAR function. The lecture divides by N − 1: use COVARIANCE.S.'},
+          {value:0.3680, tol:0.002, msg:'That is the correlation. The covariance is measured in squared percent, and it is a much larger number here.'},
+          {value:0.0019305, tol:0.00003, msg:'That is the covariance in decimals. Use the original columns, in percent.'}],
+     msg:'Use =COVARIANCE.S(A2:A162, B2:B162).'},
+    {id:'r', label:'Empirical correlation between IBM and Apple', value:0.3680, tol:0.002, strict:true,
+     alt:[{value:19.3051, tol:0.05, msg:'That is the covariance. The correlation lies between −1 and 1.'},
+          {value:0.1354, tol:0.002, msg:'That is the squared correlation. Report the correlation itself.'}],
+     msg:'Use =CORREL(A2:A162, B2:B162).'}],
+  hint:`<b>COVARIANCE.S</b> divides by N − 1, like STDEV.S. <b>CORREL</b> gives the correlation. Both
+  take the two columns as arguments. Careful : the old function <b>COVAR</b> divides by N. In French
+  Excel : COVARIANCE.STANDARD and COEFFICIENT.CORRELATION, with a semicolon between the
+  arguments.`,
+  code:`=COVARIANCE.S(A2:A162, B2:B162)
+=CORREL(???, ???)`,
+  say:'Covariance ≈ 19.31, correlation ≈ 0.368.',
+  right:`Covariance ≈ <strong>19.31</strong>, correlation ≈ <strong>0.368</strong>.
+  Both positive : in the months when IBM does better than its average, Apple tends to do better than
+  its average too. A mild relationship, not a lockstep.
+  The statistical world again : the empirical covariance is an unbiased estimator of the covariance
+  of the two random variables, and the empirical correlation estimates their correlation.
+  But 19.31 what ? Hold that question.`,
+  widgetAfter:'scatter', hud:{corr:'0.368'}, note:'2.a · cov(IBM, Apple) = 19.31 (in %²); corr = 0.368' },
+
+{ id:'t2b', type:'numeric', bg:'lab', who:'master', mood:'raised', qn:'2.b',
+  title:'TRIAL V · CHANGE THE RULER',
+  text:`A covariance of 19.31 sounds large. Is it large ? Let us change the units and see whether the
+  answer survives.
+  In two empty columns, convert both series from percent to plain returns : 6.03% becomes 0.0603.
+  Then <strong>recompute the covariance and the correlation on the two new columns.</strong>`,
+  q:'Same months, new units. Report what changed.',
+  fields:[
+    {id:'cov2', label:'Covariance of the returns in decimals', value:0.0019305, tol:0.000035, strict:true,
+     alt:[{value:19.3051, tol:0.05, msg:'That is the covariance in percent. Compute it on the two new columns, divided by 100.'},
+          {value:0.193051, tol:0.001, msg:'You divided the covariance by 100. Recompute it on the two new columns instead: each column is divided by 100.'}],
+     msg:'Compute COVARIANCE.S on the two new columns. Excel may display it as 1.93E-03: type 0.00193 or 1.93E-03.'},
+    {id:'r2', label:'Correlation of the returns in decimals', value:0.3680, tol:0.002, strict:true,
+     alt:[{value:0.003680, tol:0.0001, msg:'Did you divide the correlation by 100? Compute CORREL on the two new columns and look.'},
+          {value:0.0000368, tol:0.000002, msg:'Did you divide the correlation by 10 000? Compute CORREL on the two new columns and look.'}],
+     msg:'Compute CORREL on the two new columns.'},
+    {id:'fac', kind:'select', label:'Dividing both columns by 100 divided the covariance by…', correct:'10000',
+     options:[['100','…100'],['10000','…10 000, i.e., 100 × 100'],['1','…nothing: the covariance did not change']],
+     msg:'Divide your old covariance, 19.31, by your new one.'}],
+  hint:`Type <b>=A2/100</b> in cell D2 and <b>=B2/100</b> in cell E2, then copy both formulas down to
+  row 162 (double-click the small square at the bottom-right corner of the cell). Then apply
+  COVARIANCE.S and CORREL to columns D and E.`,
+  code:`D2:  =A2/100          ← copy down to D162
+E2:  =B2/100          ← copy down to E162
+
+=COVARIANCE.S(D2:D162, E2:E162)
+=CORREL(???, ???)`,
+  say:'Covariance ≈ 0.00193, i.e., 10 000 times smaller. Correlation : still 0.368.',
+  right:`Covariance ≈ <strong>0.00193</strong>, i.e., 10 000 times smaller. Correlation :
+  <strong>0.368</strong>, unchanged to the last decimal.
+  <span class="fx">He looks at the two covariances as if one of them had lied.</span>
+  Neither lied. Same months, same relationship, different ruler. The covariance speaks in the units
+  of the data, squared. The correlation speaks no units at all.`,
+  widgetAfter:'units', note:'2.b · in decimals: cov = 0.00193 (10 000 times smaller); corr = 0.368 (unchanged)' },
+
+{ id:'t2c', type:'choice', bg:'lab', who:'master', qn:'2.c',
+  title:'TRIAL V · WHY THE CORRELATION DID NOT MOVE',
+  text:`You have seen it. Now explain it. Write X for IBM and Y for Apple, in percent. The new columns
+  are X/100 and Y/100.
+  <strong>Which statement explains your two results ?</strong>`,
+  q:'Choose the explanation.',
+  options:[
+    {id:'a', label:'Cov(X/100, Y/100) = Cov(X, Y)/100, and the correlation does not change because it always lies between −1 and 1.'},
+    {id:'b', label:'Cov(X/100, Y/100) = Cov(X, Y)/10 000, because each variable brings one factor 1/100. The correlation divides the covariance by the two standard deviations, each also divided by 100, so the factors cancel.'},
+    {id:'c', label:'Excel rounds small numbers, which is why the covariance became so small.'},
+    {id:'d', label:'The correlation changes too, but too little to be seen with three decimals.'}
+  ], correct:'b',
+  hint:`The covariance averages the products (x − x̄)(y − ȳ). What happens to each bracket when both
+  variables are divided by 100 ? Then write the correlation as the covariance divided by the product
+  of the two standard deviations.`,
+  right:`Exactly. Cov(aX, bY) = ab · Cov(X, Y). Here a = b = 1/100, so the covariance is divided by
+  10 000.
+  The correlation, Cov(X, Y) / (s<sub>X</sub> · s<sub>Y</sub>), loses a factor 10 000 in the
+  numerator and 100 × 100 in the denominator. Nothing is left.
+  That is why the covariance alone cannot tell you whether a relationship is strong : change the
+  ruler and it changes. The correlation can : it is a pure number between −1 and 1. Heights in
+  centimetres or in inches, same story.`,
+  wrong:{a:`Each of the two variables is divided by 100, and the covariance multiplies them. Check the
+  ratio of your two covariances.`,
+  c:`Excel keeps about 15 significant digits. 0.00193 is not a rounding accident; it is 19.31 / 10 000
+  exactly.`,
+  d:`Display more decimals in Excel. The two correlations are identical, not merely close.`},
+  note:'2.c · Cov(aX, bY) = ab Cov(X, Y); the correlation has no units' },
+
+{ id:'beat', type:'info', bg:'vault', who:'master', mood:'amused', qn:'—',
+  title:'THE MASTER’S COUNTER-PROPOSAL',
+  text:`Lucius will not put everything into one stock. I forbid it. He will put <strong>80% into
+  Apple and 20% into IBM</strong>. Every month, the return of this portfolio is the weighted return
+  of its parts :
+  <br><span class="kbd">R<sub>P</sub> = 0.8 · R<sub>A</sub> + 0.2 · R<sub>I</sub></span><br>
+  And its risk, I can give you without Excel. Apple’s standard deviation is 9.80, IBM’s is 5.35.
+  Eighty percent of one plus twenty percent of the other : <strong>about 8.9%</strong>. Risks simply
+  add up, in proportion.
+  <span class="fx">He looks very sure of himself. At the Academy, that has never been a good
+  sign.</span>
+  You will compute the expected return and the risk of this portfolio in two different ways. If the
+  two ways disagree, one of us has a problem.`,
+  banner:'CLAIM: RISKS SIMPLY ADD UP', cont:'Build the portfolio' },
+
+{ id:'t3a', type:'numeric', bg:'vault', who:'master', qn:'3.a',
+  title:'TRIAL VI · METHOD 1 : MONTH BY MONTH',
+  text:`The first method is brute force. In a new column, compute the return of the portfolio for each
+  of the 161 months : 0.8 times the return of Apple plus 0.2 times the return of IBM, in percent.
+  Then treat that column like any other. <strong>Report the portfolio return of the first month, the
+  average of the column and its empirical standard deviation.</strong>`,
+  q:'Build the column, then summarize it.',
+  fields:[
+    {id:'p1', label:'Portfolio return in the first month (row 2), in %', value:4.2724, tol:0.005, strict:true,
+     alt:[{value:-0.9953, tol:0.005, msg:'You swapped the weights. 80% goes to Apple, in column B, and 20% to IBM, in column A.'},
+          {value:0.042724, tol:0.0001, msg:'You used the columns in decimals. Use the original columns, in percent.'},
+          {value:1.6386, tol:0.005, msg:'That is a 50/50 portfolio. The weights are 0.8 for Apple and 0.2 for IBM.'}],
+     msg:'In row 2: 0.8 × B2 + 0.2 × A2.'},
+    {id:'pm', label:'Average of the portfolio column, in %', value:2.7306, tol:0.005, strict:true,
+     alt:[{value:0.9957, tol:0.005, msg:'You swapped the weights. 80% goes to Apple, in column B.'},
+          {value:0.027306, tol:0.0001, msg:'You used the columns in decimals. Use the original columns, in percent.'},
+          {value:1.8632, tol:0.005, msg:'That is a 50/50 portfolio. The weights are 0.8 for Apple and 0.2 for IBM.'}],
+     msg:'Apply AVERAGE to your new column.'},
+    {id:'ps', label:'Standard deviation of the portfolio column, in %', value:8.2941, tol:0.006, strict:true,
+     alt:[{value:8.2683, tol:0.005, msg:'That is STDEV.P, which divides by N. Use STDEV.S.'},
+          {value:5.3248, tol:0.006, msg:'You swapped the weights. 80% goes to Apple, in column B.'},
+          {value:68.792, tol:0.05, msg:'That is the variance of the column. Report its standard deviation.'},
+          {value:0.082941, tol:0.0002, msg:'You used the columns in decimals. Use the original columns, in percent.'}],
+     msg:'Apply STDEV.S to your new column.'}],
+  hint:`Type the weights in two cells, e.g., 0.8 in J1 and 0.2 in J2, and refer to them with dollar
+  signs, so that they stay fixed when you copy the formula down. Then AVERAGE and STDEV.S on the new
+  column.`,
+  code:`J1:  0.8                    ← weight of Apple
+J2:  0.2                    ← weight of IBM
+G2:  =$J$1*B2 + $J$2*A2     ← copy down to G162
+
+=AVERAGE(G2:G162)
+=STDEV.S(???)`,
+  say:'First month : 4.27%. Average : 2.73%. Standard deviation : 8.29%.',
+  right:`First month : <strong>4.27%</strong>. Average : <strong>2.73%</strong>. Standard deviation :
+  <strong>8.29%</strong>.
+  <span class="fx">The Master leans over your shoulder, then leans back.</span>
+  8.29. Not 8.9. Either your column is wrong, or my arithmetic is. Let us not decide yet. A second
+  method will settle it.`,
+  hud:{port:'2.73 · 8.29'}, note:'3.a · method 1 (new column): mean 2.73%, sd 8.29%' },
+
+{ id:'t3b', type:'numeric', bg:'vault', who:'master', qn:'3.b',
+  title:'TRIAL VII · METHOD 2 : THE EXPECTATION',
+  text:`The second method never touches the 161 months. It only uses the summary statistics that you
+  already have, and the rules of the statistical world.
+  The expectation is linear :
+  <br><span class="kbd">E[0.8 · R<sub>A</sub> + 0.2 · R<sub>I</sub>] = 0.8 · ${MU_A} + 0.2 · ${MU_I}</span><br>
+  Replace each unknown expectation by its estimate. <strong>Which expected return does this give, and
+  how does it compare with method 1 ?</strong>`,
+  q:'Use the formula, not the column.',
+  fields:[
+    {id:'er', label:'Estimated expected return of the portfolio, in %', value:2.7306, tol:0.005, strict:true,
+     alt:[{value:0.9957, tol:0.005, msg:'You swapped the weights. 0.8 goes with the average of Apple.'},
+          {value:1.8632, tol:0.005, msg:'That is a 50/50 portfolio. The weights are 0.8 for Apple and 0.2 for IBM.'}],
+     msg:'Compute 0.8 × average of Apple + 0.2 × average of IBM.'},
+    {id:'cmp', kind:'select', label:'Compared with the average of method 1, this number is…', correct:'same',
+     options:[['same','…exactly the same'],['close','…close, but not equal'],['far','…far from it']],
+     msg:'Display more decimals in Excel and compare. The two numbers agree to the last digit.'}],
+  hint:`Reuse the two averages of Trial II. No new column is needed.`,
+  code:`=$J$1*AVERAGE(B2:B162) + $J$2*AVERAGE(???)`,
+  say:'0.8 × 3.31 + 0.2 × 0.42 = 2.73%, exactly the same as method 1.',
+  right:`<strong>2.73%</strong>, the same number, to every decimal that Excel shows you.
+  No coincidence : the average of a weighted sum is the weighted sum of the averages. The sample
+  average is linear, exactly like the expectation that it estimates.
+  The return was the easy part. The risk is where my 8.9% lives or dies.`,
+  note:'3.b · method 2: 0.8 x 3.31 + 0.2 x 0.42 = 2.73%, identical to method 1' },
+
+{ id:'t3c', type:'numeric', bg:'vault', who:'master', qn:'3.c',
+  title:'TRIAL VIII · METHOD 2 : THE VARIANCE',
+  text:`The variance is not linear. The lecture gives the variance of a weighted sum of two random
+  variables :
+  <br><span class="kbd">V[w<sub>A</sub>R<sub>A</sub> + w<sub>I</sub>R<sub>I</sub>] = w<sub>A</sub>²σ²<sub>A</sub> + w<sub>I</sub>²σ²<sub>I</sub> + 2w<sub>A</sub>w<sub>I</sub>·Cov(R<sub>A</sub>, R<sub>I</sub>)</span><br>
+  Replace the unknown variances and covariance by their estimates, with the returns in percent.
+  <strong>Report the estimated variance of the portfolio and its standard deviation.</strong>`,
+  q:'Use the formula, not the column.',
+  fields:[
+    {id:'pv', label:'Estimated variance of the portfolio', value:68.792, tol:0.02, strict:true,
+     alt:[{value:62.614, tol:0.02, msg:'You forgot the covariance term. Without it, you assume that IBM and Apple are unrelated.'},
+          {value:88.743, tol:0.05, msg:'The weights enter squared: 0.8² = 0.64 and 0.2² = 0.04.'},
+          {value:65.703, tol:0.02, msg:'The covariance term has a factor 2: 2 × 0.8 × 0.2 × Cov.'},
+          {value:68.7535, tol:0.015, msg:'Close, but you mixed COVARIANCE.P (or COVAR), which divides by N, with variances that divide by N − 1. Use the .S versions everywhere.'},
+          {value:68.3646, tol:0.015, msg:'You used the versions that divide by N everywhere. The lecture divides by N − 1: VAR.S and COVARIANCE.S.'},
+          {value:8.2941, tol:0.006, msg:'That is the standard deviation. The first field asks for the variance.'},
+          {value:0.0068792, tol:0.00003, msg:'That is the variance in decimals. Use the returns in percent.'}],
+     msg:'Compute 0.64 × VAR.S(Apple) + 0.04 × VAR.S(IBM) + 2 × 0.8 × 0.2 × COVARIANCE.S(IBM, Apple).'},
+    {id:'psd', label:'Estimated standard deviation of the portfolio, in %', value:8.2941, tol:0.005, strict:true,
+     alt:[{value:7.9129, tol:0.005, msg:'You forgot the covariance term.'},
+          {value:9.4203, tol:0.005, msg:'The weights enter squared: 0.64 and 0.04.'},
+          {value:8.1057, tol:0.005, msg:'The covariance term has a factor 2.'},
+          {value:8.2683, tol:0.005, msg:'You used the versions that divide by N. Use VAR.S and COVARIANCE.S.'},
+          {value:68.792, tol:0.05, msg:'That is the variance. Take its square root.'}],
+     msg:'Take the square root of the variance with SQRT.'}],
+  hint:`You need VAR.S of each column and COVARIANCE.S of the two. The weights enter squared, 0.8²
+  and 0.2², and the covariance term has a factor 2. SQRT gives the standard deviation.`,
+  code:`=$J$1^2*VAR.S(B2:B162) + $J$2^2*VAR.S(???) + 2*$J$1*$J$2*COVARIANCE.S(???, ???)
+=SQRT(???)`,
+  say:'Variance ≈ 68.79, i.e., a standard deviation of 8.29%. The same as method 1.',
+  right:`Variance ≈ <strong>68.79</strong>, standard deviation ≈ <strong>8.29%</strong>. The same as
+  your column, to the last decimal.
+  <span class="fx">The Master writes 8.29 next to his 8.9, and stares at the gap.</span>
+  Two methods, one answer. So the problem is not your column.`,
+  widgetAfter:'twoways', note:'3.c · method 2: 0.64 s2_A + 0.04 s2_I + 0.32 cov = 68.79, sd = 8.29%' },
+
+{ id:'t3c2', type:'choice', bg:'vault', who:'master', qn:'3.c',
+  title:'TRIAL VIII · WHY EXACTLY THE SAME ?',
+  text:`The two methods did not merely come close. They agree to every digit.
+  <strong>Why ?</strong>`,
+  q:'Choose the reason.',
+  options:[
+    {id:'a', label:'Luck: with 161 months, the two methods happened to give the same number.'},
+    {id:'b', label:'The rules for the expectation and the variance of a weighted sum also hold exactly for the sample average, the empirical variance and the empirical covariance, as long as they all use the same divisor, N − 1.'},
+    {id:'c', label:'Because the returns are normally distributed.'},
+    {id:'d', label:'Because the correlation between IBM and Apple is positive.'}
+  ], correct:'b',
+  hint:`Write the empirical variance of the column 0.8·y + 0.2·x and expand the square inside it. Which
+  terms appear ?`,
+  right:`Exactly. Expand the empirical variance of the portfolio column : the square of a sum produces
+  the two empirical variances and twice the empirical covariance, with exactly the weights of the
+  formula. It is algebra, not luck, and not an assumption.
+  That is also why the divisor matters : mix N and N − 1, and the identity breaks by a hair.
+  In practice, investors use method 2. With 500 stocks, nobody builds a column for every possible set
+  of weights : the averages, the variances and the covariances are enough.`,
+  wrong:{a:`Luck does not reproduce fifteen digits. Change the weights in J1 and J2 and watch both
+  methods move together.`,
+  c:`Normality plays no role here. The identity holds for any 161 pairs of numbers, normal or not.`,
+  d:`With a negative correlation, the two methods would still agree. Only the value would change.`},
+  note:'3.c · the formulas hold exactly in the sample, with the same divisor N - 1' },
+
+{ id:'t3d', type:'choice', bg:'vault', who:'master', mood:'raised', qn:'3.d',
+  title:'TRIAL IX · THE MASTER’S ARITHMETIC',
+  text:`Now my 8.9%. I took the weighted average of the two standard deviations :
+  0.8 × 9.80 + 0.2 × 5.35 = <strong>8.91%</strong>. You found <strong>8.29%</strong>, twice.
+  <strong>Where did my reasoning fail ?</strong>`,
+  q:'The true standard deviation of the portfolio is lower because…',
+  options:[
+    {id:'corr', label:'…the correlation between IBM and Apple is below 1, so their bad months partly offset each other.'},
+    {id:'mean', label:'…Apple has the higher average return.'},
+    {id:'round', label:'…Excel rounds the numbers.'},
+    {id:'n', label:'…the lecture divides by N − 1.'}
+  ], correct:'corr',
+  hint:`Look at the variance formula of the portfolio : which number links the two stocks, and which
+  value would it need for the two answers to agree ?`,
+  wrong:{mean:`The averages do not enter the variance formula at all.`,
+  round:`Rounding moves the fifth decimal, not the first. The gap is 0.62 points.`,
+  n:`Both 8.29% and the standard deviations in my arithmetic use N − 1. The divisor is not the issue.`},
+  right:`Exactly. My <strong>8.91%</strong>, against 8.29% in the data. My arithmetic assumed that IBM and Apple
+  always move in perfect lockstep, i.e., a correlation of 1. With a correlation of 1, the variance
+  formula becomes a perfect square, (0.8σ<sub>A</sub> + 0.2σ<sub>I</sub>)², and the risks do add up
+  in proportion.
+  With a correlation of 0.368, the bad months of one stock are partly cushioned by the other. Compared
+  with all in Apple, Lucius gives up 0.58 points of expected return per month, and sheds 1.51 points
+  of risk.
+  <span class="fx">He crosses out his 8.9%. Slowly, so that everybody sees it.</span>`,
+  widgetAfter:'frontier', wow:true, note:'3.d · weighted average of the sds = 8.91% > 8.29%: diversification works because corr < 1' },
+
+{ id:'close', type:'info', bg:'floor', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`Lucius will not put everything into Apple. Not because Apple is a bad stock, but because no
+  average, however attractive, comes without a standard deviation.
+  <span class="fx">He folds the business plan and slides it back to Lucius, car included.</span>
+  Four rules leave with you.
+  <strong>One.</strong> A summary statistic lives in the real world. Under the assumptions, it is one
+  realization of an estimator : the average estimates the expectation, the empirical variance
+  estimates the variance.
+  <strong>Two.</strong> Never judge an investment by its expected return alone. Read the standard
+  deviation next to it.
+  <strong>Three.</strong> The covariance depends on the units, the correlation does not. To say how
+  strongly two variables move together, read the correlation.
+  <strong>Four.</strong> The risk of a portfolio is not the average of the risks. It depends on the
+  covariance, and it falls below that average as soon as the correlation is below 1.
+  <span class="fx">At home, change the weights in J1 and J2. With about 10% in Apple, the portfolio is
+  less risky than IBM alone, and it earns more.</span>`,
+  banner:'DIVERSIFY. MEASURE. DOUBT.', cont:'See what you found', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  el.note.innerHTML = notes.map(n=>'▸ '+escapeHtml(n)).join('<br>');
+}
+
+/* ---- HUD: filled only by solved steps, so it never gives an answer away ---- */
+const HUD0 = {avg:'—', sd:'—', corr:'—', port:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown after an answer, drawn from the embedded
+   data. Points are never connected; dark marks on a pale ground.
+   Hovering a point shows its values.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series, plus optional straight lines */
+function panelSVG(o){
+  const W=700, H=o.H||300, L=o.L||84, R=684, T=44, B=(o.B||236);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}"
+      x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="${l.dash}"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${s.tip(i)}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||3.6}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.8}" stroke="${PLOT.paper}" stroke-width="1">${tip}</circle>`;
+    }
+  });
+  let pins='';
+  (o.pins||[]).forEach(p=>{
+    pins += TXT(px(p.x).toFixed(1), (py(p.y)+(p.dy||-12)).toFixed(1), p.label, {col:p.col||PLOT.label, anchor:p.anchor, sz:17});
+  });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${pins}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* ---- the cold open: the first rows of the ledger ---- */
+function playTable(host){
+  const cols=[150,350,550];
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=108+i*24;
+    rows += TXT(cols[0],y,MONTHS[i],{sz:19}) + TXT(cols[1],y,DATA.IBM[i].toFixed(3),{sz:19})
+          + TXT(cols[2],y,DATA.AAPL[i].toFixed(3),{sz:19});
+  }
+  const svg=`<svg viewBox="0 0 700 262" style="width:100%;height:auto;display:block">
+    <rect width="700" height="262" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'THE FIRST FIVE OF 161 MONTHS',{sz:18,anchor:'start'})}
+    ${TXT(cols[0],70,'month',{sz:19,col:PLOT.ink})}${TXT(cols[1],70,'IBM (column A)',{sz:19,col:PLOT.ink})}
+    ${TXT(cols[2],70,'APPLE (column B)',{sz:19,col:PLOT.ink})}
+    <line x1="60" y1="80" x2="640" y2="80" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(cols[1],230,'monthly returns in percent: 6.028 means +6.028% in that month',{sz:16})}
+    ${TXT(cols[1],252,'the months are not in the file; they are shown here for orientation',{sz:16,col:PLOT.second})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE LEDGER', svg, 'The Excel file holds two columns of 161 numbers, with the names in row 1.');
+  return 600;
+}
+
+/* ---- Apple against IBM, with the two averages ---- */
+function playScatter(host){
+  const o = {
+    series:[{x:DATA.IBM, y:DATA.AAPL, tip:i=>`month ${i+1}: IBM ${DATA.IBM[i].toFixed(2)}%, Apple ${DATA.AAPL[i].toFixed(2)}%`}],
+    lines:[{x1:STATS.mI, y1:-35, x2:STATS.mI, y2:40, color:PLOT.axis, w:1.5, dash:'6 5'},
+           {x1:-25, y1:STATS.mA, x2:20, y2:STATS.mA, color:PLOT.axis, w:1.5, dash:'6 5'}],
+    pins:[{x:19.5, y:STATS.mA, label:'Apple average', anchor:'end', dy:-8},
+          {x:STATS.mI, y:39, label:' IBM average', anchor:'start', dy:4}],
+    xmin:-25, xmax:20, ymin:-35, ymax:40,
+    xticks:[-20,-10,0,10,20], yticks:[-30,-20,-10,0,10,20,30,40],
+    title:'Apple against IBM, 161 months, r = 0.368',
+    xlab:'IBM monthly return (%)', ylab:'Apple monthly return (%)'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · DO THEY MOVE TOGETHER ?', panelSVG(o),
+    'One point is one month. More points fall in the upper-right and lower-left quarters: a positive, mild relationship.');
+  return 900;
+}
+
+/* ---- side-by-side cards, for comparisons of a few numbers ---- */
+function cardsSVG(head, cards, w){
+  w = w || 300;
+  const gap = (700 - 60 - cards.length*w)/Math.max(1,cards.length-1);
+  let out='';
+  cards.forEach((c,k)=>{
+    const x = 30 + k*(w+gap);
+    out += `<rect x="${x}" y="52" width="${w}" height="164" fill="#fbfaf4" stroke="${c.col}" stroke-width="2"/>
+      ${TXT(x+w/2,82,c.title,{sz:21,col:c.col})}
+      ${TXT(x+w/2,106,c.sub,{sz:16})}`;
+    c.rows.forEach((r,j)=>{
+      out += TXT(x+18,146+j*30,r[0],{sz:18,anchor:'start'}) + TXT(x+w-18,146+j*30,r[1],{sz:22,anchor:'end',col:PLOT.ink});
+    });
+  });
+  return `<svg viewBox="0 0 700 236" style="width:100%;height:auto;display:block">
+    <rect width="700" height="236" fill="${PLOT.paper}"/>
+    ${TXT(30,32,head,{sz:18,anchor:'start'})}${out}</svg>`;
+}
+
+/* ---- same months, two rulers ---- */
+function playUnits(host){
+  const svg = cardsSVG('SAME 161 MONTHS, TWO UNITS', [
+    {title:'IN PERCENT', sub:'6.03 means +6.03%', col:PLOT.ink,
+     rows:[['covariance','19.305'],['correlation','0.368']]},
+    {title:'IN DECIMALS', sub:'0.0603 means +6.03%', col:PLOT.second,
+     rows:[['covariance','0.00193'],['correlation','0.368']]}
+  ]);
+  host.innerHTML = plotFrame('EVIDENCE · CHANGE THE RULER', svg,
+    'Covariance divided by 100 × 100 = 10 000. Correlation unchanged: it has no units.');
+  return 900;
+}
+
+/* ---- one portfolio, two methods ---- */
+function playTwoWays(host){
+  const svg = cardsSVG('PORTFOLIO 80% APPLE + 20% IBM', [
+    {title:'METHOD 1', sub:'a new column, month by month', col:PLOT.ink,
+     rows:[['average','2.7306%'],['standard deviation','8.2941%']]},
+    {title:'METHOD 2', sub:'formulas of the lecture', col:PLOT.second,
+     rows:[['0.8 μA + 0.2 μI','2.7306%'],['√ variance formula','8.2941%']]}
+  ]);
+  host.innerHTML = plotFrame('EVIDENCE · TWO METHODS, ONE ANSWER', svg,
+    'Identical to every digit, because both methods divide by N − 1.');
+  return 900;
+}
+
+/* ---- every mix of the two stocks: expected return against risk ---- */
+function playFrontier(host){
+  const W=700,H=320,L=84,R=684,T=44,B=256, xmin=4, xmax=11, ymin=0, ymax=3.8;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L), py=v=>B-(v-ymin)/(ymax-ymin)*(B-T);
+  const pt=w=>{
+    const m = w*STATS.mA + (1-w)*STATS.mI;
+    const v = w*w*STATS.vA + (1-w)*(1-w)*STATS.vI + 2*w*(1-w)*STATS.cov;
+    return [Math.sqrt(v), m];
+  };
+  const sI=Math.sqrt(STATS.vI), sA=Math.sqrt(STATS.vA);
+  let curve='';
+  for(let k=0;k<=100;k++){ const [s,m]=pt(k/100); curve+=(curve?'L':'M')+px(s).toFixed(1)+' '+py(m).toFixed(1)+' '; }
+  const [s80,m80]=pt(0.8), wavg=0.8*sA+0.2*sI;
+  const [s10,m10]=pt(0.1);
+  const dot=(x,y,col,tip,hollow)=>`<circle cx="${px(x).toFixed(1)}" cy="${py(y).toFixed(1)}" r="6"
+    fill="${hollow?PLOT.paper:col}" stroke="${hollow?col:PLOT.paper}" stroke-width="${hollow?2.5:2}"><title>${tip}</title></circle>`;
+  let ticks='';
+  [4,5,6,7,8,9,10,11].forEach(v=>{ ticks+=`<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>`+TXT(px(v),B+21,v,{sz:15}); });
+  [0,1,2,3].forEach(v=>{ ticks+=`<line x1="${L-5}" y1="${py(v)}" x2="${L}" y2="${py(v)}" stroke="${PLOT.axis}"/>`+TXT(L-9,py(v)+5,v,{sz:15,anchor:'end'}); });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,24,'Every mix of Apple and IBM, from 0% to 100% Apple',{sz:17,anchor:'start'})}
+    <line x1="${px(sI).toFixed(1)}" y1="${py(STATS.mI).toFixed(1)}" x2="${px(sA).toFixed(1)}" y2="${py(STATS.mA).toFixed(1)}"
+      stroke="${PLOT.axis}" stroke-width="2" stroke-dasharray="7 6"/>
+    <path d="${curve}" fill="none" stroke="${PLOT.ink}" stroke-width="2.5"/>
+    <line x1="${px(s80).toFixed(1)}" y1="${py(m80).toFixed(1)}" x2="${px(wavg).toFixed(1)}" y2="${py(m80).toFixed(1)}"
+      stroke="${PLOT.fit}" stroke-width="2"/>
+    ${dot(sI,STATS.mI,PLOT.ink,'100% IBM: mean 0.42%, sd 5.35%')}
+    ${dot(sA,STATS.mA,PLOT.ink,'100% Apple: mean 3.31%, sd 9.80%')}
+    ${dot(s10,m10,PLOT.second,'10% Apple: mean 0.71%, sd 5.26%')}
+    ${dot(wavg,m80,PLOT.fit,'The Master: 8.91%, i.e., correlation = 1',true)}
+    ${dot(s80,m80,PLOT.fit,'80% Apple: mean 2.73%, sd 8.29%')}
+    ${TXT(px(sI)+10,py(STATS.mI)+22,'100% IBM',{sz:16,anchor:'start'})}
+    ${TXT(px(sA)-10,py(STATS.mA)-12,'100% Apple',{sz:16,anchor:'end'})}
+    ${TXT(px(s80)-6,py(m80)-16,'80/20 : 8.29',{sz:17,anchor:'end',col:PLOT.fit})}
+    ${TXT(px(wavg)+12,py(m80)+5,'Master : 8.91',{sz:17,anchor:'start',col:PLOT.fit})}
+    ${TXT(px(s10)+12,py(m10)-8,'10% Apple',{sz:16,anchor:'start',col:PLOT.second})}
+    ${TXT(px(7.6),py(1.1),'dashed: correlation = 1',{sz:15,anchor:'start'})}
+    ${TXT(px(7.6),py(0.85),'curve: correlation = 0.368',{sz:15,anchor:'start',col:PLOT.ink})}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2,H-12,'Risk: standard deviation of the monthly return (%)',{sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">Expected monthly return (%)</text>
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE MASTER’S STRAIGHT LINE', svg,
+    'Risks add up in proportion only on the dashed line, i.e., with a correlation of 1. The data bend to the left of it.');
+  return 1000;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')    return playTable(host);
+  if(name==='scatter')  return playScatter(host);
+  if(name==='units')    return playUnits(host);
+  if(name==='twoways')  return playTwoWays(host);
+  if(name==='frontier') return playFrontier(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>buildZone(s));
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+
+  function advance(givenAway){
+    box.querySelectorAll('button').forEach(x=>x.disabled=true);
+    const label = s.options.find(o=>o.id===s.correct).label;
+    conclude(s, givenAway ? `<em>“…the answer was : ${label}”</em>` : `<em>“${label}”</em>`, mySeq);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const b=document.createElement('button');
+    b.className='btn amber'; b.textContent='SHOW THE ANSWER';
+    b.onclick=()=>{
+      const good = box.querySelector(`[data-oid="${s.correct}"]`);
+      if(good) good.classList.add('given');
+      setTimeout(()=>{ if(mySeq===seq) advance(true); }, 500);
+    };
+    bar.appendChild(b);
+  }
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      advance(false);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+        offerSolution();
+        verdict('give','Two attempts. You may take the answer and keep going — the reasoning matters more than the guess.');
+      }
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+
+  function advance(givenAway){
+    inputs().forEach(b=>b.disabled=true);
+    box.querySelectorAll('label').forEach(l=>{
+      if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add(givenAway?'given':'right');
+    });
+    reactTo(givenAway ? 'wow' : 'right');
+    setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 700);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      inputs().forEach(b=>{ b.checked = s.correct.indexOf(b.value)>=0; });
+      advance(true);
+    };
+    bar.appendChild(g);
+  }
+  submit.onclick=()=>{
+    if(chosen() === wanted){ advance(false); return; }
+    reactTo('wrong'); fails++;
+    clearVerdict();
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. Take the answer and keep going.');
+    }
+  };
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/\s+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+function tolerance(f){
+  const abs = f.tol || 0;
+  if(f.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(f.value));
+}
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 3.31.';
+  const tol = tolerance(f);
+  const diff = f.abs ? Math.abs(Math.abs(v)-Math.abs(f.value)) : Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){ if(Math.abs(v-a.value) <= a.tol) return a.msg; }
+  if(!f.abs && Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+function shownValue(f){
+  if(f.kind==='select') return f.correct;
+  return String(f.show !== undefined ? f.show : f.value);
+}
+
+function zoneNumeric(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  function advance(givenAway){
+    rows.forEach(r=>{ r.input.disabled=true; });
+    const line = givenAway ? `<em>“…the answer was : ${s.say}”</em>` : `<em>“${s.say}”</em>`;
+    setTimeout(()=>{ if(mySeq===seq) conclude(s, line, mySeq); }, givenAway ? 900 : 350);
+  }
+  function offerSolution(){
+    if(bar.querySelector('.btn.amber')) return;
+    const g=document.createElement('button'); g.className='btn amber'; g.textContent='SHOW THE ANSWER';
+    g.onclick=()=>{
+      rows.forEach(r=>{ r.input.value = shownValue(r.f); r.row.classList.remove('bad','good'); r.row.classList.add('given'); });
+      clearVerdict();
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      reactTo('wow');
+      advance(true);
+    };
+    bar.appendChild(g);
+  }
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      advance(false);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    if(fails>=CONFIG.FAILS_BEFORE_SOLUTION){
+      offerSolution();
+      verdict('give','Two attempts. You may take the answer and keep going — but check it in Excel first, the next question builds on it.');
+    }
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE1',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise I</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>window.open(CONFIG.DATA_FILE,'ibmAppleData'));
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+function finish(){
+  $('#endblurb').innerHTML =
+    `You computed the averages and the standard deviations of two stocks and placed them in the
+     statistical world, as estimates of expectations and variances. You watched the covariance shrink
+     10 000 times while the correlation did not move. Then you built the same portfolio twice, once
+     month by month and once with the formulas of the lecture. Both gave 8.29%, and the Master’s 8.9%
+     did not survive the covariance.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: RISKS SIMPLY ADD UP';
+  show('scr-end');
+}
+
+$('#btn-again').onclick = ()=>{ idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  el.doom.classList.remove('struck'); el.doom.textContent='CASE OPEN';
+  setHUD(HUD0); show('scr-game'); render(); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v1.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "LOADING TICKER TAPE ......... IBM, AAPL",
+  "COUNTING EGGS AND BASKETS ... 2 STOCKS, 1 BASKET",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "PYTHON INTERPRETER .......... NOT TODAY. USE EXCEL.",
+  "OPENING CASE FILE ........... 161 MONTHS, FEB 2004 - JUN 2017",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  const v = $('#playername').value.trim();
+  playerName = v || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+  idx=0; notes=[]; el.note.innerHTML='<i style="color:#666">empty</i>';
+  setHUD(HUD0);
+  show('scr-game');
+  render();
+};
+</script>
+</body>
+</html>
