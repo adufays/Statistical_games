@@ -1,1 +1,1743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 6: Does Prosperity Cure Inequality?</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 6
+  "Does Prosperity Cure Inequality?"  (Excel Lab 5: Kuznets hypothesis)
+  EDHEC · Multivariate Data Analysis · Empirical Session 6
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine as Empirical Exercise 4: no checkpoints, no passwords,
+  no SHOW THE ANSWER button. Every question has a HINT button.
+
+  QUESTIONS (Excel Lab 5.tex)
+  ---------
+  1. Scatter plot of the Gini index against GDP per capita   -> MCQ
+  2. Estimates of b1 and b2 in  Gini_i = b1 + b2 GDP_i + e_i  -> numbers
+  3. QQ plot of the standardized residuals: normality?        -> MCQ
+  4. Residuals against fitted values: homoskedasticity?       -> MCQ
+  5. Is b2 significant at the 5% significance level?  t-test, p-value and
+     95% confidence interval, which reach the same conclusion -> numbers
+  The scale remark of question 5 (b2 depends on the unit of GDP) has
+  its own question, right after the estimation.
+
+  DATA
+  ----
+  Kuznets_Gini_GDP_V2.xlsx: 71 countries, 2018. Column A: country,
+  B: Gini index (0-100 scale), C: GDP per capita (US$, PPP).
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE VI</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="kuznets">DATA (XLSX)</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>DOES PROSPERITY<br>CURE INEQUALITY ?</h1>
+      <h2>Empirical Exercise VI &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus believes that inequality falls as countries grow rich, a simplified version of
+      the Kuznets hypothesis. The Gini index and the GDP per capita of 71 countries will judge him. You
+      will estimate a regression, check its assumptions with a QQ plot and a diagnostic plot, and test
+      its slope in three different ways.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>Kuznets_Gini_GDP_V2.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and open it in Excel. Compute every number and
+        draw every plot there, and keep your workbook: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your plots, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example Excel formula, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers with a dot or a comma as the decimal separator, e.g., <code>36.18</code> or
+      <code>36,18</code>, with three significant digits. Very small numbers can be typed exactly as
+      Excel displays them, e.g., <code>-8.54E-05</code>.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">In the file, column <code>A</code> holds the country, column
+        <code>B</code> the Gini index and column <code>C</code> the GDP per capita in US dollars. Row 1
+        holds the names; rows 2 to 72 hold the 71 countries. English Excel separates the arguments of a
+        function with a comma; French Excel uses a semicolon, e.g.,
+        <code>=LOI.STUDENT.INVERSE.BILATERALE(0,05;69)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code>, <code>=AVERAGE(range)</code></td><td><code>=NB(plage)</code>, <code>=MOYENNE(plage)</code></td><td>Number of values; sample average.</td><td><code>=AVERAGE(B2:B72)</code></td></tr>
+            <tr><td>Insert → Charts → Scatter</td><td>Insertion → Graphiques → Nuage de points</td><td>Scatter plot. Right-click → Select Data to choose which column goes on which axis.</td><td>X: C2:C72, Y: B2:B72</td></tr>
+            <tr><td>Data → Data Analysis → Regression</td><td>Données → Utilitaire d’analyse → Régression</td><td>Full regression output. Tick <b>Residuals</b> to get the predicted values and the residuals of each country. If it is missing: File → Options → Add-ins → Analysis ToolPak.</td><td>Y range: B1:B72, X range: C1:C72, tick Labels</td></tr>
+            <tr><td><code>=STDEV.S(range)</code></td><td><code>=ECARTYPE.STANDARD(plage)</code></td><td>Empirical standard deviation, to standardize the residuals.</td><td><code>=STDEV.S(D2:D72)</code></td></tr>
+            <tr><td>Data → Sort</td><td>Données → Trier</td><td>Sorts a column in ascending order, for the QQ plot.</td><td>Sort the standardized residuals</td></tr>
+            <tr><td><code>=NORM.S.INV(p)</code></td><td><code>=LOI.NORMALE.STANDARD.INVERSE.N(p)</code></td><td>Quantile of N(0, 1), for the horizontal axis of the QQ plot.</td><td><code>=NORM.S.INV((ROW()-1-0.5)/71)</code></td></tr>
+            <tr><td><code>=T.INV.2T(α, df)</code></td><td><code>=LOI.STUDENT.INVERSE.BILATERALE(α; df)</code></td><td>Critical value of a two-sided t-test at significance level α.</td><td><code>=T.INV.2T(0.05, 69)</code></td></tr>
+            <tr><td><code>=T.DIST.2T(|t|, df)</code></td><td><code>=LOI.STUDENT.BILATERALE(|t|; df)</code></td><td>Two-sided p-value of a t-statistic. It needs a positive t.</td><td><code>=T.DIST.2T(ABS(-2.5), 69)</code></td></tr>
+            <tr><td><code>8.54E-05</code></td><td><code>8,54E-05</code></td><td>Scientific notation: 8.54 × 10⁻⁵ = 0.0000854.</td><td><code>-8.54E-05</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>intercept</span><b id="hud-b1">—</b></div>
+            <div class="hudrow"><span>slope</span><b id="hud-b2">—</b></div>
+            <div class="hudrow"><span>t-stat</span><b id="hud-t">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise VI &nbsp;·&nbsp; Does Prosperity Cure Inequality ?</h2>
+      <p id="endblurb"></p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button */
+  DATA_FILES: {
+    kuznets: "https://www.dropbox.com/scl/fi/4uwl7h97qiryhm4rguojp/Kuznets_Gini_GDP_V2.xlsx?rlkey=59gohkf6jl2l4hvvoqhutyyy3&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted, unless the
+     field is marked 'strict', in which case its own 'tol' applies.   */
+  RTOL: 0.02,
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 71 countries of Kuznets_Gini_GDP_V2.xlsx, embedded for
+   the pictures only. The student computes everything in Excel.
+   ================================================================ */
+const DATA = {
+  COUNTRY:["Albania","Angola","Armenia","Australia","Austria","Belarus","Belgium","Benin","Bulgaria","Burkina Faso","Chad","China","Cote dIvoire","Croatia","Cyprus","Czech Republic","Denmark","Estonia","Finland","France","Georgia","Germany","Greece","Guinea","Guinea-Bissau","Hungary","India","Indonesia","Iran,Islamic Rep.","Ireland","Israel","Italy","Kazakhstan","Kyrgyz Republic","Lao PDR","Latvia","Lithuania","Luxembourg","Mali","Malta","Moldova","Mongolia","Montenegro","Netherlands","Niger","Nigeria","North Macedonia","Norway","Pakistan","Philippines","Poland","Portugal","Romania","Russian Federation","Senegal","Serbia","Seychelles","Sierra Leone","Slovak Republic","Slovenia","Spain","Sweden","Switzerland","Tanzania","Thailand","Togo","Turkiye","Ukraine","United Arab Emirates","United States","Vietnam"],
+  GINI:[30.1,51.3,34.4,34.3,30.8,25.2,27.2,37.8,41.3,47.3,37.5,38.5,37.2,29.7,32.7,25.0,28.2,30.3,27.3,32.4,36.4,31.7,32.9,29.6,34.8,29.6,34.6,38.4,42.0,30.6,38.6,35.2,27.8,27.7,38.8,35.1,35.7,35.4,36.1,28.7,25.7,32.7,36.8,28.1,37.3,35.1,33.0,27.6,29.6,42.3,30.2,33.5,35.8,37.5,38.1,35.0,32.1,35.7,25.0,24.6,34.7,30.0,33.1,40.5,36.4,42.4,41.9,26.1,26.0,41.4,35.7],
+  GDP:[13317.1,6982.1,12715.1,49029.1,55258.4,18974.7,51139.1,3160.8,22206.1,2117.8,1576.3,15134.0,5033.5,28192.3,39977.0,39933.0,56178.8,35097.7,48049.6,45284.0,14253.4,53486.8,29141.2,2499.7,1901.9,31121.7,6514.0,11371.7,15311.6,83726.4,39903.4,42045.9,25544.3,5133.2,7592.8,30050.7,35446.7,115049.9,2283.7,44602.8,12363.1,12028.6,20686.6,56060.9,1200.4,5155.1,16145.5,64341.3,5294.2,8516.1,31674.1,34040.7,28523.5,26656.4,3309.5,17452.8,28740.5,1654.6,31159.0,37984.1,40257.0,52349.3,70597.3,2590.2,18101.5,2061.3,28318.4,12336.9,66968.2,61339.8,9548.7]
+};
+/* the fitted line and its test, for the pictures */
+const FIT = { b1:36.18359, b2:-8.544156e-5, se2:2.679277e-5, t:-3.18896, df:69, crit:1.99495,
+              lo:-1.388917e-4, hi:-3.199145e-5 };
+const giniAt = x => FIT.b1 + FIT.b2*x;
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   A number field is accepted within CONFIG.RTOL of its target or within
+   its own 'tol', whichever is larger; 'strict:true' keeps 'tol' alone.
+   'alt' lists common wrong values, each with its own feedback.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const B1 = 'β<sub>1</sub>', B2 = 'β<sub>2</sub>', H0 = 'H<sub>0</sub>', H1 = 'H<sub>1</sub>';
+
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE VI',
+  text:`Grow rich, and inequality will take care of itself. That, roughly, is what Simon Kuznets
+  suggested in 1955 : inequality first rises when a poor country starts to develop, then falls once
+  the economy is prosperous enough. An inverted U.
+  <span class="fx">The Master draws an upside-down U on the blackboard, then rubs out its left half.</span>
+  Today we test a simplified version, the right half only : <strong>does inequality decrease with
+  income per capita ?</strong>
+  Inequality is measured by the <strong>Gini index</strong> : 0 means that everybody earns the same,
+  100 that one person earns everything. The file gives the Gini index and the GDP per capita, in US
+  dollars at purchasing power parity, of 71 countries in 2018.`,
+  widget:'table', banner:'CLAIM: PROSPERITY CURES INEQUALITY', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE FILE',
+  text:`Download <span class="kbd">Kuznets_Gini_GDP_V2.xlsx</span> with the DATA (XLSX) button and
+  open it. Column A holds the country, column B the Gini index, column C the GDP per capita, with the
+  names in row 1.
+  <strong>How many countries does the file contain, and what is the average Gini index ?</strong>`,
+  q:'Report what your workbook says.',
+  fields:[
+    {id:'n', label:'Number of countries', value:71, tol:0, strict:true,
+     alt:[{value:72, tol:0, msg:'Row 1 holds the names, not a country. Count the numbers only, i.e., =COUNT(B2:B72).'}],
+     msg:'Use =COUNT(B2:B72).'},
+    {id:'mg', label:'Average Gini index', value:33.832, tol:0.01, strict:true,
+     alt:[{value:27518.2, tol:20, msg:'That is the average GDP per capita. The Gini index is in column B.'},
+          {value:0.33832, tol:0.0005, msg:'The Gini index of this file is on a 0–100 scale. Report it as it is in column B.'}],
+     msg:'Use =AVERAGE(B2:B72).'}],
+  hint:`<b>COUNT</b> counts the cells that contain numbers, and <b>AVERAGE</b> computes the sample
+  average. The countries run from row 2 to row 72.`,
+  code:`=COUNT(B2:B72)
+=AVERAGE(???)`,
+  say:'71 countries, with an average Gini index of about 33.8.',
+  right:`<strong>71</strong> countries, and an average Gini index of <strong>33.8</strong>. Some
+  countries sit near 25, others above 45.
+  <span class="fx">The Master looks at the GDP column and whistles : from about 1,200 dollars per
+  person in Niger to 115,000 in Luxembourg.</span>
+  Before any regression, a picture.`,
+  note:'71 countries; average Gini = 33.8 (0-100 scale)' },
+
+{ id:'t1', type:'choice', bg:'lab', who:'master', qn:'1',
+  title:'TRIAL II · THE CLOUD',
+  text:`<strong>Make a scatter plot with the GDP per capita on the horizontal axis and the Gini index on
+  the vertical axis.</strong> Then tell me what it shows.`,
+  q:'Which description fits your scatter plot?',
+  options:[
+    {id:'a', label:'A negative but weak relationship: richer countries tend to be less unequal, with a lot of scatter. Most countries are below 40,000 dollars, and a few very rich countries sit far to the right.'},
+    {id:'b', label:'A strong positive relationship: richer countries are clearly more unequal.'},
+    {id:'c', label:'An almost perfect negative straight line: GDP per capita determines the Gini index.'},
+    {id:'d', label:'A clear inverted U: inequality first rises with income, then falls.'}
+  ], correct:'a',
+  hint:`Select the data with GDP in the X values (column C) and the Gini index in the Y values
+  (column B) : Insert → Charts → Scatter, then right-click → Select Data to set the two ranges. Then
+  look from left to right : does the cloud drift up, down, or stay level ? And how tightly ?`,
+  right:`Exactly. The cloud drifts downward, but loosely : between 5,000 and 15,000 dollars per
+  person, the Gini index ranges from about 26 to 51.
+  Notice also the shape of the horizontal axis : three quarters of the countries are crowded below
+  40,000 dollars, while Luxembourg, Ireland and Switzerland sit alone on the right. Keep that
+  crowding in mind; it will matter when we look at the residuals.`,
+  wrong:{b:`Look again at the right of your plot : are the richest countries the most unequal ones ?`,
+  c:`If the points were on a line, you would not need statistics, only a ruler. Your cloud is thick.`,
+  d:`That is Kuznets’ full hypothesis, not what this cloud shows. Our countries are mostly past the
+  early stage of development, and today we only test the right half of the U.`},
+  widgetAfter:'scatter', note:'scatter: negative, weak, noisy relationship; GDP crowded below 40k$' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'2',
+  title:'TRIAL III · THE LINE',
+  text:`Estimate the simple linear regression
+  <br><span class="kbd">Gini<sub>i</sub> = ${B1} + ${B2} · GDP<sub>i</sub> + ε<sub>i</sub></span><br>
+  The Gini index is the dependent variable (Y), the GDP per capita the explanatory variable (X). Use
+  Data → Data Analysis → Regression, and tick <strong>Residuals</strong> : you will need them for
+  the next questions.
+  <strong>Report the estimates of ${B1} and ${B2}.</strong>`,
+  q:'Read the Coefficients column.',
+  fields:[
+    {id:'b1', label:`Estimate of ${B1}`, value:36.184, tol:0.02, strict:true,
+     alt:[{value:78381.97, tol:50, msg:'You swapped Y and X: that regression explains GDP with the Gini index. Y is the Gini index, column B.'},
+          {value:0.9578, tol:0.005, msg:'That is the standard error of the intercept. Read the Coefficients column.'},
+          {value:37.778, tol:0.03, msg:'That is the t Stat of the intercept. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Intercept row.'},
+    {id:'b2', label:`Estimate of ${B2}`, value:-8.5442e-5, tol:0,
+     alt:[{value:-8.5442, tol:0.02, msg:'You dropped the E-05: -8.54E-05 means −0.0000854. Type it with its exponent.'},
+          {value:-0.085442, tol:0.001, msg:'That is the slope with GDP measured in thousands of dollars. The file measures GDP in dollars.'},
+          {value:-1503.4, tol:5, msg:'You swapped Y and X: that regression explains GDP with the Gini index. Y is the Gini index, column B.'},
+          {value:2.6793e-5, tol:1e-6, msg:'That is the standard error of the slope. Read the Coefficients column.'},
+          {value:-3.189, tol:0.01, msg:'That is the t Stat of the slope. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, GDP row. Excel shows it as -8.5E-05 or similar: type it that way.'}],
+  hint:`Data → Data Analysis → Regression. Input Y Range : B1:B72 (Gini). Input X Range : C1:C72
+  (GDP). Tick <b>Labels</b> and <b>Residuals</b>. The slope is a very small number : Excel writes it
+  in scientific notation, e.g., -8.5E-05 means −0.000085.`,
+  code:`Data → Data Analysis → Regression
+   Input Y Range:  B1:B72     ← Gini index
+   Input X Range:  C1:C72     ← GDP per capita
+   [x] Labels    [x] Residuals`,
+  say:`${B1} ≈ 36.18 and ${B2} ≈ −8.54E-05.`,
+  right:`${B1} ≈ <strong>36.18</strong> and ${B2} ≈ <strong>−0.0000854</strong>.
+  <span class="fx">The Master squints at the slope. So many zeros.</span>
+  A slope that small looks like nothing at all. Before you conclude that GDP does not matter, tell me
+  what this number is measured in.`,
+  widgetAfter:'fit', hud:{b1:'36.18', b2:'-8.54e-5'}, note:'Gini = 36.18 - 0.0000854 x GDP' },
+
+{ id:'t2b', type:'choice', bg:'lab', who:'master', mood:'raised', qn:'2',
+  title:'TRIAL III · SO MANY ZEROS',
+  text:`${B2} ≈ −0.0000854. <strong>What does it mean ?</strong>`,
+  q:'Choose the correct reading of the slope.',
+  options:[
+    {id:'a', label:'On average, one more dollar of GDP per capita goes with a Gini index lower by 0.0000854 points, i.e., 1,000 more dollars with a Gini lower by about 0.085 points. The size of the number depends on the unit of GDP.'},
+    {id:'b', label:'The slope is so close to zero that GDP has no relationship with inequality.'},
+    {id:'c', label:'One more dollar of GDP per capita lowers the Gini index by 8.54 points.'},
+    {id:'d', label:'Measuring GDP in thousands of dollars would leave the slope unchanged.'}
+  ], correct:'a',
+  hint:`A slope is measured in units of Y per unit of X. Here X is in dollars. What happens to the slope
+  if you measure GDP in thousands of dollars instead ?`,
+  right:`Exactly. Dollars are a tiny unit for a GDP per capita, so the slope per dollar is tiny. Measure
+  GDP in thousands of dollars and the same slope becomes −0.085 points per 1,000 dollars. Between the
+  poorest and the richest country of the file, that adds up to about 10 Gini points.
+  The size of a coefficient depends on the units. Whether it is distinguishable from zero is a
+  question for a test, not for the number of zeros.`,
+  wrong:{b:`The number of zeros depends on the unit of GDP. Measured in thousands of dollars, the slope
+  would be −0.085. Only a test can tell whether it is distinguishable from zero.`,
+  c:`−8.54E-05 is −0.0000854, not −8.54. Mind the E-05 : it shifts the decimal point five places.`,
+  d:`Dividing GDP by 1,000 multiplies the slope by 1,000. The relationship is the same; its unit is
+  not.`},
+  note:'b2 is per dollar: -0.085 Gini points per 1,000$; size depends on units' },
+
+{ id:'t3', type:'choice', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL IV · ARE THE ERRORS NORMAL ?',
+  text:`Before any test, check its assumptions. The fourth one says that the error terms are normally
+  distributed. <strong>Draw a normal QQ plot of the standardized residuals</strong>, as in the
+  lecture : standardize the residuals, sort them, compute the matching quantiles of N(0, 1), and plot
+  the sorted residuals against those quantiles.
+  <strong>What does your QQ plot show ?</strong>`,
+  q:'Read your QQ plot.',
+  options:[
+    {id:'a', label:'The points stay close to the 45° line, with small departures in the upper tail (a few countries much more unequal than predicted). There is no strong evidence against normality.'},
+    {id:'b', label:'The points form a clear S shape, far from the line: the residuals are strongly non-normal.'},
+    {id:'c', label:'All the points lie exactly on the line: the residuals are proven to be normal.'},
+    {id:'d', label:'A QQ plot cannot be used on residuals; it only works on the raw data.'}
+  ], correct:'a',
+  hint:`In the residual output, standardize each residual : (residual − average) / STDEV.S. Sort the
+  standardized residuals in ascending order. Next to the i-th one, compute the theoretical quantile
+  NORM.S.INV((i − 0.5)/71). Plot the sorted residuals (Y) against the quantiles (X) and add the line
+  y = x.`,
+  code:`E2:  =(D2 - AVERAGE($D$2:$D$72)) / STDEV.S($D$2:$D$72)   ← standardized residual, copy down
+      then copy column E as values and sort it (Data → Sort)
+F2:  =NORM.S.INV((ROW()-1-0.5)/71)                         ← theoretical quantile, copy down
+Chart: Scatter with X = F2:F72, Y = sorted E2:E72`,
+  right:`Exactly. The points hug the 45° line. The largest standardized residual, Angola at about
+  3.1, sits a little above it : a few countries are more unequal than the line predicts.
+  <span class="fx">Nothing is ever exactly normal. The question is whether the departure is large
+  enough to worry about.</span>
+  And remember the lecture : with 71 countries, the central limit theorem makes the OLS estimator
+  approximately normal even if the errors are not. Normality is not where this regression is
+  fragile.`,
+  wrong:{b:`Look at the middle of your plot : the points follow the line closely. Only the last two or
+  three points drift away.`,
+  c:`Real data never sit exactly on the line. A QQ plot can raise doubts; it never proves normality.`,
+  d:`The QQ plot compares any set of numbers with a distribution. Here we compare the standardized
+  residuals, our stand-ins for the error terms, with N(0, 1).`},
+  widgetAfter:'qq', note:'QQ plot: close to the 45° line, slight upper tail (Angola): normality not in doubt' },
+
+{ id:'t4', type:'choice', bg:'lab', who:'master', qn:'4',
+  title:'TRIAL V · IS THE VARIANCE CONSTANT ?',
+  text:`The third assumption says that the variance of the error term is the same for every country :
+  homoskedasticity. <strong>Draw the diagnostic plot of the lecture : the residuals on the vertical
+  axis, the fitted values on the horizontal axis.</strong>
+  Look carefully. Some people see a funnel in this plot.
+  <strong>What do you conclude ?</strong>`,
+  q:'Read your diagnostic plot.',
+  options:[
+    {id:'a', label:'The spread of the residuals is roughly the same along the fitted values. The cloud only looks narrower on the left because the countries are spread thinly there (the richer ones): fewer points per zone, not smaller variance. No strong evidence against homoskedasticity.'},
+    {id:'b', label:'There is a clear funnel: the variance of the errors grows with the fitted values, so the errors are heteroskedastic.'},
+    {id:'c', label:'Most residuals are close to zero, which proves that the model fits perfectly.'},
+    {id:'d', label:'The residuals average zero, which is the definition of homoskedasticity.'}
+  ], correct:'a',
+  hint:`The fitted values and the residuals are in the RESIDUAL OUTPUT of the regression. Plot Residuals
+  (Y) against Predicted Gini (X). Then compare the vertical spread in different zones of the
+  horizontal axis, and count how many countries each zone contains. A zone with five points always
+  looks thinner than a zone with forty.`,
+  code:`Scatter: X = Predicted Gini, Y = Residuals   (from the RESIDUAL OUTPUT)
+
+To compare the spreads fairly, sort the residual output by Predicted Gini,
+cut it into groups of equal size, and compare:
+=STDEV.S(???)          ← residuals of one group`,
+  right:`Exactly. Two thirds of the countries are poor or middle income, so their fitted values crowd
+  between 33 and 36. The richer third is spread thinly over a much wider range on the left, and a
+  thin zone always looks less spread than a crowded one.
+  Also, only 3 residuals out of
+  71, about 4%, fall outside ±1.96 standard deviations, as expected when the variance is constant.
+  <span class="fx">A diagnostic plot must be read with its density in mind.</span>`,
+  wrong:{b:`Count the points before you judge the spread. The left of the plot holds far fewer countries
+  per zone than the right. Compare groups with the same number of countries, and the funnel
+  disappears.`,
+  c:`Small residuals would mean a good fit, but R² is only 0.13. And the question is about the variance
+  of the residuals along the axis, not their size.`,
+  d:`Residuals always average zero in a regression with an intercept. Homoskedasticity is about their
+  spread being the same everywhere.`},
+  widgetAfter:'resid', note:'residual plot: constant spread; the "funnel" is a density effect (rich countries spread thinly)' },
+
+{ id:'beat', type:'info', bg:'court', who:'master', qn:'—',
+  title:'THE TRIAL OF THE SLOPE',
+  text:`The assumptions hold up well enough. Now the question of the exercise : <strong>is ${B2}
+  significant at the 5% significance level ?</strong>
+  <br><span class="kbd">${H0} : ${B2} = 0</span> against <span class="kbd">${H1} : ${B2} ≠ 0</span><br>
+  You know three ways to answer : compare the t-statistic with a critical value, compare the p-value
+  with the 5% significance level, or check whether the 95% confidence interval contains zero.
+  A 5% significance level and a 95% confidence level are two sides of the same coin : 95% = 1 − 5%.
+  We shall use all three, and see whether they agree.
+  <span class="fx">This time the variance of the error term is estimated, so the statistic follows a
+  Student t distribution with N − 2 = 69 degrees of freedom.</span>`,
+  widget:'tdist', banner:'H0: SLOPE = 0', cont:'Open the trial' },
+
+{ id:'t5', type:'numeric', bg:'court', who:'master', qn:'5.a',
+  title:'TRIAL VI · FIRST WITNESS : THE T-TEST',
+  text:`<span class="kbd">${H0} : ${B2} = 0</span> against <span class="kbd">${H1} : ${B2} ≠ 0</span>,
+  at the 5% significance level.
+  <strong>Report the t-statistic, the critical value and your decision.</strong>`,
+  q:'Run the t-test.',
+  fields:[
+    {id:'t', label:'t-statistic', value:-3.189, tol:0.01, strict:true,
+     alt:[{value:-8.5442e-5, tol:2e-6, msg:'That is the estimate itself. Divide it by its standard error.'},
+          {value:2.6793e-5, tol:1e-6, msg:'That is the standard error. The t-statistic is the estimate divided by it.'},
+          {value:37.778, tol:0.03, msg:'That is the t Stat of the intercept. Use the GDP row.'}],
+     msg:'t = (estimate − 0) / standard error, with the GDP row. Excel prints it in the t Stat column.'},
+    {id:'crit', label:'Critical value, two-sided, 5% significance level', value:1.995, tol:0.003, strict:true,
+     alt:[{value:1.96, tol:0.003, msg:'That is the quantile of the normal distribution. With an estimated variance, use the t distribution with 69 degrees of freedom: =T.INV(0.975, 69).'},
+          {value:1.667, tol:0.003, msg:'That is a one-sided critical value. The test is two-sided: =T.INV(0.975, 69).'},
+          {value:2.649, tol:0.003, msg:'That is the critical value at the 1% significance level. The significance level here is 5%.'},
+          {value:-1.995, tol:0.003, msg:'Report the positive critical value: we reject when the absolute value of t is larger than it.'}],
+     msg:'Use =T.INV(0.975, 69): 69 = 71 countries − 2 estimated coefficients.'},
+    {id:'d', kind:'select', label:'Decision at the 5% significance level', correct:'reject',
+     options:[['reject','Reject H₀: β₂ is significant'],['fail','Fail to reject H₀'],['accept','Accept H₀: β₂ = 0']],
+     msg:'Compare the absolute value of t with the critical value.'}],
+  hint:`The t-statistic is in the <b>t Stat</b> column, GDP row : it is the estimate divided by its
+  standard error, i.e., the test of ${B2} = 0. The critical value of a two-sided test at the 5%
+  significance level is <b>T.INV.2T(0.05, df)</b>, with df = N − 2.`,
+  code:`=??? / ???                 ← estimate / standard error (or read t Stat)
+=T.INV.2T(0.05, ???)       ← critical value, two-sided, 5% significance`,
+  say:'t ≈ −3.19, and |t| is larger than the critical value 1.995 : we reject H₀.',
+  right:`|t| ≈ <strong>3.19</strong>, larger than <strong>1.995</strong>. We reject ${H0} : the slope is
+  significant at the 5% significance level.
+  <span class="fx">By the way : with 69 degrees of freedom, the t critical value is barely different
+  from the normal 1.96. The t distribution matters in small samples.</span>
+  First witness heard. Now the second.`,
+  widgetAfter:'ttest', hud:{t:'-3.19'}, note:'t = -3.19, |t| > t(0.975; 69) = 1.995: reject b2 = 0' },
+
+{ id:'t5b', type:'numeric', bg:'court', who:'master', qn:'5.b',
+  title:'TRIAL VI · TWO MORE WITNESSES',
+  text:`Same hypothesis, two other ways of looking at it. The regression output already prints both,
+  next to the t Stat.
+  <strong>Report the p-value of the slope and its 95% confidence interval, then tell me whether the
+  three approaches agree.</strong>`,
+  q:'Hear the p-value and the confidence interval.',
+  fields:[
+    {id:'p', label:'p-value of the slope', value:0.002148, tol:0.0001, strict:true,
+     alt:[{value:0.001074, tol:0.00005, msg:'That is a one-sided p-value. The test is two-sided: =T.DIST.2T(ABS(t), 69), or the P-value column.'},
+          {value:0.001428, tol:0.00005, msg:'That p-value comes from the normal distribution. Use the t distribution with 69 degrees of freedom, as in the P-value column.'},
+          {value:0.997852, tol:0.0002, msg:'That is 1 minus the p-value. Read the P-value column, GDP row.'}],
+     msg:'Read the P-value column, GDP row, or compute =T.DIST.2T(ABS(t), 69). Excel may show 0.00215 or 2.15E-03.'},
+    {id:'lo', label:'Lower bound of the 95% confidence interval', value:-1.3889e-4, tol:0,
+     alt:[{value:-1.5641e-4, tol:1e-6, msg:'That is the lower bound of the 99% confidence interval. Use the 95% confidence level.'},
+          {value:34.273, tol:0.02, msg:'That is the interval of the intercept. Use the GDP row.'},
+          {value:-3.1991e-5, tol:2e-7, msg:'That is the upper bound. The lower bound is the more negative one.'}],
+     msg:'Read the Lower 95% column, GDP row, or compute estimate − critical value × standard error.'},
+    {id:'hi', label:'Upper bound of the 95% confidence interval', value:-3.1991e-5, tol:0,
+     alt:[{value:-3.2928e-5, tol:2e-7, msg:'That bound was built with 1.96. Use the t critical value, 1.995, or read the Upper 95% column.'},
+          {value:-1.4468e-5, tol:1e-6, msg:'That is the upper bound of the 99% confidence interval. Use the 95% confidence level.'},
+          {value:-1.3889e-4, tol:2e-6, msg:'That is the lower bound. The upper bound is the less negative one.'}],
+     msg:'Read the Upper 95% column, GDP row, or compute estimate + critical value × standard error.'},
+    {id:'agree', kind:'select', label:'The three approaches…', correct:'agree',
+     options:[['agree','…all reject H₀: |t| > 1.995, p-value < 5% significance level, and 0 lies outside the 95% confidence interval'],
+              ['ci','…disagree: the t-test rejects, but the 95% confidence interval contains 0'],
+              ['p','…disagree: the t-test rejects, but the p-value is above the 5% significance level']],
+     msg:'Check each witness: is the p-value below the 0.05 significance level? Is 0 inside your 95% confidence interval?'}],
+  hint:`The regression output prints, in the GDP row, a <b>P-value</b> column and the <b>Lower 95%</b>
+  and <b>Upper 95%</b> columns. You can also compute them : p-value = T.DIST.2T(|t|, 69), and the
+  interval = estimate ± critical value × standard error.`,
+  code:`=T.DIST.2T(ABS(???), 69)          ← two-sided p-value
+=??? - T.INV.2T(0.05, 69) * ???    ← lower bound: estimate − critical × SE
+=??? + T.INV.2T(0.05, 69) * ???    ← upper bound`,
+  say:'p ≈ 0.0021, and the 95% confidence interval is about [−1.39E-04 ; −3.20E-05]. The three approaches all reject H₀.',
+  right:`p-value ≈ <strong>0.0021</strong>, far below the 0.05 significance level. 95% confidence
+  interval ≈ <strong>[−0.000139 ; −0.000032]</strong> : entirely negative, zero is outside.
+  Three witnesses, one verdict : ${B2} is significantly different from zero at the 5% significance
+  level, i.e., with 95% confidence.`,
+  widgetAfter:'three', note:'p = 0.0021 < 0.05; 95% CI [-1.39e-4 ; -3.20e-5] excludes 0: same verdict' },
+
+{ id:'t5c', type:'choice', bg:'court', who:'master', mood:'raised', qn:'5.c',
+  title:'TRIAL VI · WHY THE WITNESSES AGREE',
+  text:`Three different numbers, three different rules, and the same verdict.
+  <strong>Is that a coincidence ?</strong>`,
+  q:'Choose the explanation.',
+  options:[
+    {id:'a', label:'No: the three are the same test written three ways. |t| > critical value exactly when the p-value < 5% significance level, and exactly when the 95% confidence interval excludes 0. They always agree, as long as the confidence level equals 1 − the significance level.'},
+    {id:'b', label:'Yes: they agree here by luck, and could easily disagree with other data.'},
+    {id:'c', label:'No: they agree because the sample is large; in small samples they disagree.'},
+    {id:'d', label:'No: the p-value and the interval are computed from the t-statistic, but the t-test is more reliable, so it decides when they disagree.'}
+  ], correct:'a',
+  hint:`The 95% confidence interval contains every value that the t-test at the 5% significance level
+  would not reject. And the p-value is the significance level at which your t-statistic would sit
+  exactly on the critical value.`,
+  right:`Exactly. The 95% confidence interval is built from the same estimate, standard error and
+  critical value as the t-test : it collects every value of ${B2} that the test at the 5% significance
+  level would not reject. And the p-value is the smallest significance level at which ${H0} would be
+  rejected. One test, three presentations.
+  <span class="fx">They can only disagree if you mix levels : a test at the 5% significance level with
+  a 99% confidence interval, for instance.</span>`,
+  wrong:{b:`It is not luck : when the confidence level equals 1 − the significance level, the three
+  rules are mathematically equivalent. Try to find data on which they disagree : you will not.`,
+  c:`The equivalence holds in every sample size, as long as the three use the same distribution, and
+  the confidence level equals 1 − the significance level.`,
+  d:`They never disagree when the confidence level equals 1 − the significance level, so there is
+  nothing to arbitrate. They are three ways of reading the same comparison.`},
+  note:'t-test, p-value and confidence interval: one test, three presentations' },
+
+{ id:'t6', type:'choice', bg:'world', who:'master', qn:'conclusion',
+  title:'TRIAL VII · THE VERDICT ON KUZNETS',
+  text:`The slope is significantly negative. The Master wants to write in his memoirs that prosperity
+  cures inequality.
+  <strong>Which conclusion can he defend ?</strong>`,
+  q:'Choose the defensible conclusion.',
+  options:[
+    {id:'a', label:'Across these 71 countries in 2018, richer countries tend to be less unequal, and the association is significant. But GDP explains only about 13% of the variation (R² = 0.13), and a single year of many countries says nothing about how one country evolves as it grows.'},
+    {id:'b', label:'Growth reduces inequality: every country that becomes richer will become more equal.'},
+    {id:'c', label:'The slope is too small to matter, so GDP and inequality are unrelated.'},
+    {id:'d', label:'The p-value of 0.002 means that there is a 0.2% probability that the claim is false.'}
+  ], correct:'a',
+  hint:`Three things to keep apart : is the slope significant, is the relationship strong, and does a
+  comparison between countries tell us what happens inside one country over time ?`,
+  right:`Exactly. Significant is not strong : R² ≈ 0.13 leaves most of the differences in inequality
+  unexplained. And a comparison of countries in 2018 is not the history of one country over time,
+  which is what Kuznets described.
+  <span class="fx">The Master crosses out “cures” and writes “goes with, on average, in 2018”. It is
+  less catchy. It is true.</span>`,
+  wrong:{b:`A cross-section compares different countries in the same year. It does not follow any
+  country as it grows, and an association is not a cause.`,
+  c:`Measured per 1,000 dollars the slope is −0.085, and it is significant. Small units make small
+  numbers, not small effects.`,
+  d:`A p-value is not the probability that the hypothesis is true or false. It says how surprising the
+  data would be if ${B2} were 0.`},
+  note:'significant (t = -3.19) but weak (R2 = 0.13), and a cross-section is not a history' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`Prosperity does not cure inequality. It goes with a little less of it, on average, across
+  countries.
+  Four rules leave with you.
+  <strong>One.</strong> Plot first, and read a plot with its density in mind : fewer points look less
+  spread, they are not.
+  <strong>Two.</strong> Check the assumptions before you trust a test : the QQ plot for normality, the
+  residuals against the fitted values for homoskedasticity.
+  <strong>Three.</strong> The t-test, the p-value and the confidence interval are one test in three
+  costumes. With a 95% confidence level and a 5% significance level, they always agree.
+  <strong>Four.</strong> The size of a coefficient depends on its units; its significance does not.
+  And significant is neither strong nor causal.`,
+  banner:'PLOT. CHECK. TEST. STAY HUMBLE.', cont:'Finish', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {b1:'—', b2:'—', t:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the scatter plot and the fitted line, the QQ plot of
+   the standardized residuals, the residuals against the fitted values
+   with a ±1.96·s band, the t distribution of the test, and the three
+   ways of reading it. Points are never connected; hovering a point
+   shows its country.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series, straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="7 6"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||4}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.8}" stroke="${PLOT.paper}" stroke-width="1">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{ labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* residuals of the fitted line, and their standardized version */
+function residuals(){
+  const e = DATA.GINI.map((g,i)=>g - giniAt(DATA.GDP[i]));
+  const m = e.reduce((a,b)=>a+b,0)/e.length;
+  const s = Math.sqrt(e.reduce((a,b)=>a+(b-m)*(b-m),0)/(e.length-1));
+  return {e, s, z:e.map(v=>(v-m)/s)};
+}
+/* quantile of N(0, 1), Acklam's rational approximation */
+function qnorm(p){
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00],
+        b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01],
+        c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00],
+        d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const tail=q=>(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  if(p<0.02425) return tail(Math.sqrt(-2*Math.log(p)));
+  if(p>1-0.02425) return -tail(Math.sqrt(-2*Math.log(1-p)));
+  const q=p-0.5, r=q*q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+
+/* ---- the cold open: the first rows of the file ---- */
+function playTable(host){
+  const cols=[90,400,580];
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=108+i*24;
+    rows += TXT(cols[0],y,DATA.COUNTRY[i],{sz:19,anchor:'start'}) + TXT(cols[1],y,DATA.GINI[i].toFixed(1),{sz:19})
+          + TXT(cols[2],y,Math.round(DATA.GDP[i]).toLocaleString('en-US'),{sz:19});
+  }
+  const svg=`<svg viewBox="0 0 700 250" style="width:100%;height:auto;display:block">
+    <rect width="700" height="250" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'KUZNETS_GINI_GDP_V2.XLSX · THE FIRST FIVE OF 71 COUNTRIES',{sz:18,anchor:'start'})}
+    ${TXT(cols[0],70,'country (A)',{sz:19,col:PLOT.ink,anchor:'start'})}${TXT(cols[1],70,'Gini index (B)',{sz:19,col:PLOT.ink})}
+    ${TXT(cols[2],70,'GDP per capita, $ (C)',{sz:19,col:PLOT.ink})}
+    <line x1="80" y1="80" x2="660" y2="80" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(350,236,'Gini index: 0 = perfect equality, 100 = perfect inequality · GDP at purchasing power parity, 2018',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE FILE', svg, 'Source: World Bank, World Development Indicators.');
+  return 600;
+}
+
+/* ---- Gini against GDP, with or without the fitted line ---- */
+function playScatter(host, withFit){
+  const o = {
+    series:[{x:DATA.GDP.map(v=>v/1000), y:DATA.GINI,
+             tip:i=>`${DATA.COUNTRY[i]}: Gini ${DATA.GINI[i].toFixed(1)}, GDP ${Math.round(DATA.GDP[i]).toLocaleString('en-US')} $`}],
+    lines:[], labels:[],
+    xmin:0, xmax:120, ymin:20, ymax:55,
+    xticks:[0,20,40,60,80,100,120], yticks:[20,25,30,35,40,45,50,55],
+    title: withFit ? 'Gini = 36.18 − 0.0000854 × GDP' : 'Gini index against GDP per capita, 71 countries, 2018',
+    xlab:'GDP per capita (thousands of US$, PPP)', ylab:'Gini index'
+  };
+  if(withFit){
+    const x0=1.2, x1=115.05;
+    o.lines.push({x1:x0, y1:giniAt(x0*1000), x2:x1, y2:giniAt(x1*1000)});
+    o.labels.push({x:118, y:giniAt(115050)-2.4, text:'−0.085 per 1,000 $', anchor:'end', col:PLOT.fit});
+  }
+  host.innerHTML = plotFrame(withFit ? 'EVIDENCE · THE FITTED LINE' : 'EVIDENCE · THE CLOUD', panelSVG(o),
+    withFit ? 'The axis is in thousands of dollars: per 1,000 $, the slope is −0.085 Gini points.'
+            : 'One point is one country. Three quarters of them sit below 40,000 $.');
+  return 900;
+}
+
+/* ---- normal QQ plot of the standardized residuals ---- */
+function playQQ(host){
+  const r = residuals(), n = r.z.length;
+  const idx = r.z.map((v,i)=>i).sort((a,b)=>r.z[a]-r.z[b]);
+  const zs = idx.map(i=>r.z[i]), q = zs.map((v,k)=>qnorm((k+1-0.5)/n));
+  const top = idx[n-1];
+  const o = {
+    series:[{x:q, y:zs, tip:k=>`${DATA.COUNTRY[idx[k]]}: standardized residual ${zs[k].toFixed(2)}`}],
+    lines:[{x1:-2.8, y1:-2.8, x2:3.2, y2:3.2, color:PLOT.fit}],
+    labels:[{x:q[n-1]-0.12, y:zs[n-1]+0.05, text:DATA.COUNTRY[top], anchor:'end', col:PLOT.second}],
+    xmin:-3, xmax:3.3, ymin:-3, ymax:3.6,
+    xticks:[-3,-2,-1,0,1,2,3], yticks:[-3,-2,-1,0,1,2,3],
+    title:'Sorted standardized residuals against N(0, 1) quantiles',
+    xlab:'Theoretical quantiles of N(0, 1)', ylab:'Standardized residuals'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE QQ PLOT', panelSVG(o),
+    'Normal errors put the points on the red 45° line. Only the upper tail drifts a little above it.');
+  return 900;
+}
+
+/* ---- residuals against fitted values, with a ±1.96·s band ---- */
+function playResid(host){
+  const r = residuals(), f = DATA.GDP.map(x=>giniAt(x)), band = 1.96*r.s;
+  const o = {
+    series:[{x:f, y:r.e, tip:i=>`${DATA.COUNTRY[i]}: fitted ${f[i].toFixed(1)}, residual ${r.e[i].toFixed(1)}`}],
+    lines:[{x1:25.5, y1:0, x2:37, y2:0, color:PLOT.axis, w:1.2},
+           {x1:25.5, y1:band, x2:37, y2:band, color:PLOT.fit, dash:true},
+           {x1:25.5, y1:-band, x2:37, y2:-band, color:PLOT.fit, dash:true}],
+    labels:[{x:25.7, y:band+1, text:'+1.96 s', col:PLOT.fit}, {x:25.7, y:-band-2, text:'−1.96 s', col:PLOT.fit}],
+    xmin:25.5, xmax:37, ymin:-14, ymax:18,
+    xticks:[26,28,30,32,34,36], yticks:[-10,-5,0,5,10,15],
+    title:'Residuals against fitted values',
+    xlab:'Fitted Gini index', ylab:'Residual'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE DIAGNOSTIC PLOT', panelSVG(o),
+    'Two thirds of the countries crowd between 33 and 36. Spread is the same everywhere; density is not. 3 of 71 points lie outside the band.');
+  return 900;
+}
+
+/* ---- the t distribution with 69 df, its rejection region, and t ---- */
+function lgamma(z){
+  const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+    -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(z<0.5) return Math.log(Math.PI/Math.abs(Math.sin(Math.PI*z)))-lgamma(1-z);
+  z-=1; let x=c[0];
+  for(let i=1;i<9;i++) x+=c[i]/(z+i);
+  const t=z+7.5;
+  return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x);
+}
+function tpdf(x,n){ return Math.exp(lgamma((n+1)/2)-lgamma(n/2)-0.5*Math.log(n*Math.PI)-(n+1)/2*Math.log(1+x*x/n)); }
+function playT(host, withStat){
+  const W=700,H=250,L=30,R=670,T=44,B=196,xmin=-4.5,xmax=4.5,ymax=0.42;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L), py=v=>B-v/ymax*(B-T);
+  let curve='';
+  for(let x=xmin;x<=xmax+1e-9;x+=0.05) curve+=(curve?'L':'M')+px(x).toFixed(1)+' '+py(tpdf(x,FIT.df)).toFixed(1)+' ';
+  const tail=(a,b)=>{
+    let p=`M${px(a).toFixed(1)} ${B} `;
+    for(let x=a;x<=b+1e-9;x+=0.05) p+=`L${px(x).toFixed(1)} ${py(tpdf(x,FIT.df)).toFixed(1)} `;
+    return `<path d="${p}L${px(b).toFixed(1)} ${B} Z" fill="${PLOT.fit}" fill-opacity=".28"/>`;
+  };
+  let ticks='';
+  [-4,-3,-2,-1,0,1,2,3,4].forEach(v=>{ ticks+=`<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>`+TXT(px(v),B+21,v,{sz:15}); });
+  const tx=px(FIT.t);
+  const stat = withStat ? `<line x1="${tx.toFixed(1)}" y1="${B}" x2="${tx.toFixed(1)}" y2="${T+10}" stroke="${PLOT.second}" stroke-width="3"/>`
+    + TXT((tx+8).toFixed(1), T+16, 't = ' + FIT.t.toFixed(2), {sz:18, col:PLOT.second, anchor:'start'}) : '';
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,'If H0 is true, t follows a Student t distribution with 69 degrees of freedom',{sz:17,anchor:'start'})}
+    ${tail(xmin,-FIT.crit)}${tail(FIT.crit,xmax)}
+    <path d="${curve}" fill="none" stroke="${PLOT.ink}" stroke-width="2"/>
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT(px(0),py(0.2),'95%',{sz:20,col:PLOT.ink})}
+    ${TXT(px(-FIT.crit),B+40,'-1.995',{sz:16,col:PLOT.fit})}${TXT(px(FIT.crit),B+40,'1.995',{sz:16,col:PLOT.fit})}
+    ${stat}
+  </svg>`;
+  host.innerHTML = plotFrame(withStat ? 'EVIDENCE · WHERE YOUR t FALLS' : 'THE RULE · A TWO-SIDED t-TEST AT 5% SIGNIFICANCE', svg,
+    withStat ? 'The observed t lies in the left rejection region: 2.5% of the distribution lies beyond each critical value.'
+             : '2.5% in each shaded tail. With 69 degrees of freedom, the t distribution is very close to N(0, 1).');
+  return 900;
+}
+
+/* ---- three witnesses, one verdict, and the interval on a ruler ---- */
+function playThree(host){
+  const card=(x,title,l1,l2,l3)=>`
+    <rect x="${x}" y="48" width="200" height="118" fill="#fbfaf4" stroke="${PLOT.ink}" stroke-width="2"/>
+    ${TXT(x+100,74,title,{sz:19,col:PLOT.ink})}
+    ${TXT(x+100,102,l1,{sz:17})}${TXT(x+100,126,l2,{sz:17})}
+    ${TXT(x+100,154,l3,{sz:19,col:PLOT.fit})}`;
+  const L=60, R=640, A=232, xmin=-1.6e-4, xmax=0.2e-4;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L);
+  let ticks='';
+  [-1.6e-4,-1.2e-4,-0.8e-4,-0.4e-4,0].forEach(v=>{ ticks += `<line x1="${px(v)}" y1="${A}" x2="${px(v)}" y2="${A+5}" stroke="${PLOT.axis}"/>`
+    + TXT(px(v), A+21, v===0?'0':(v*1e4).toFixed(1)+'e-4', {sz:15}); });
+  const svg=`<svg viewBox="0 0 700 270" style="width:100%;height:auto;display:block">
+    <rect width="700" height="270" fill="${PLOT.paper}"/>
+    ${TXT(30,28,'H0: slope = 0, at the 5% significance level',{sz:18,anchor:'start'})}
+    ${card(30,'t-TEST','|t| = 3.19','critical 1.995','REJECT')}
+    ${card(250,'p-VALUE','p = 0.0021','significance 0.05','REJECT')}
+    ${card(470,'95% CONFIDENCE','[-1.39e-4 ;','-3.20e-5]','0 OUTSIDE: REJECT')}
+    <rect x="${px(FIT.lo)}" y="${A-26}" width="${px(FIT.hi)-px(FIT.lo)}" height="12" fill="${PLOT.ink}"/>
+    <circle cx="${px(FIT.b2)}" cy="${A-20}" r="6" fill="${PLOT.paper}" stroke="${PLOT.fit}" stroke-width="2.5"/>
+    <line x1="${px(0)}" y1="${A-40}" x2="${px(0)}" y2="${A}" stroke="${PLOT.fit}" stroke-width="2" stroke-dasharray="5 4"/>
+    ${TXT(px(0)+6,A-30,'0',{sz:16,col:PLOT.fit,anchor:'start'})}
+    <line x1="${L}" y1="${A}" x2="${R}" y2="${A}" stroke="${PLOT.axis}"/>
+    ${ticks}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THREE WITNESSES, ONE VERDICT', svg,
+    'The bar is the 95% confidence interval of the slope, the circle its estimate. Zero lies outside the interval.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='scatter') return playScatter(host, false);
+  if(name==='fit')     return playScatter(host, true);
+  if(name==='qq')      return playQQ(host);
+  if(name==='resid')   return playResid(host);
+  if(name==='tdist')   return playT(host, false);
+  if(name==='ttest')   return playT(host, true);
+  if(name==='three')   return playThree(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your workbook step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+function tolerance(f){
+  const abs = f.tol || 0;
+  if(f.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(f.value));
+}
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){ if(Math.abs(v-a.value) <= a.tol) return a.msg; }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE6',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise VI</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+/* two data files: the button names its file in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — no password: this exercise is not graded
+   ================================================================ */
+function finish(){
+  $('#endblurb').innerHTML =
+    `You looked at the cloud before fitting the line, read a slope full of zeros in the right units,
+     checked the normality of the errors with a QQ plot and their constant variance with a
+     diagnostic plot, without being fooled by a funnel made of sparse points. Then you tested the
+     slope three ways, with the t-statistic, the p-value and the confidence interval, and saw
+     that they are one and the same test.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: PROSPERITY CURES INEQUALITY';
+  show('scr-end');
+}
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v6.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE VI ........ KUZNETS, 1955",
+  "DATA ........................ 71 COUNTRIES, 2018",
+  "ASSUMPTIONS ................. TO BE CHECKED",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
