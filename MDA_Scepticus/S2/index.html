@@ -1,1 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 2: The Price of Convenience</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 2
+  "The Price of Convenience"
+  EDHEC · Multivariate Data Analysis · Empirical Session 2
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine and same characters as Empirical Exercise 1.
+
+  HOW THE EXERCISE WORKS
+  ----------------------
+  The game does NOT compute anything. Students work in two windows:
+     Excel      open Monoprix_Carrefour.xlsx and compute every number;
+     this game  report numbers, choose interpretations, get feedback.
+  There is no questions PDF: Master Scepticus asks the questions one
+  after the other. Every question has a HINT button.
+
+  DIFFERENCES WITH EXERCISE 1
+  ---------------------------
+  * No SHOW THE ANSWER button: students must find every answer.
+  * Not graded: no password. Five checkpoints save the progress; the
+    latest one stays visible at the top of the notebook.
+        CP1  scatter plot and correlation done
+        CP2  regression estimated, R2 reported
+        CP3  question 1 done (same bill? basket)
+        CP4  question 2 done (prediction at 3.19)
+        CP5  question 3 done = exercise completed
+  * The checkpoint reached is remembered by the browser, and the intro
+    screen offers to resume from it.
+
+  DATA
+  ----
+  Prices in euros of 20 products, same brand and size, on the Monoprix
+  and Carrefour websites. Column A: product, B: Monoprix, C: Carrefour.
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ---------- checkpoint: always visible at the top of the notebook ---------- */
+#cpbox{padding:7px 9px; background:#fff6d6; border-bottom:2px solid var(--panel-dk); font-family:var(--mono); color:#111}
+#cpbox .cphead{display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:16px; color:#5a4a1a}
+#cpbox .cpnone{font-size:16px; color:#777}
+.cpcard{margin:10px 0 4px; padding:12px 14px; background:#2a2005; border:2px solid; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.cpcard .cptitle{font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.5px; color:var(--amber)}
+.cpcard p{margin:6px 0 0; font-size:14px; line-height:1.55; color:var(--cream)}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE II</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data>DATA (XLSX)</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE PRICE OF<br>CONVENIENCE</h1>
+      <h2>Empirical Exercise II &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus does his shopping at Monoprix, next door, and claims that it costs no more
+      than Carrefour. The prices of 20 products in both shops will judge him. You will draw a scatter
+      plot, estimate a simple linear regression, read its coefficients, and use it to predict
+      prices, once wisely and once not.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>Monoprix_Carrefour.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and open it in Excel. Compute every number
+        there. Keep your workbook: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, choose the interpretations, and defend them in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example Excel formula, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p><strong style="color:var(--amber)">Checkpoints.</strong> Five times during the exercise, your
+      progress is saved. The latest checkpoint always stays at the top of your notebook. If you close
+      this window, you can resume from your last checkpoint on the same computer.</p>
+      <p>Type numbers with a dot or a comma as the decimal separator, e.g., <code>4.02</code> or
+      <code>4,02</code>. Give prices in euros to the cent, e.g., <code>4.02</code>, and the other
+      numbers with three decimals, e.g., <code>0.984</code>.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">In the file, column <code>A</code> holds the products, column
+        <code>B</code> the Monoprix prices and column <code>C</code> the Carrefour prices. Row 1
+        holds the names; rows 2 to 21 hold the 20 products. English Excel separates the arguments of
+        a function with a comma; French Excel uses a semicolon, e.g.,
+        <code>=PENTE(B2:B21;C2:C21)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code></td><td><code>=NB(plage)</code></td><td>Counts the cells that contain numbers.</td><td><code>=COUNT(C2:C21)</code></td></tr>
+            <tr><td><code>=MIN(range)</code>, <code>=MAX(range)</code></td><td><code>=MIN</code>, <code>=MAX</code></td><td>Smallest and largest value of a range.</td><td><code>=MAX(C2:C21)</code></td></tr>
+            <tr><td><code>=CORREL(r1, r2)</code></td><td><code>=COEFFICIENT.CORRELATION(r1; r2)</code></td><td>Empirical correlation.</td><td><code>=CORREL(B2:B21, C2:C21)</code></td></tr>
+            <tr><td>Insert → Charts → Scatter</td><td>Insertion → Graphiques → Nuage de points</td><td>Scatter plot. Right-click → Select Data to choose which column goes on which axis.</td><td>X: C2:C21, Y: B2:B21</td></tr>
+            <tr><td>Data → Data Analysis → Regression</td><td>Données → Utilitaire d’analyse → Régression</td><td>Full regression output: coefficients, R Square, residuals. If it is missing: File → Options → Add-ins → Analysis ToolPak.</td><td>Y range: B1:B21, X range: C1:C21, tick Labels</td></tr>
+            <tr><td><code>=INTERCEPT(y, x)</code></td><td><code>=ORDONNEE.ORIGINE(y; x)</code></td><td>OLS intercept of the regression of y on x.</td><td><code>=INTERCEPT(B2:B21, C2:C21)</code></td></tr>
+            <tr><td><code>=SLOPE(y, x)</code></td><td><code>=PENTE(y; x)</code></td><td>OLS slope of the regression of y on x.</td><td><code>=SLOPE(B2:B21, C2:C21)</code></td></tr>
+            <tr><td><code>=RSQ(y, x)</code></td><td><code>=COEFFICIENT.DETERMINATION(y; x)</code></td><td>Coefficient of determination R².</td><td><code>=RSQ(B2:B21, C2:C21)</code></td></tr>
+            <tr><td><code>=LINEST(y, x, 1, 1)</code></td><td><code>=DROITEREG(y; x; 1; 1)</code></td><td>Regression table in one formula. Careful: the slope comes first, then the intercept.</td><td><code>=LINEST(B2:B21, C2:C21, 1, 1)</code></td></tr>
+            <tr><td><code>$F$18</code></td><td><code>$F$18</code></td><td>Absolute reference: it stays fixed when you copy the formula down.</td><td><code>=$F$17+$F$18*C2</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn primary" id="btn-begin">BEGIN</button>
+        <button class="btn amber" id="btn-resume" style="display:none"></button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>intercept a</span><b id="hud-a">—</b></div>
+            <div class="hudrow"><span>slope b</span><b id="hud-b">—</b></div>
+            <div class="hudrow"><span>R²</span><b id="hud-r2">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div id="cpbox"></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:400px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise II &nbsp;·&nbsp; The Price of Convenience</h2>
+      <p id="endblurb"></p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data of the exercise, downloaded by the DATA (XLSX) button */
+  DATA_FILE: "https://www.dropbox.com/scl/fi/ny9o44lvinv5tdh8arjsf/Monoprix_Carrefour.xlsx?rlkey=e1fgssftg1ex79zkpzrwaj3sh&raw=1",
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { aisle:'', lab:'', till:'' },
+  FALLBACK: {
+    aisle:"linear-gradient(180deg,#0f0a14,#2e1f3d 60%,#5a3a6b)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    till: "linear-gradient(180deg,#140a06,#3d1f12 60%,#6b3a1e)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted, unless the
+     field is marked 'strict', in which case its own 'tol' applies.   */
+  RTOL: 0.02,
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2,
+  /* browser storage key for the latest checkpoint reached */
+  STORE_KEY: 'academyDoubt.E2.progress.v2'
+};
+
+/* number of checkpoints: each one saves the progress in the browser */
+const N_CP = 5;
+
+/* ================================================================
+   DATA — the 20 products of Monoprix_Carrefour.xlsx, embedded for
+   the pictures only. The student computes everything in Excel.
+   ================================================================ */
+const DATA = {
+  ITEMS:["Mignonnette Noir de noir","Mignonnette Noir orange","Bloc noir Pistache","Chocolat noir truffé","Delichoc noir","La goudale à l'ancienne","Maltesers 192.5g","Le chat l'expert (lessive)","Le chat bébé","Huile olive vierge classico carapelli","Tyrrels barbecue (chips)","Tyrrels Veg (chips)","Pom'Potes 5 fruits","Bonne Maman cerise intense","Bonne Maman abricot intense","Bonne maman galettes beurre","Bonne maman petites galettes choco","Ben and Jerry's half baked","Ben and Jerry's cookie Dough","20 snickers mini"],
+  MONO:[3.99,3.99,2.99,2.85,1.95,2.99,3.19,15.99,14.9,9.29,3.19,3.79,2.49,2.95,2.35,2.15,3.29,6.65,6.65,4.69],
+  CARR:[3.42,3.77,3.0,2.47,1.49,2.35,2.53,14.78,11.78,6.09,2.55,3.35,2.05,2.25,1.85,1.75,2.49,5.11,4.56,3.43]
+};
+const OLS = { a:0.324551, b:1.157506, xmin:1.49, xmax:14.78 };
+const fitAt = x => OLS.a + OLS.b*x;
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   A number field is accepted within CONFIG.RTOL of its target or within
+   its own 'tol', whichever is larger; 'strict:true' keeps 'tol' alone.
+   'alt' lists common wrong values, each with its own feedback. 'pct:true'
+   catches a proportion typed as a percentage.
+
+   'cp:n' awards checkpoint n once the step is solved: it is announced
+   under the Master's reply and pinned at the top of the notebook.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const STEPS = [
+{ id:'open', type:'info', bg:'aisle', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE II',
+  text:`Since last week, my nephew Lucius counts every euro. Good. Now he asks me where to do his
+  shopping.
+  <span class="fx">The Master puts down a Monoprix bag. It is very full, and it was very
+  convenient.</span>
+  I shop at Monoprix, next door. Carrefour is across town. My claim : for the same product, the two
+  shops charge the same price. Convenience costs nothing.
+  The file contains the prices of <strong>20 products</strong>, same brand and same size, found on
+  the websites of both shops. Today you will fit a line through them :
+  <br><span class="kbd">Monoprix<sub>i</sub> = a + b · Carrefour<sub>i</sub> + ε<sub>i</sub></span><br>
+  If the two shops charge the same prices, the intercept (a) should be close to 0 and the slope (b) close to 1.`,
+  widget:'table', banner:'CLAIM: SAME PRICES EVERYWHERE', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE RECEIPTS',
+  text:`Download the Excel file with the DATA (XLSX) button at the top and open it. Column A holds the
+  products, column B the Monoprix prices and column C the Carrefour prices, in euros. Row 1 holds the
+  names.
+  <strong>How many products does the file contain, and what are the cheapest and the most expensive
+  Carrefour prices ?</strong>
+  Remember the last two numbers. They will matter at the end.`,
+  q:'Report what your workbook says.',
+  fields:[
+    {id:'n', label:'Number of products', value:20, tol:0, strict:true,
+     alt:[{value:21, tol:0, msg:'Row 1 holds the names, not a product. Count the numbers only, i.e., =COUNT(C2:C21).'},
+          {value:40, tol:0, msg:'That counts both price columns. Each product appears once: count one column.'}],
+     msg:'Count the numbers in column C with =COUNT(C2:C21).'},
+    {id:'cmin', label:'Cheapest Carrefour price, in €', value:1.49, tol:0.005, strict:true,
+     alt:[{value:1.95, tol:0.005, msg:'That is the cheapest Monoprix price. Carrefour is in column C.'}],
+     msg:'Use =MIN(C2:C21).'},
+    {id:'cmax', label:'Most expensive Carrefour price, in €', value:14.78, tol:0.005, strict:true,
+     alt:[{value:15.99, tol:0.005, msg:'That is the most expensive Monoprix price. Carrefour is in column C.'}],
+     msg:'Use =MAX(C2:C21).'}],
+  hint:`<b>COUNT</b> counts the cells that contain numbers. <b>MIN</b> and <b>MAX</b> return the
+  smallest and the largest value of a range. The prices run from row 2 to row 21. In French Excel,
+  COUNT is called NB, and the arguments are separated by a semicolon.`,
+  code:`=COUNT(C2:C21)
+=MIN(C2:C21)
+=MAX(???)`,
+  say:'20 products. At Carrefour, prices go from 1.49 € to 14.78 €.',
+  right:`<strong>20</strong> products, from <strong>1.49 €</strong> (a chocolate bar) to
+  <strong>14.78 €</strong> (a detergent) at Carrefour.
+  Twenty products is a small basket. Keep it in mind : everything we conclude today comes from these
+  twenty, and from this price range.`,
+  note:'20 products; Carrefour prices from 1.49 to 14.78 euros' },
+
+{ id:'t1', type:'numeric', bg:'lab', who:'master', qn:'plot',
+  title:'TRIAL II · LOOK BEFORE YOU FIT',
+  text:`Before any line, a picture. <strong>Draw a scatter plot with the Carrefour price on the
+  horizontal axis and the Monoprix price on the vertical axis.</strong> In the model, Monoprix is the
+  dependent variable : it goes up the vertical axis.
+  Then compute the empirical correlation between the two prices, and tell me what the cloud looks
+  like.`,
+  q:'Describe the cloud.',
+  fields:[
+    {id:'r', label:'Correlation between the Monoprix and the Carrefour prices', value:0.9839, tol:0.01, strict:true,
+     alt:[{value:0.9681, tol:0.0015, msg:'That is the squared correlation. Report the correlation itself.'}],
+     msg:'Use =CORREL(B2:B21, C2:C21).'},
+    {id:'shape', kind:'select', label:'The points of your scatter plot…', correct:'line',
+     options:[['line','…lie close to an increasing straight line'],
+              ['curve','…follow a clear curve, not a straight line'],
+              ['none','…form a shapeless cloud'],
+              ['down','…lie close to a decreasing straight line']],
+     msg:'Look at your chart: when the Carrefour price grows, what does the Monoprix price do, and how far are the points from a straight line?'}],
+  hint:`Insert an empty scatter chart (Insert → Charts → Scatter), then right-click it → Select Data →
+  Add. Choose C2:C21 for the X values (Carrefour) and B2:B21 for the Y values (Monoprix). If you
+  select both columns at once, Excel puts column B on the horizontal axis, which is the wrong way
+  round. <b>CORREL</b> gives the correlation.`,
+  code:`=CORREL(B2:B21, C2:C21)
+
+Chart → Select Data → Add:
+   Series X values:  C2:C21     ← Carrefour, horizontal
+   Series Y values:  B2:B21     ← Monoprix, vertical`,
+  say:'r ≈ 0.984, and the points lie close to an increasing straight line.',
+  right:`r ≈ <strong>0.984</strong>. The points hug an increasing straight line : what is expensive at
+  Carrefour is expensive at Monoprix.
+  <span class="fx">The Master nods. So far, the data agree with him.</span>
+  A line is a good idea. Look at the dashed diagonal in the picture : that is where a product would
+  sit if both shops charged exactly the same price. Where are most of the points ?`,
+  widgetAfter:'scatter', cp:1, note:'corr(Monoprix, Carrefour) = 0.984: an increasing straight line' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'OLS',
+  title:'TRIAL III · DRAW THE LINE',
+  text:`Now estimate the model by ordinary least squares :
+  <br><span class="kbd">Monoprix<sub>i</sub> = a + b · Carrefour<sub>i</sub> + ε<sub>i</sub></span><br>
+  Use Data → Data Analysis → Regression, or the functions of the Excel helper. The Monoprix price is
+  the dependent variable (Y); the Carrefour price is the explanatory variable (X).
+  <strong>Report the estimated intercept a and the estimated slope b.</strong>`,
+  q:'Report the two OLS estimates.',
+  fields:[
+    {id:'a', label:'Estimated intercept a', value:0.3246, tol:0.005, strict:true,
+     alt:[{value:-0.1419, tol:0.005, msg:'You swapped Y and X: that regression explains Carrefour with Monoprix. Y is the Monoprix column, B.'},
+          {value:1.1575, tol:0.01, msg:'That is the slope. The intercept is in the Intercept row. With LINEST, the slope comes first.'},
+          {value:0.2594, tol:0.003, msg:'That is the standard error of the intercept. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Intercept row, or use =INTERCEPT(B2:B21, C2:C21).'},
+    {id:'b', label:'Estimated slope b', value:1.1575, tol:0.003, strict:true,
+     alt:[{value:0.8363, tol:0.003, msg:'You swapped Y and X: that regression explains Carrefour with Monoprix. Y is the Monoprix column, B.'},
+          {value:0.3246, tol:0.005, msg:'That is the intercept. The slope is in the Carrefour row. With LINEST, the slope comes first.'},
+          {value:0.0496, tol:0.002, msg:'That is the standard error of the slope. Read the Coefficients column.'},
+          {value:23.354, tol:0.05, msg:'That is the t Stat of the slope. Read the Coefficients column.'},
+          {value:1.2376, tol:0.003, msg:'That is the total Monoprix bill divided by the total Carrefour bill, not the OLS slope.'}],
+     msg:'Read the Coefficients column, Carrefour row, or use =SLOPE(B2:B21, C2:C21).'}],
+  hint:`Data → Data Analysis → Regression. Input Y Range : B1:B21. Input X Range : C1:C21. Tick
+  <b>Labels</b>, because row 1 holds the names. The estimates are in the Coefficients column. If Data
+  Analysis is missing, activate the Analysis ToolPak (File → Options → Add-ins), or use
+  <b>INTERCEPT</b> and <b>SLOPE</b>. Careful with their order : y first, then x.`,
+  code:`Data → Data Analysis → Regression
+   Input Y Range:  B1:B21     ← Monoprix
+   Input X Range:  C1:C21     ← Carrefour
+   [x] Labels
+
+or, in any empty cell:
+=INTERCEPT(B2:B21, C2:C21)
+=SLOPE(???, ???)`,
+  say:'a ≈ 0.32 and b ≈ 1.16.',
+  right:`a ≈ <strong>0.32</strong> and b ≈ <strong>1.16</strong>. Neither 0 nor 1.
+  <span class="fx">The Master frowns at the two numbers, as if they had been rude to him.</span>
+  Before we argue about what they mean, one more number : how well does this line describe the twenty
+  products ?`,
+  widgetAfter:'fit', hud:{a:'0.325', b:'1.158'}, note:'OLS: Monoprix = 0.32 + 1.16 x Carrefour' },
+
+{ id:'t2b', type:'numeric', bg:'lab', who:'master', qn:'R²',
+  title:'TRIAL III · HOW GOOD IS THE LINE ?',
+  text:`The regression output contains several numbers with an R in their name. <strong>Report the
+  coefficient of determination R², and tell me what it measures.</strong>`,
+  q:'Report and read the R².',
+  fields:[
+    {id:'r2', label:'Coefficient of determination R²', value:0.9681, tol:0.001, strict:true, pct:true,
+     alt:[{value:0.9839, tol:0.0015, msg:'That is Multiple R, i.e., the correlation. R² is the line R Square.'},
+          {value:0.9663, tol:0.0004, msg:'That is the Adjusted R Square. Use R Square.'}],
+     msg:'Read the line R Square of the regression output, or use =RSQ(B2:B21, C2:C21).'},
+    {id:'meaning', kind:'select', label:'R² measures that…', correct:'var',
+     options:[['var','…the Carrefour price accounts for about 97% of the variation of the Monoprix prices across the 20 products'],
+              ['pct','…Monoprix charges about 97% of the Carrefour price'],
+              ['share','…about 97% of the products are more expensive at Monoprix'],
+              ['prob','…there is a 97% probability that the model is true']],
+     msg:'R² compares the sum of squared residuals of the line with that of the empty model, i.e., the sample average. What does that measure?'}],
+  hint:`In the regression output, R Square is the second line of the Regression Statistics table.
+  <b>RSQ</b> gives it too. In a simple regression, it is also the square of the correlation of Trial
+  II.`,
+  code:`=RSQ(B2:B21, C2:C21)
+=CORREL(B2:B21, C2:C21)^2`,
+  say:'R² ≈ 0.968 : the Carrefour price accounts for about 97% of the variation of the Monoprix prices.',
+  right:`R² ≈ <strong>0.968</strong>, i.e., 0.984 squared. The line leaves only about 3% of the
+  variation of the Monoprix prices unexplained.
+  A line this good deserves to be read carefully. And to be used carefully, which is not the same
+  thing.`,
+  hud:{r2:'0.968'}, cp:2, note:'R2 = 0.968 = 0.984^2' },
+
+{ id:'t3a', type:'choice', bg:'aisle', who:'master', qn:'1.a',
+  title:'TRIAL IV · READ THE PRICE LIST',
+  text:`The line is a price list. Take the Carrefour price, multiply it by b, add a, and you get the
+  expected Monoprix price :
+  <br><span class="kbd">expected Monoprix price = 0.32 + 1.16 × Carrefour price</span><br>
+  <strong>Which reading of a and b is correct ?</strong>`,
+  q:'Choose the reading of the two coefficients.',
+  options:[
+    {id:'a', label:'a: Monoprix adds about 0.32 € to every product, whatever its price. b: on top of that, Monoprix charges about 116% of the Carrefour price.'},
+    {id:'b', label:'a: Monoprix is about 32% more expensive. b: Monoprix adds about 1.16 € to every product.'},
+    {id:'c', label:'a is the average Monoprix price, and b is the average Carrefour price.'},
+    {id:'d', label:'a and b cannot be interpreted: only the R² can.'}
+  ], correct:'a',
+  hint:`Set the Carrefour price to 0 : what is left of the line ? Then raise the Carrefour price by
+  1 € : by how much does the expected Monoprix price move ?`,
+  right:`Exactly. The intercept a is a fixed markup, about <strong>32 cents per product</strong>. The
+  slope b is proportional : for every euro charged by Carrefour, Monoprix is expected to charge about
+  <strong>1.16 €</strong>, i.e., 116% of the price.
+  Both point in the same direction. With identical prices, we would expect a ≈ 0 and b ≈ 1.`,
+  wrong:{b:`You have swapped the two roles. a is in euros, added to every product. b multiplies the
+  price : 1.16 means 116%.`,
+  c:`The average Monoprix price is 5.02 € and the average Carrefour price is 4.05 €. Neither is a
+  coefficient of the line.`,
+  d:`The coefficients are the most readable part of a regression : a in euros per product, b in euros
+  per euro of Carrefour price.`},
+  note:'1.a · a = fixed markup of 0.32 euro per product; b = 116% of the Carrefour price' },
+
+{ id:'t3b', type:'choice', bg:'aisle', who:'master', mood:'raised', qn:'1.b',
+  title:'TRIAL IV · THE SAME BILL ?',
+  text:`Now the question that Lucius actually asked.
+  <strong>If he goes to Monoprix, should he expect the same bill as if he goes to Carrefour ?</strong>`,
+  q:'Answer Lucius.',
+  options:[
+    {id:'a', label:'Yes: R² = 0.97 and the correlation is 0.98, so the two shops charge almost the same prices.'},
+    {id:'b', label:'No: with a > 0 and b > 1, every product is expected to cost more at Monoprix, and the gap grows with the price.'},
+    {id:'c', label:'No: Monoprix is cheaper, because b is close to 1.'},
+    {id:'d', label:'We cannot say anything: a regression cannot compare two shops.'}
+  ], correct:'b',
+  hint:`Compare the estimated line with the “same price” line, i.e., a = 0 and b = 1. Is the estimated
+  line above it or below it ?`,
+  right:`Exactly. With a > 0 and b > 1, the line lies above the “same price” diagonal over the whole
+  range of the data. Every product is expected to cost more at Monoprix, and the gap grows with the
+  price.
+  <span class="fx">The Master looks at his Monoprix bag. It has become more expensive while he was
+  not looking.</span>
+  Notice the trap in the first answer. A correlation of 0.98 says that the two price lists move
+  together. It does not say that they are equal : a shop charging exactly twice the Carrefour price
+  would have a correlation of 1.`,
+  wrong:{a:`A correlation of 0.98 says that the two price lists move together, not that they are
+  equal. A shop charging exactly twice the Carrefour price would have a correlation of 1.`,
+  c:`b = 1.16 is above 1, and a is above 0. Both make Monoprix more expensive, not cheaper.`,
+  d:`It can : the line gives the expected Monoprix price for any Carrefour price. Compare it with the
+  diagonal on which both prices are equal.`},
+  banner:'CLAIM: SAME PRICES EVERYWHERE', note:'1.b · No: a > 0 and b > 1, Monoprix is more expensive. High correlation is not equal prices.' },
+
+{ id:'t3c', type:'numeric', bg:'till', who:'master', qn:'1.c',
+  title:'TRIAL V · LUCIUS’S BASKET',
+  text:`Let us put a number on the bill. Lucius’s weekly basket contains <strong>10 products</strong>,
+  each between 1.50 € and 15 €. Together, they cost <strong>40.00 € at Carrefour</strong>.
+  The expected price of each product is a + b × its Carrefour price, so each product carries its own
+  markup a.
+  <strong>Which bill does the model predict at Monoprix, and how much more is that than at
+  Carrefour ?</strong>`,
+  q:'Price the basket.',
+  fields:[
+    {id:'bill', label:'Expected bill at Monoprix, in €', value:49.546, tol:0.01, strict:true,
+     alt:[{value:46.625, tol:0.03, msg:'You added the markup a only once. Each of the 10 products carries its own: 10 × a.'},
+          {value:46.300, tol:0.03, msg:'You forgot the ten markups a.'},
+          {value:9.546, tol:0.03, msg:'That is the extra cost. The first field asks for the whole bill.'}],
+     msg:'Add up the ten expected prices: 10 × a + b × 40.'},
+    {id:'extra', label:'Extra cost compared with Carrefour, in €', value:9.546, tol:0.03, strict:true,
+     alt:[{value:49.546, tol:0.03, msg:'That is the whole bill. Subtract the Carrefour bill, 40 €.'},
+          {value:6.625, tol:0.03, msg:'You added the markup a only once. Each of the 10 products carries its own: 10 × a.'},
+          {value:6.300, tol:0.03, msg:'You forgot the ten markups a.'}],
+     msg:'Subtract the Carrefour bill, 40 €, from the expected Monoprix bill.'}],
+  hint:`Write the ten expected prices one under the other : a + b × price<sub>1</sub>, a + b ×
+  price<sub>2</sub>, … When you add them up, the ten a’s give 10 × a, and the ten prices give the
+  Carrefour bill, 40 €. Use the cells of your regression output, not rounded numbers.`,
+  code:`=10*??? + ???*40      ← intercept and slope cells of your regression output`,
+  say:'About 49.55 € at Monoprix, i.e., 9.55 € more than at Carrefour.',
+  right:`About <strong>49.55 €</strong>, i.e., <strong>9.55 €</strong> more : almost a quarter more for
+  the same basket.
+  <span class="fx">The Master adds up last month’s receipts in his head, and stops halfway.</span>
+  Try it on the file itself. The 20 products cost 81.07 € at Carrefour. The model predicts 20 × a +
+  b × 81.07 = 100.33 €. The actual Monoprix total is 100.33 €, to the cent. That is no luck : with an
+  intercept, the OLS residuals always add up to zero.`,
+  cp:3, note:'1.c · basket of 10 products, 40 euros at Carrefour: about 49.55 euros at Monoprix (+9.55)' },
+
+{ id:'t4', type:'numeric', bg:'aisle', who:'master', qn:'2',
+  title:'TRIAL VI · THE SNICKERS ICE CREAM',
+  text:`Lucius wants a box of Snickers ice creams. It is not in the file. At Carrefour, it costs
+  <strong>3.19 €</strong>.
+  <strong>Which price does the model predict at Monoprix ?</strong> And before you trust your number,
+  check one thing : is 3.19 € inside the range of Carrefour prices that the line has seen ?`,
+  q:'Predict, then check the range.',
+  fields:[
+    {id:'pred', label:'Expected Monoprix price of the Snickers ice cream, in €', value:4.017, tol:0.01, strict:true,
+     alt:[{value:3.692, tol:0.01, msg:'You forgot the intercept a.'},
+          {value:3.515, tol:0.01, msg:'You forgot to multiply the Carrefour price by the slope b.'},
+          {value:2.526, tol:0.01, msg:'That comes from the regression of Carrefour on Monoprix. Use Monoprix = a + b × Carrefour.'},
+          {value:3.19, tol:0.002, msg:'That is the Carrefour price. Put it into the estimated line.'}],
+     msg:'Compute a + b × 3.19 with your estimates.'},
+    {id:'range', kind:'select', label:'Is 3.19 € inside the range of the Carrefour prices of the file?', correct:'in',
+     options:[['in','Yes: it lies between the cheapest and the most expensive Carrefour prices'],
+              ['out','No: it lies outside the range of the Carrefour prices']],
+     msg:'Compare 3.19 € with the cheapest and the most expensive Carrefour prices of Trial I.'}],
+  hint:`Replace the Carrefour price by 3.19 in the estimated line : a + b × 3.19. Use the cells of
+  your regression output rather than rounded numbers. Then compare 3.19 € with the minimum and the
+  maximum of column C.`,
+  code:`=??? + ???*3.19      ← intercept + slope × Carrefour price`,
+  say:'About 4.02 € at Monoprix. And 3.19 € is well inside the range of the data.',
+  right:`About <strong>4.02 €</strong>, i.e., 83 cents more than at Carrefour. This is a fitted value :
+  the point of the line above 3.19 €.
+  And it is a prediction we can use. 3.19 € sits in the middle of the products the line has seen :
+  twelve of the twenty products cost between 2 € and 4 € at Carrefour.`,
+  widgetAfter:'predict', cp:4, note:'2 · Snickers ice cream: 3.19 at Carrefour, about 4.02 at Monoprix (inside the data range)' },
+
+{ id:'t5a', type:'numeric', bg:'aisle', who:'master', qn:'3.a',
+  title:'TRIAL VII · THE SUNSCREEN',
+  text:`Summer is coming, and Lucius needs sunscreen. At Carrefour, it costs <strong>20.05 €</strong>.
+  Same question, same line. <strong>Which price does the model predict at Monoprix ?</strong> And this
+  time, can we trust the number ?`,
+  q:'Predict, then judge the prediction.',
+  fields:[
+    {id:'pred', label:'Expected Monoprix price of the sunscreen, in €', value:23.533, tol:0.02, strict:true,
+     alt:[{value:23.208, tol:0.01, msg:'You forgot the intercept a.'},
+          {value:20.375, tol:0.01, msg:'You forgot to multiply the Carrefour price by the slope b.'},
+          {value:16.626, tol:0.01, msg:'That comes from the regression of Carrefour on Monoprix. Use Monoprix = a + b × Carrefour.'}],
+     msg:'Compute a + b × 20.05 with your estimates.'},
+    {id:'trust', kind:'select', label:'Can we trust this prediction?', correct:'no',
+     options:[['yes','Yes: with R² = 0.97, the line fits almost perfectly'],
+              ['no','No: 20.05 € is above every Carrefour price of the file, so the line is used where it has never been observed'],
+              ['neg','No: the predicted price is negative']],
+     msg:'Compare 20.05 € with the most expensive Carrefour price of the file, which you found in Trial I.'}],
+  hint:`Same formula as for the Snickers ice cream. Then compare 20.05 € with the maximum of column
+  C.`,
+  code:`=??? + ???*20.05`,
+  say:'About 23.53 €. But 20.05 € is above every Carrefour price in the data, so I would not trust it.',
+  right:`About <strong>23.53 €</strong>. And no, we should not trust it. The most expensive product of
+  the file costs 14.78 € at Carrefour. Above that price, the line has never seen a single product : it
+  simply continues straight, because that is all a line can do.
+  There is a second problem. The file contains chocolate, crisps, jam, ice cream, olive oil and
+  detergent. Not one cosmetic. A sunscreen may follow another price list.
+  <span class="fx">The Master takes a receipt out of his pocket. He has been waiting for this
+  moment.</span>`,
+  note:'3.a · sunscreen: 20.05 -> 23.53 predicted, but 20.05 is outside the data range (max 14.78)' },
+
+{ id:'t5b', type:'numeric', bg:'till', who:'master', mood:'amused', qn:'3.b',
+  title:'TRIAL VII · THE RECEIPT',
+  text:`Here is the receipt. The sunscreen costs <strong>18.90 € at Monoprix</strong>, against 20.05 €
+  at Carrefour. For once, Monoprix is cheaper.
+  <strong>Compute the prediction error, i.e., the residual : the actual Monoprix price minus the
+  predicted one.</strong> Then compare it with the residuals of the 20 products of the file.`,
+  q:'Measure the miss.',
+  fields:[
+    {id:'res', label:'Residual of the sunscreen, in €', value:-4.633, tol:0.02, strict:true,
+     alt:[{value:-1.15, tol:0.01, msg:'That is the difference between the two shops. The residual compares the actual Monoprix price with the predicted one.'},
+          {value:1.15, tol:0.01, msg:'That is the difference between the two shops. The residual compares the actual Monoprix price with the predicted one.'}],
+     msg:'Residual = 18.90 − your prediction of the previous question.'},
+    {id:'size', kind:'select', label:'In absolute value, this residual is…', correct:'bigger',
+     options:[['bigger','…larger in absolue value than every residual of the 20 products of the file'],
+              ['typical','…of the same size as the residuals of the 20 products'],
+              ['smaller','…smaller than most residuals of the 20 products']],
+     msg:'Compute the 20 residuals of the file and look at the largest ones, in absolute value.'}],
+  hint:`In the Regression dialog, tick <b>Residuals</b> : Excel lists the residual of each product. Or
+  build them yourself in a new column : actual Monoprix price minus fitted value, with dollar signs on
+  the cells of a and b. Then look at the MIN and the MAX of that column.`,
+  code:`D2:  =B2 - (??? + ???*C2)     ← copy down to D21; use $ on the cells of a and b
+=MIN(D2:D21)
+=MAX(D2:D21)`,
+  say:'The residual is about −4.63 €, more than twice the largest residual of the file.',
+  right:`About <strong>−4.63 €</strong>. In the file, the residuals go from −1.44 € to +1.92 €. The
+  sunscreen miss is more than twice as large as anything the line produced on its own data.
+  <span class="fx">One more clue was hiding in the file. Its most expensive product, the 14.78 €
+  detergent, already sits below the line. At the top of the range, Monoprix was not that expensive
+  after all.</span>
+  A line summarizes the data you gave it. Outside that data, it is a guess wearing a tie.`,
+  widgetAfter:'extrap', wow:true, cp:5, note:'3.b · actual 18.90 vs predicted 23.53: residual -4.63, twice the largest residual of the file' },
+
+{ id:'close', type:'info', bg:'aisle', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`My claim is dead. For the same product, Monoprix charges about 32 cents more, plus about 16% of
+  the price. Lucius’s basket costs almost a quarter more next door. Convenience is not free : it has a
+  price list, and you have just estimated it.
+  <span class="fx">He folds the Monoprix bag carefully. He will take it to Carrefour.</span>
+  Four rules leave with you.
+  <strong>One.</strong> Plot before you fit. The cloud tells you whether a line deserves to exist.
+  <strong>Two.</strong> Read the coefficients in their units : a in euros per product, b in euros per
+  euro.
+  <strong>Three.</strong> A high correlation or a high R² means that two variables move together, not
+  that they are equal.
+  <strong>Four.</strong> Predict inside the data. Outside the observed range, or for products unlike
+  those of the sample, the line keeps going straight while reality turns.`,
+  banner:'PLOT. FIT. READ. STAY INSIDE.', cont:'See what you found', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook'), cpbox:$('#cpbox')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let cpReached = 0;               // latest checkpoint reached (0 = none)
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- checkpoints: the latest one stays pinned in the notebook ---- */
+function loadProgress(){
+  try{
+    const v = JSON.parse(localStorage.getItem(CONFIG.STORE_KEY) || 'null');
+    return (v && v.cp >= 1 && v.cp <= N_CP) ? v : null;
+  }catch(e){ return null; }
+}
+function saveProgress(){
+  try{ localStorage.setItem(CONFIG.STORE_KEY, JSON.stringify({cp:cpReached, name:playerName})); }catch(e){}
+}
+function renderCP(){
+  el.cpbox.innerHTML = `<div class="cphead"><span>CHECKPOINT</span><span>${cpReached} / ${N_CP}</span></div>
+    <span class="cpnone">${cpReached ? 'progress saved' : 'no checkpoint yet'}</span>`;
+}
+function awardCP(n){
+  if(n > cpReached) cpReached = n;
+  saveProgress();
+  renderCP();
+}
+/* the card under the Master's reply, when a step carries a checkpoint */
+function cpCard(n){
+  const d=document.createElement('div'); d.className='cpcard';
+  d.innerHTML = `<div class="cptitle">CHECKPOINT ${n} OF ${N_CP} REACHED</div>
+    <p>${n<N_CP ? 'Your progress is saved. If you close this window, you can resume from here on the same computer.'
+                : 'You have completed the exercise.'}</p>`;
+  el.zone.appendChild(d);
+}
+
+/* ---- HUD: filled only by solved steps, so it never gives an answer away ---- */
+const HUD0 = {a:'—', b:'—', r2:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && solved.has(STEPS[k].id)) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown after an answer, drawn from the embedded
+   data. Points are never connected; dark marks on a pale ground.
+   Hovering a point shows the product and its two prices.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18', shade:'#e2d6b8'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* a scatter panel: the products, plus optional shaded band, lines,
+   highlighted points and labels */
+function panelSVG(o){
+  const W=700, H=o.H||330, L=o.L||70, R=684, T=44, B=(o.B||266);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let shade='';
+  if(o.shade){
+    shade = `<rect x="${px(o.shade.x1).toFixed(1)}" y="${T}" width="${(px(o.shade.x2)-px(o.shade.x1)).toFixed(1)}" height="${B-T}" fill="${PLOT.shade}"/>`
+      + TXT(((px(o.shade.x1)+px(o.shade.x2))/2).toFixed(1), B-10, o.shade.label, {sz:15});
+  }
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}"
+      x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="${l.dash}"`:''}/>`;
+  });
+  let marks='';
+  for(let i=0;i<DATA.CARR.length;i++){
+    marks += `<circle cx="${px(DATA.CARR[i]).toFixed(1)}" cy="${py(DATA.MONO[i]).toFixed(1)}" r="5"
+      fill="${PLOT.ink}" fill-opacity=".85" stroke="${PLOT.paper}" stroke-width="1.5"><title>${escapeAttr(DATA.ITEMS[i])}: Carrefour ${DATA.CARR[i].toFixed(2)} €, Monoprix ${DATA.MONO[i].toFixed(2)} €</title></circle>`;
+  }
+  (o.points||[]).forEach(p=>{
+    marks += `<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.y).toFixed(1)}" r="7"
+      fill="${p.hollow?PLOT.paper:p.col}" stroke="${p.hollow?p.col:PLOT.paper}" stroke-width="${p.hollow?2.5:2}"><title>${escapeAttr(p.tip)}</title></circle>`;
+  });
+  let pins='';
+  (o.pins||[]).forEach(p=>{
+    pins += TXT(px(p.x).toFixed(1), (py(p.y)+(p.dy||-12)).toFixed(1), p.label, {col:p.col||PLOT.label, anchor:p.anchor, sz:17});
+  });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${shade}
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${pins}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, 'Carrefour price (€)', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">Monoprix price (€)</text>
+  </svg>`;
+}
+const BASE = ()=>({ xmin:0, xmax:16, ymin:0, ymax:17, xticks:[0,2,4,6,8,10,12,14,16], yticks:[0,4,8,12,16],
+  lines:[{x1:0, y1:0, x2:16, y2:16, color:PLOT.axis, w:1.5, dash:'6 5'}],
+  pins:[{x:15.6, y:15.6, label:'same price', anchor:'end', dy:22}] });
+
+/* ---- the cold open: the first rows of the file ---- */
+function playTable(host){
+  const cols=[56,470,600];
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=108+i*24;
+    rows += TXT(cols[0],y,DATA.ITEMS[i],{sz:19,anchor:'start'}) + TXT(cols[1],y,DATA.MONO[i].toFixed(2),{sz:19})
+          + TXT(cols[2],y,DATA.CARR[i].toFixed(2),{sz:19});
+  }
+  const svg=`<svg viewBox="0 0 700 262" style="width:100%;height:auto;display:block">
+    <rect width="700" height="262" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'MONOPRIX_CARREFOUR.XLSX · THE FIRST FIVE OF 20 PRODUCTS',{sz:18,anchor:'start'})}
+    ${TXT(cols[0],70,'product (A)',{sz:19,col:PLOT.ink,anchor:'start'})}${TXT(cols[1],70,'Monoprix (B)',{sz:19,col:PLOT.ink})}
+    ${TXT(cols[2],70,'Carrefour (C)',{sz:19,col:PLOT.ink})}
+    <line x1="50" y1="80" x2="660" y2="80" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(350,236,'prices in euros, same brand and same size in both shops',{sz:16})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE RECEIPTS', svg, 'Source: the websites of Monoprix and Carrefour (column G of the file).');
+  return 600;
+}
+
+function playScatter(host){
+  const o = Object.assign(BASE(), {title:'Monoprix against Carrefour, 20 products, r = 0.984'});
+  host.innerHTML = plotFrame('EVIDENCE · THE CLOUD', panelSVG(o),
+    'One point is one product. The dashed diagonal is “same price in both shops”. 19 of the 20 points lie above it.');
+  return 900;
+}
+
+function playFit(host){
+  const o = BASE();
+  o.title = 'Monoprix = 0.32 + 1.16 × Carrefour';
+  o.lines.push({x1:OLS.xmin, y1:fitAt(OLS.xmin), x2:OLS.xmax, y2:fitAt(OLS.xmax), color:PLOT.fit, w:2.5});
+  o.pins.push({x:OLS.xmax, y:fitAt(OLS.xmax), label:'OLS line', anchor:'end', dy:-14, col:PLOT.fit});
+  host.innerHTML = plotFrame('EVIDENCE · THE LINE', panelSVG(o),
+    'The OLS line is drawn over the observed Carrefour prices only, from 1.49 € to 14.78 €. It lies above the diagonal.');
+  return 900;
+}
+
+function playPredict(host){
+  const o = BASE();
+  o.xmax=8; o.ymax=10; o.xticks=[0,1,2,3,4,5,6,7,8]; o.yticks=[0,2,4,6,8,10];
+  o.lines=[{x1:0, y1:0, x2:8, y2:8, color:PLOT.axis, w:1.5, dash:'6 5'},
+           {x1:OLS.xmin, y1:fitAt(OLS.xmin), x2:8, y2:fitAt(8), color:PLOT.fit, w:2.5},
+           {x1:3.19, y1:0, x2:3.19, y2:fitAt(3.19), color:PLOT.second, w:1.5, dash:'4 4'}];
+  o.pins=[{x:7.8, y:7.8, label:'same price', anchor:'end', dy:22}];
+  o.points=[{x:3.19, y:fitAt(3.19), col:PLOT.second, tip:'Snickers ice cream: 3.19 € at Carrefour, about 4.02 € expected at Monoprix'}];
+  o.pins.push({x:3.19, y:fitAt(3.19), label:'Snickers ice cream: 4.02 €', anchor:'end', dy:-14, col:PLOT.second});
+  o.title = 'Zoom on the cheap products: the prediction at 3.19 €';
+  host.innerHTML = plotFrame('EVIDENCE · A PREDICTION INSIDE THE DATA', panelSVG(o),
+    'Twelve products of the file cost between 2 € and 4 € at Carrefour: the line knows this neighbourhood well.');
+  return 900;
+}
+
+function playExtrap(host){
+  const o = BASE();
+  o.xmax=22; o.ymax=25; o.xticks=[0,4,8,12,16,20]; o.yticks=[0,5,10,15,20,25];
+  o.shade={x1:OLS.xmax, x2:22, label:'no product here'};
+  o.lines=[{x1:0, y1:0, x2:22, y2:22, color:PLOT.axis, w:1.5, dash:'6 5'},
+           {x1:OLS.xmin, y1:fitAt(OLS.xmin), x2:OLS.xmax, y2:fitAt(OLS.xmax), color:PLOT.fit, w:2.5},
+           {x1:OLS.xmax, y1:fitAt(OLS.xmax), x2:20.05, y2:fitAt(20.05), color:PLOT.fit, w:2.5, dash:'7 5'},
+           {x1:20.05, y1:18.90, x2:20.05, y2:fitAt(20.05), color:PLOT.second, w:2}];
+  o.pins=[{x:11.5, y:11.5, label:'same price', anchor:'start', dy:24}];
+  o.points=[{x:20.05, y:fitAt(20.05), col:PLOT.fit, hollow:true, tip:'Predicted: 23.53 €'},
+            {x:20.05, y:18.90, col:PLOT.second, tip:'Actual Monoprix price: 18.90 €'}];
+  o.pins.push({x:19.7, y:fitAt(20.05), label:'predicted 23.53', anchor:'end', dy:-10, col:PLOT.fit});
+  o.pins.push({x:20.05, y:18.90, label:'actual 18.90', anchor:'middle', dy:28, col:PLOT.second});
+  o.title = 'The sunscreen, 20.05 € at Carrefour';
+  host.innerHTML = plotFrame('EVIDENCE · A PREDICTION OUTSIDE THE DATA', panelSVG(o),
+    'Beyond 14.78 €, the dashed line is a guess. The actual price falls 4.63 € below it, under the “same price” diagonal.');
+  return 1000;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='scatter') return playScatter(host);
+  if(name==='fit')     return playFit(host);
+  if(name==='predict') return playPredict(host);
+  if(name==='extrap')  return playExtrap(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your workbook step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  return s.type==='choice' ? s.options.find(o=>o.id===s.correct).label : s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  if(s.cp) cpCard(s.cp);
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one, and a card at a checkpoint */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  if(s.cp) awardCP(s.cp);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>{ if(s.cp) cpCard(s.cp); contButton('Continue', next); }); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+function tolerance(f){
+  const abs = f.tol || 0;
+  if(f.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(f.value));
+}
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){ if(Math.abs(v-a.value) <= a.tol) return a.msg; }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE2',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise II</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>window.open(CONFIG.DATA_FILE,'supermarketData'));
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — what the apprentice did, and the notebook
+   ================================================================ */
+function finish(){
+  $('#endblurb').innerHTML =
+    `You plotted the prices before fitting them, estimated the line by ordinary least squares and
+     read its coefficients in euros: a markup of about 32 cents per product, plus 116% of the
+     Carrefour price. You priced Lucius’s basket, predicted the Snickers ice cream inside the data,
+     and refused to trust the sunscreen prediction outside it. The receipt proved you right.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: SAME PRICES EVERYWHERE';
+  show('scr-end');
+}
+
+
+/* ---- start, replay, resume ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes(); renderCP();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+/* resume just after the step that awarded checkpoint cp: everything
+   before it counts as solved, and its notes are back in the notebook */
+function resumeFrom(cp){
+  const ci = STEPS.findIndex(s=>s.cp===cp);
+  if(ci<0) return startAt(0);
+  solved = new Set(); notes = [];
+  for(let k=0; k<=ci; k++){ solved.add(STEPS[k].id); if(STEPS[k].note) notes.push(STEPS[k].note); }
+  cpReached = Math.max(cpReached, cp);
+  startAt(ci+1);
+}
+
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v2.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCANNING RECEIPTS ........... MONOPRIX, CARREFOUR",
+  "COUNTING PRODUCTS ........... 20",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "CHECKPOINTS ................. 5 SAVE POINTS ON THE WAY",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+/* a checkpoint saved in this browser: offer to resume from it */
+(function offerResume(){
+  const p = loadProgress();
+  if(!p) return;
+  cpReached = p.cp;
+  if(p.name){ playerName = p.name; $('#playername').value = p.name; }
+  const b = $('#btn-resume');
+  b.textContent = p.cp < N_CP ? `RESUME FROM CHECKPOINT ${p.cp}` : 'REVIEW THE COMPLETED EXERCISE';
+  b.style.display = '';
+  b.onclick = ()=>{ readName(); resumeFrom(p.cp); };
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
