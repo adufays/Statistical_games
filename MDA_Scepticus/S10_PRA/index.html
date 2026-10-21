@@ -1,1 +1,1990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 10, Part 2: Does Pollution Save Lives?</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 10, PART 2
+  "Does Pollution Save Lives?"  (Excel_lab_PRA.tex: principal regression analysis)
+  EDHEC · Multivariate Data Analysis · Empirical Session 10
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine as Empirical Exercise 10 (PCA): no checkpoints, no
+  passwords, no SHOW THE ANSWER button. Every question has a HINT.
+  Numbers follow the course margin rule: counts exact; ±0.01 when
+  0.1 <= |value| < 1e6; ±1% otherwise. Every test states its
+  significance level ("5% significance level") or its confidence
+  level ("95% confidence level").
+
+  QUESTIONS (Excel_lab_PRA.tex)
+  ---------
+  setup  number of cities, average MORT                            -> numbers
+  1a     full regression: b(HC), b(NOX), R2                         -> numbers
+  1b     t Stats of HC and NOX, critical value, two decisions       -> numbers + selects
+  2a-c   regression without NOX: b(HC), p-value of HC, decision,
+         b(SO)                                                      -> numbers + select
+  2      why did HC and SO move so much?                            -> MCQ
+  3      correlation matrix: HC-NOX, PREC-HC, most correlated pair  -> numbers + select
+  4      EigCov: l1, loading of NOX in v1, k for 80%, share kept    -> numbers
+  5      regression on PC1-PC3: R2, coefficient of PC3, comparison  -> numbers + select
+  6      composition of the factors (|loading| > 0.4)               -> MCQ
+         regression on F1-F3: R2, coefficient of F3, significance   -> numbers + select
+  7      F1 (HC & NOX): coefficient, p-value, decision              -> numbers + select
+         do HC and NOX increase mortality?                          -> MCQ
+  8      scatter plot of MORT against F3                            -> MCQ
+
+  Sign convention imposed on the eigenvectors (defined up to their
+  sign): HC > 0 in v1, JANT > 0 in v2, PREC > 0 in v3. It matches the
+  EigCov output of DATA_PCA_with_solutions.xlsm.
+
+  DATA
+  ----
+  DATA_PCA.xlsx, sheet Sheet1: 60 cities (McDonald & Schwing, 1973).
+  A PREC (mean annual precipitation, inches), B JANT (mean January
+  temperature, F), C HC, D NOX, E SO (relative pollution potentials of
+  hydrocarbons, nitrogen oxides, sulfur dioxide), F MORT (age-adjusted
+  mortality per 100,000). Sheet "DATA description". The function
+  EigCov exists only inside EigCov.xlsm (Blackboard).
+
+  TARGET VALUES (statsmodels / numpy on the Excel file)
+  -------------
+  N = 60; mean MORT 940.3584
+  Q1 (all 5): b0 800.9970, PREC 3.1977, JANT -0.1077, HC -0.689282
+     (se 0.582410, t -1.183500, p 0.2418), NOX 1.398819 (se 1.174445,
+     t 1.191047, p 0.2388), SO 0.333687 (p 0.0377); R2 50.6870%,
+     adj 46.1210%; t crit (0.05, 54) 2.004879
+     traps: no intercept HC 3.722617, NOX -6.666526; one-sided 1.673565;
+     1% significance level 2.669985; normal 1.96
+  Q2 (no NOX): HC -0.00448123 (se 0.093225, t -0.048064, p 0.961839),
+     SO 0.475696; R2 49.3915%; no intercept HC 0.491433, SO 0.990285
+  corr HC-NOX 0.983840 (cov.S 4192.76, cov.P 4122.88); PREC-HC -0.531760
+  eigenvalues 2.591279 1.160586 0.897808 0.344293 0.006034
+  cumulative % 51.8256 75.0373 92.9935 99.8793 100; k = 3
+  v1 = (-0.391849, 0.213061, 0.600347, 0.604641, 0.273956)
+  v2 = (0.323922, 0.809269, 0.101731, 0.040187, -0.477696)
+  v3 = (0.638283, 0.185939, -0.060385, 0.072331, 0.741042)
+  covariance matrix instead: cumulative % 75.24, 98.78
+  Q5 PCR (PC1-PC3, standardized): R2 48.5459%; PC3 44.366652 (t 7.05)
+     traps: 2 PCs 2.8762%; 5 PCs 50.6870%; raw-data PCs 42.3716%
+     (PC3 1.757326); covariance PCs 40.2684% (PC3 2.109108); adj 45.7894%
+  Q6 factors: F1 = .600347 HC + .604641 NOX; F2 = .809269 JANT
+     - .477696 SO; F3 = .638283 PREC + .741042 SO (standardized data)
+     R2 48.7081%; F1 -4.118897 (t -0.8248, p 0.412976); F2 2.398628
+     (p 0.7156); F3 47.151030 (t 6.7941); t crit (0.05, 56) 2.003241
+     traps: +-1 loadings R2 49.1773% (F3 32.629208); raw data 39.2837%
+     (F3 1.882068)
+  MORT on F3 alone: 940.358 + 46.599 F3, R2 0.4801, corr 0.6929
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE X · PART 2</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="pollution">DATA (XLSX)</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>DOES POLLUTION<br>SAVE LIVES ?</h1>
+      <h2>Empirical Exercise X · Part 2 &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus has run a regression of mortality on pollution and climate in 60 American cities,
+      and he has read a negative coefficient on hydrocarbons: more pollution, fewer deaths. You will
+      replicate his regression, watch its coefficients jump when one variable leaves, find the
+      culprit in the correlation matrix, and repair the regression with principal components and with
+      factors that can be interpreted. Then you will decide whether hydrocarbons and nitrogen oxides
+      increase mortality.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>DATA_PCA.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top. The eigenvalues and eigenvectors need the function
+        <strong>EigCov</strong>, which only exists inside the file <code>EigCov.xlsm</code>, available on
+        <strong>Blackboard</strong>. Open EigCov.xlsm, enable its macros, copy the data into it, and do all
+        your work in that workbook (save it as .xlsm): each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your plots, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example Excel formula, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers with a dot or a comma as the decimal separator, e.g., <code>36.18</code>
+      or <code>36,18</code>. Give two decimals: your answer is accepted within 0.01 of the
+      exact value. Very small or very large numbers can be typed as Excel displays them, e.g.,
+      <code>-8.54E-05</code>, and are accepted within 1%. Counts must be exact. R² and shares are asked in
+      percent, e.g., <code>12.34</code> for 12.34%. Every regression includes an intercept.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">In the sheet <code>Sheet1</code>, column <code>A</code> holds PREC, the mean
+        annual precipitation (inches), <code>B</code> JANT, the mean January temperature (°F), <code>C</code>
+        HC, <code>D</code> NOX and <code>E</code> SO, the relative pollution potentials of hydrocarbons,
+        nitrogen oxides and sulfur dioxide, and <code>F</code> MORT, the age-adjusted mortality rate per
+        100,000 inhabitants. Row 1 holds the names; rows 2 to 61 hold the 60 cities. The function
+        <code>EigCov</code> works only inside <code>EigCov.xlsm</code>, on Blackboard. English Excel
+        separates the arguments of a function with a comma; French Excel uses a semicolon, e.g.,
+        <code>=LOI.STUDENT.INVERSE.BILATERALE(0,05;54)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code>, <code>=AVERAGE(range)</code></td><td><code>=NB(plage)</code>, <code>=MOYENNE(plage)</code></td><td>Number of values; sample average.</td><td><code>=AVERAGE(F2:F61)</code></td></tr>
+            <tr><td>Data → Data Analysis → Regression</td><td>Données → Utilitaire d’analyse → Régression linéaire</td><td>Full regression output, intercept included (leave <b>Constant is Zero</b> unticked). The X range must be <b>adjacent columns</b>. Tick <b>Labels</b>. If the menu is missing: File → Options → Add-ins → Analysis ToolPak.</td><td>Y: F1:F61, X: A1:E61</td></tr>
+            <tr><td><code>=T.INV.2T(α, df)</code></td><td><code>=LOI.STUDENT.INVERSE.BILATERALE(α; df)</code></td><td>Critical value of a two-sided t-test at the significance level α.</td><td><code>=T.INV.2T(0.05, 54)</code></td></tr>
+            <tr><td>Data → Data Analysis → Correlation</td><td>Données → Utilitaire d’analyse → Analyse de corrélation</td><td>Correlation matrix of adjacent columns. Excel fills the <b>lower triangle only</b>: copy each value to its mirror cell.</td><td>Input Range: A1:E61, tick Labels in First Row</td></tr>
+            <tr><td><code>=CORREL(x, y)</code></td><td><code>=COEFFICIENT.CORRELATION(x; y)</code></td><td>Correlation between two columns.</td><td><code>=CORREL(C2:C61,D2:D61)</code></td></tr>
+            <tr><td><code>=STDEV.S(range)</code>, <code>=STANDARDIZE(x, mean, sd)</code></td><td><code>=ECARTYPE.STANDARD(plage)</code>, <code>=CENTREE.REDUITE(x; moyenne; écart_type)</code></td><td>Standard deviation (N − 1); standardized value (x − mean) / sd. Anchor the mean and the sd with $.</td><td><code>=STANDARDIZE(A2,A$63,A$64)</code></td></tr>
+            <tr><td><code>=EigCov(matrix)</code></td><td><code>=EigCov(matrice)</code></td><td>Only inside <b>EigCov.xlsm</b> (Blackboard). Select an empty block of K + 1 rows and K columns, type the formula, press Ctrl + Shift + Enter. Row 1: the eigenvalues, from the largest. Below: one eigenvector per <b>column</b>.</td><td><code>=EigCov(I2:M6)</code> in a block of 6 × 5 cells</td></tr>
+            <tr><td><code>=MMULT(row, column)</code></td><td><code>=PRODUITMAT(ligne; colonne)</code></td><td>Matrix product. A row of 5 standardized values times a column of 5 loadings gives one score.</td><td><code>=MMULT(H2:L2,$I$10:$I$14)</code></td></tr>
+            <tr><td><code>=IF(ABS(x)>0.4, x, 0)</code></td><td><code>=SI(ABS(x)>0,4; x; 0)</code></td><td>Keeps a loading when its absolute value exceeds 0.4, sets it to 0 otherwise.</td><td><code>=IF(ABS(I10)>0.4,I10,0)</code></td></tr>
+            <tr><td>Insert → Charts → Scatter</td><td>Insertion → Graphiques → Nuage de points</td><td>Scatter plot. Right-click → Select Data to choose which column goes on which axis.</td><td>X: F3, Y: MORT</td></tr>
+            <tr><td><code>6.03E-03</code></td><td><code>6,03E-03</code></td><td>Scientific notation: 6.03 × 10⁻³ = 0.00603.</td><td><code>-4.48E-03</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>R², 5 variables</span><b id="hud-r1">—</b></div>
+            <div class="hudrow"><span>R², 3 components</span><b id="hud-r5">—</b></div>
+            <div class="hudrow"><span>R², 3 factors</span><b id="hud-r6">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise X · Part 2 &nbsp;·&nbsp; Does Pollution Save Lives ?</h2>
+      <p id="endblurb"></p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button */
+  DATA_FILES: {
+    pollution: "https://www.dropbox.com/scl/fi/oobn1bvwqhbuontvlpep2/DATA_PCA.xlsx?rlkey=465fnk4qcvp40uehlopzyau7s&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 60 cities of DATA_PCA.xlsx, embedded for the pictures
+   only: the first rows of the file, the mortality and the third
+   factor of each city. The correlation matrix, the eigenvalues, the
+   first three eigenvectors (sign convention: HC > 0 in v1, JANT > 0
+   in v2, PREC > 0 in v3) and the regression results drawn in the
+   pictures. The student computes everything in Excel.
+   ================================================================ */
+const DATA = {
+  FIRST:[[36,27,21,15,59,921.87],[35,23,8,10,39,997.875],[44,29,6,6,33,962.354],[47,45,18,8,24,982.291],[43,35,43,38,206,1071.289]],
+  MORT:[921.9,997.9,962.4,982.3,1071.3,1030.4,934.7,899.5,1001.9,912.3,1017.6,1024.9,970.5,986.0,958.8,860.1,936.2,871.8,959.2,941.2,891.7,871.3,971.1,887.5,952.5,968.7,919.7,844.1,861.8,989.3,1006.5,861.4,929.1,857.6,961.0,923.2,1113.2,994.6,1015.0,991.3,894.0,938.5,946.2,1025.5,874.3,953.6,839.7,911.7,790.7,899.3,904.2,950.7,972.5,912.2,967.8,823.8,1003.5,895.7,911.8,954.4],
+  F3:[-0.026,-0.324,0.181,0.268,2.14,1.213,0.456,-0.094,-0.283,-0.482,0.623,2.342,1.247,-0.032,-0.477,-0.768,-0.529,-1.731,0.414,-0.971,-1.024,-0.919,-0.274,-0.152,-0.065,-0.138,-0.733,0.106,-0.794,1.157,0.577,0.83,0.362,-1.115,0.771,0.017,0.446,0.93,1.55,2.359,-0.138,-0.122,0.644,0.357,-0.761,-0.049,-2.144,-0.861,-2.151,-0.546,0.093,-0.296,-0.743,-0.332,0.796,-1.216,0.35,-0.047,0.24,-0.132]
+};
+/* the correlation matrix, the eigenvalues and the first three eigenvectors */
+const PCA = {
+  NAMES:["PREC","JANT","HC","NOX","SO"],
+  R:[[1.0,0.0922,-0.5318,-0.4873,-0.1069],[0.0922,1.0,0.3508,0.321,-0.1078],[-0.5318,0.3508,1.0,0.9838,0.2823],[-0.4873,0.321,0.9838,1.0,0.4094],[-0.1069,-0.1078,0.2823,0.4094,1.0]],
+  LAM:[2.591279,1.160586,0.897808,0.344293,0.006034],
+  V:[[-0.3918,0.2131,0.6003,0.6046,0.274],[0.3239,0.8093,0.1017,0.0402,-0.4777],[0.6383,0.1859,-0.0604,0.0723,0.741]]
+};
+/* the regressions drawn in the pictures (95% confidence level intervals) */
+const REG = {
+  COEF:{hc1:[-0.689282,-1.856945,0.47838], hc2:[-0.004481,-0.191308,0.182347], so1:[0.333687,0.019683,0.647691], so2:[0.475696,0.271398,0.679994]},
+  FT:[["F1",-0.8248],["F2",0.3662],["F3",6.7941]],
+  FCRIT:2.003241,
+  F3A:940.3584, F3B:46.6008
+};
+
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   Every number field follows the course margin rule, applied by the
+   engine (marginOf): 'exact:true' integers (counts) must be exact;
+   values with 0.1 <= |value| < 1e6 are accepted within ±0.01; smaller
+   or larger values within ±1% of the target. Fields carry no tolerance
+   of their own. 'alt' lists common wrong values, each with its own
+   feedback, checked with the same rule around the wrong value.
+   R² and shares are asked in percent, so that ±0.01 stays meaningful.
+
+   Every test names its significance level ("5% significance level")
+   or its confidence level ("95% confidence level").
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const BHC = 'β<sub>HC</sub>', BNOX = 'β<sub>NOX</sub>', BSO = 'β<sub>SO</sub>', BF1 = 'β<sub>F1</sub>',
+      H0 = 'H<sub>0</sub>', H1 = 'H<sub>1</sub>', L1 = 'λ<sub>1</sub>';
+const SIGNMSG = 'Opposite sign: apply the sign convention. HC must load positively in the first eigenvector, JANT in the second, PREC in the third; if not, multiply that whole eigenvector by −1.';
+const DECISION = [['sig','Significant at the 5% significance level: reject H₀ (β = 0)'],
+                  ['not','Not significant at the 5% significance level: fail to reject H₀ (β = 0)']];
+
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE X · PART 2',
+  text:`Last night I ran a regression.
+  <span class="fx">The Master slaps a printout on the desk.</span>
+  Sixty American cities, from a study of 1973 on air pollution and mortality. For each one : the
+  age-adjusted mortality rate, the rain, the January temperature, and three pollutants, the hydrocarbons
+  HC, the nitrogen oxides NOX and the sulfur dioxide SO.
+  And here is the coefficient of HC : <strong>negative</strong>. The more hydrocarbons in the air, the
+  fewer deaths. Hence my claim : <strong>hydrocarbons save lives</strong>.
+  You look shocked. Good. Replicate my regression first, then try to prove me wrong.`,
+  widget:'table', banner:'CLAIM: HYDROCARBONS SAVE LIVES', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE FILE',
+  text:`Download <span class="kbd">DATA_PCA.xlsx</span> with the DATA (XLSX) button. Then take
+  <span class="kbd">EigCov.xlsm</span> from <strong>Blackboard</strong>, open it, enable its macros, and
+  copy the data into it. Work in that file from now on : it holds the function EigCov, which you will
+  need for the eigenvectors, and which exists nowhere else.
+  The dependent variable is <strong>MORT</strong>, column F : deaths per 100,000 inhabitants. The five
+  other columns are the explanatory variables.
+  <strong>How many cities, and what is their average mortality rate ?</strong>`,
+  q:'Report what your workbook says.',
+  fields:[
+    {id:'n', label:'Number of cities', value:60, exact:true,
+     alt:[{value:61, msg:'Row 1 holds the names, not a city. Count the numbers only, i.e., =COUNT(F2:F61).'}],
+     msg:'Use =COUNT(F2:F61).'},
+    {id:'m', label:'Average of MORT (deaths per 100,000)', value:940.358433,
+     alt:[{value:37.366667, msg:'That is the average of PREC, column A. MORT is in column F.'},
+          {value:53.766667, msg:'That is the average of SO, column E. MORT is in column F.'}],
+     msg:'Use =AVERAGE(F2:F61), and give two decimals.'}],
+  hint:`<b>COUNT</b> counts the cells that contain numbers, <b>AVERAGE</b> computes the sample average.
+  The cities run from row 2 to row 61.`,
+  code:`=COUNT(F2:F61)
+=AVERAGE(???)`,
+  say:'60 cities, with an average mortality of about 940.36 deaths per 100,000.',
+  right:`<strong>60</strong> cities, about <strong>940</strong> deaths per 100,000 inhabitants a year on
+  average, from 791 in the healthiest city to 1,113 in the deadliest.
+  <span class="fx">The Master taps the printout.</span>
+  Now my regression. All five explanatory variables, and an intercept, as in every regression of today.`,
+  note:'60 cities; average MORT = 940.36 per 100,000' },
+
+{ id:'t1', type:'numeric', bg:'lab', who:'master', qn:'1a',
+  title:'TRIAL II · THE MASTER’S REGRESSION',
+  text:`Estimate
+  <br><span class="kbd">MORT = β<sub>0</sub> + β<sub>PREC</sub>·PREC + β<sub>JANT</sub>·JANT + ${BHC}·HC + ${BNOX}·NOX + ${BSO}·SO + ε</span><br>
+  with Data → Data Analysis → Regression : Y = MORT, X = the five adjacent columns A to E.
+  <strong>Report the estimates of ${BHC} and ${BNOX}, and the R².</strong>`,
+  q:'Read the Coefficients column, and R Square in percent.',
+  fields:[
+    {id:'hc', label:`Estimate of ${BHC}`, value:-0.689282,
+     alt:[{value:3.722617, msg:'You ticked Constant is Zero: that regression has no intercept. Every regression of this exercise includes one.'},
+          {value:0.582410, msg:'That is the standard error of HC. Read the Coefficients column.'},
+          {value:-1.183500, msg:'That is the t Stat of HC. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, row HC. Y = MORT (column F), X = columns A to E.'},
+    {id:'nox', label:`Estimate of ${BNOX}`, value:1.398819,
+     alt:[{value:-6.666526, msg:'You ticked Constant is Zero: that regression has no intercept. Every regression of this exercise includes one.'},
+          {value:1.174445, msg:'That is the standard error of NOX. Read the Coefficients column.'},
+          {value:1.191047, msg:'That is the t Stat of NOX. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, row NOX.'},
+    {id:'r2', label:'R² (%)', value:50.686996,
+     alt:[{value:0.50686996, msg:'That is a proportion. Give the R² in percent: multiply by 100.'},
+          {value:46.120995, msg:'That is the Adjusted R Square. Report R Square.'},
+          {value:71.194812, msg:'That is Multiple R, the correlation between MORT and its fitted values. Report R Square.'},
+          {value:97.426417, msg:'That R² comes from a regression without intercept (Constant is Zero). Every regression of this exercise includes one.'}],
+     msg:'Read R Square in the Regression Statistics, and multiply by 100.'}],
+  hint:`Data → Data Analysis → Regression. Input Y Range : F1:F61 (MORT). Input X Range : A1:E61, the five
+  adjacent columns. Tick <b>Labels</b>. Leave <b>Constant is Zero</b> unticked : we want an intercept.`,
+  code:`Data → Data Analysis → Regression
+   Input Y Range:  F1:F61     ← MORT
+   Input X Range:  A1:E61     ← PREC, JANT, HC, NOX, SO
+   [x] Labels     [ ] Constant is Zero`,
+  say:'β_HC ≈ −0.69, β_NOX ≈ 1.40, and R² ≈ 50.69%.',
+  right:`${BHC} ≈ <strong>−0.69</strong> and ${BNOX} ≈ <strong>+1.40</strong>. Half of the variance of the
+  mortality is explained : R² ≈ <strong>50.69%</strong>.
+  <span class="fx">The Master smiles.</span>
+  You see ? Negative. One more unit of hydrocarbons, 0.69 fewer deaths per 100,000. And the nitrogen
+  oxides, the other traffic pollutant, go the other way. Odd, I admit. Now tell me
+  whether these two numbers mean anything.`,
+  hud:{r1:'50.69%'}, note:'Model 1 (5 X): b_HC = -0.69, b_NOX = +1.40, R2 = 50.69%' },
+
+{ id:'t2', type:'numeric', bg:'court', who:'master', qn:'1b',
+  title:'TRIAL III · ARE THEY SIGNIFICANT ?',
+  text:`Test each of them :
+  <br><span class="kbd">${H0} : β = 0</span> against <span class="kbd">${H1} : β ≠ 0</span>,
+  at the <strong>5% significance level</strong>, i.e., with a <strong>95% confidence level</strong>.<br>
+  The t Stat of Excel tests exactly this. The model has 60 − 6 = 54 degrees of freedom.
+  <strong>Report the two t-statistics, the critical value, and your two decisions.</strong>`,
+  q:'Test HC and NOX at the 5% significance level.',
+  fields:[
+    {id:'thc', label:'t-statistic of HC', value:-1.183500,
+     alt:[{value:-0.689282, msg:'That is the estimate. The t Stat is the estimate divided by its standard error.'},
+          {value:0.241795, msg:'That is the P-value of HC. Report its t Stat.'}],
+     msg:'Read the t Stat column, row HC.'},
+    {id:'tnox', label:'t-statistic of NOX', value:1.191047,
+     alt:[{value:1.398819, msg:'That is the estimate. The t Stat is the estimate divided by its standard error.'},
+          {value:0.238844, msg:'That is the P-value of NOX. Report its t Stat.'}],
+     msg:'Read the t Stat column, row NOX.'},
+    {id:'crit', label:'Critical value, two-sided, 5% significance level', value:2.004879,
+     alt:[{value:-2.004879, msg:'Report the positive critical value: we reject when the absolute value of t is larger than it.'},
+          {value:1.959964, msg:'That is the critical value of the normal distribution. With 54 degrees of freedom, use the Student t: =T.INV.2T(0.05, 54).'},
+          {value:1.673565, msg:'That is a one-sided critical value. The test is two-sided: =T.INV.2T(0.05, 54).'},
+          {value:2.669985, msg:'That is the critical value at the 1% significance level. The test uses a 5% significance level.'}],
+     msg:'Use =T.INV.2T(0.05, 54): 54 = 60 cities − 6 estimated coefficients.'},
+    {id:'dhc', kind:'select', label:'Decision for HC', correct:'not', options:DECISION,
+     msg:'HC: compare the absolute value of its t Stat with the critical value.'},
+    {id:'dnox', kind:'select', label:'Decision for NOX', correct:'not', options:DECISION,
+     msg:'NOX: compare the absolute value of its t Stat with the critical value.'}],
+  hint:`The t Stat column already divides each estimate by its standard error. Reject ${H0} at the 5%
+  significance level when |t| is larger than the critical value <b>T.INV.2T(0.05, df)</b>, with df = N − 6
+  here (six coefficients, the intercept included). The P-value column says the same thing : reject when
+  it is below 0.05.`,
+  code:`=T.INV.2T(0.05, 54)          ← French: =LOI.STUDENT.INVERSE.BILATERALE(0,05;54)
+=ABS(???) > ???              ← TRUE means: reject H0 at the 5% significance level`,
+  say:'|t| ≈ 1.18 and 1.19, both below 2.00 : neither HC nor NOX is significant at the 5% significance level.',
+  right:`|t| ≈ <strong>1.18</strong> for HC and <strong>1.19</strong> for NOX, both below the critical value
+  <strong>2.00</strong>. Neither is significant at the 5% significance level : their P-values, 0.24, are
+  far above 0.05. With a 95% confidence level, both confidence intervals contain 0 : from −1.86 to 0.48
+  for HC, from −0.96 to 3.75 for NOX.
+  <span class="fx">The Master stops smiling.</span>
+  So my negative coefficient could just as well be zero, or positive. Let us see how solid it is. Remove
+  one variable, and watch.`,
+  note:'Model 1: t_HC = -1.18, t_NOX = 1.19 < 2.00: neither significant at the 5% significance level' },
+
+{ id:'t3', type:'numeric', bg:'lab', who:'master', qn:'2a-c',
+  title:'TRIAL IV · WITHOUT NOX',
+  text:`Estimate the same regression without NOX : MORT on PREC, JANT, HC and SO, intercept included.
+  The X range must be adjacent columns : copy the four columns side by side, or delete column D in a copy
+  of the sheet.
+  <strong>Report the estimate of ${BHC} (three significant digits, it is small), its P-value, your
+  decision at the 5% significance level, and the estimate of ${BSO}.</strong>`,
+  q:'Read the new regression output.',
+  fields:[
+    {id:'hc2', label:`Estimate of ${BHC}, without NOX`, value:-0.00448123,
+     alt:[{value:-0.689282, msg:'That is the estimate of the regression with NOX (question 1). Remove NOX from the X range.'},
+          {value:0.491433, msg:'You ticked Constant is Zero: that regression has no intercept. Every regression of this exercise includes one.'},
+          {value:-0.048064, msg:'That is the t Stat of HC. Read the Coefficients column.'},
+          {value:-0.0448123, msg:'Check the decimals: the estimate is ten times smaller. Excel may display it as -4.48E-03.'}],
+     msg:'Read the Coefficients column, row HC, with three significant digits, e.g., -1.23E-03.'},
+    {id:'phc', label:'P-value of HC, without NOX', value:0.961839,
+     alt:[{value:0.241795, msg:'That is the P-value of HC in question 1. Read the new regression.'},
+          {value:0.093225, msg:'That is the standard error of HC. Read the P-value column.'}],
+     msg:'Read the P-value column, row HC, of the regression without NOX.'},
+    {id:'dhc2', kind:'select', label:'Decision for HC, without NOX', correct:'not', options:DECISION,
+     msg:'Compare the P-value of HC with 0.05: we use a 5% significance level.'},
+    {id:'so2', label:`Estimate of ${BSO}, without NOX`, value:0.475696,
+     alt:[{value:0.333687, msg:'That is the estimate of SO in question 1. Read the regression without NOX.'},
+          {value:0.990285, msg:'You ticked Constant is Zero: that regression has no intercept. Every regression of this exercise includes one.'},
+          {value:0.101943, msg:'That is the standard error of SO. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, row SO, of the regression without NOX.'}],
+  hint:`Copy PREC, JANT, HC, SO into four adjacent columns of a new sheet, MORT next to them, and run Data →
+  Data Analysis → Regression again, with Labels ticked. A very small coefficient may be printed as, e.g.,
+  <b>-4.5E-03</b> : type it as Excel shows it.`,
+  code:`new sheet: A PREC | B JANT | C HC | D SO | E MORT
+Data → Data Analysis → Regression
+   Input Y Range:  E1:E61
+   Input X Range:  A1:D61     [x] Labels`,
+  say:'β_HC ≈ −0.00448, P-value 0.96, not significant ; β_SO ≈ 0.48.',
+  right:`${BHC} ≈ <strong>−0.0045</strong> : 150 times smaller than in question 1, practically zero, with a
+  P-value of <strong>0.96</strong>. Not significant at the 5% significance level. And ${BSO} jumped from
+  0.33 to <strong>0.48</strong>, up by 43%, although SO never left the model.
+  <span class="fx">The Master crumples his printout.</span>
+  One variable out, and the coefficients dance. Why ?`,
+  widgetAfter:'coefs', note:'Without NOX: b_HC = -0.0045 (p = 0.96), b_SO = 0.48 (0.33 before)' },
+
+{ id:'t4', type:'choice', bg:'lab', who:'master', qn:'2',
+  title:'TRIAL V · WHY DID THEY DANCE ?',
+  text:`Removing NOX moved ${BHC} from −0.69 to −0.004 and ${BSO} from 0.33 to 0.48.
+  <strong>What is the most likely explanation ?</strong>`,
+  q:'Choose the explanation.',
+  options:[
+    {id:'a', label:'An error in Excel: the same data must always give the same coefficients, whatever the other variables in the model.'},
+    {id:'b', label:'HC and NOX carry almost the same information. With both in the model, the regression cannot tell their effects apart and splits them almost arbitrarily: large, unstable, imprecise coefficients. Remove one, and the other takes over the common part.'},
+    {id:'c', label:'NOX was the only significant variable, so removing it destroyed the model.'},
+    {id:'d', label:'The sample is too small: with 60 cities, every coefficient changes when the model changes.'}
+  ], correct:'b',
+  hint:`A coefficient measures the effect of a variable <b>other things equal</b>. Ask yourself : can HC
+  change while NOX stays equal, in these cities ? Compare the two columns with <b>CORREL</b>.`,
+  code:`=CORREL(C2:C61, D2:D61)     ← HC and NOX`,
+  right:`Multicollinearity. HC and NOX rise and fall together : where one is high, the other is high. "HC up, NOX constant" almost never happens in these data, so the regression has almost no
+  information to separate their effects. Hence the huge standard errors, and the opposite signs of
+  question 1 : −0.69 for HC and +1.40 for NOX, which roughly cancel out.
+  <span class="fx">The Master pins a sign on the wall : OTHER THINGS EQUAL ?</span>
+  Let us measure it.`,
+  wrong:{a:`Excel computed correctly. A coefficient measures an effect other things equal : change the
+  "other things", the list of variables, and the coefficient may change. The question is why so much.`,
+  c:`NOX was not significant at the 5% significance level either : its t Stat was 1.19. And the R² barely
+  moved, from 50.7% to 49.4%. The model survived ; its coefficients did not.`,
+  d:`Sixty cities is not a lot, but PREC barely moved, from 3.20 to 3.49, while HC went from −0.69 to
+  −0.004. Something specific to HC is at work.`},
+  note:'Unstable coefficients: HC and NOX carry the same information (multicollinearity)' },
+
+{ id:'t5', type:'numeric', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL VI · THE CORRELATION MATRIX',
+  text:`Compute the correlation matrix of the five <strong>explanatory</strong> variables : Data → Data
+  Analysis → Correlation on columns A to E, MORT excluded. Excel fills only the lower triangle : copy each
+  value to its mirror cell, you will need the full matrix for EigCov.
+  <strong>Report two entries, and the pair of variables with the highest correlation.</strong>`,
+  q:'Read your 5 × 5 correlation matrix.',
+  fields:[
+    {id:'hn', label:'Correlation between HC and NOX', value:0.983840,
+     alt:[{value:4192.760169, msg:'That is the covariance of HC and NOX (COVARIANCE.S). Report the correlation.'},
+          {value:4122.880833, msg:'That is the covariance computed by the Covariance tool, which divides by N. Report the correlation.'}],
+     msg:'Read the crossing of the HC and NOX rows and columns, or check with =CORREL(C2:C61,D2:D61).'},
+    {id:'ph', label:'Correlation between PREC and HC', value:-0.531760,
+     msg:'Read the crossing of the PREC and HC rows and columns, or check with =CORREL(A2:A61,C2:C61).'},
+    {id:'pair', kind:'select', label:'The most correlated pair', correct:'hn',
+     options:[['hn','HC and NOX'],['ph','PREC and HC'],['ns','NOX and SO'],['pm','PREC and MORT']],
+     msg:'Compare the absolute values of the off-diagonal entries of the matrix of the explanatory variables (MORT is not one of them).'}],
+  hint:`Data → Data Analysis → Correlation. Input Range : A1:E61, the five explanatory variables only.
+  Tick <b>Labels in First Row</b>. Look for the largest absolute value off the diagonal.`,
+  code:`Data → Data Analysis → Correlation
+   Input Range:  A1:E61     [x] Labels in First Row
+=CORREL(C2:C61, D2:D61)    ← check: HC and NOX`,
+  say:'HC and NOX : 0.98, by far the highest. PREC and HC : −0.53.',
+  right:`<strong>0.98</strong> between HC and NOX : almost one and the same variable. The next ones are far
+  behind : −0.53 between PREC and HC, −0.49 between PREC and NOX. The polluted cities of the file are dry
+  ones : the four cities with the most hydrocarbons get 10 to 18 inches of rain a year, against 37 on
+  average.
+  <span class="fx">The Master circles the 0.98 twice.</span>
+  Two columns, one piece of information. Principal components were made for this.`,
+  widgetAfter:'corr', note:'corr(HC, NOX) = 0.98, the highest; corr(PREC, HC) = -0.53' },
+
+{ id:'t6', type:'numeric', bg:'lab', who:'master', qn:'4',
+  title:'TRIAL VII · THE COMPONENTS',
+  text:`Now the eigenvalues and eigenvectors of this correlation matrix. Excel has no built-in function for
+  them : use <span class="kbd">EigCov</span>, from the file <strong>EigCov.xlsm</strong> on
+  <strong>Blackboard</strong>. Work inside that file, macros enabled : anywhere else, Excel answers
+  #NAME?.
+  Select an empty block of <strong>6 rows and 5 columns</strong>, type <span class="kbd">=EigCov(</span>
+  followed by your full 5 by 5 matrix, and press Ctrl + Shift + Enter. Row 1 : the eigenvalues, from the
+  largest. Below : <strong>one eigenvector per column</strong>.
+  An eigenvector is defined up to its sign. Our convention : <strong>HC must load positively in the
+  first eigenvector, JANT in the second, PREC in the third</strong> ; if not, multiply that whole
+  eigenvector by −1.
+  <strong>Report ${L1}, the loading of NOX in the first eigenvector, the number of components needed to
+  keep at least 80% of the total variance, and the share they keep.</strong>`,
+  q:'Read the output of EigCov. Shares in percent.',
+  fields:[
+    {id:'l1', label:`First eigenvalue ${L1}`, value:2.591279,
+     alt:[{value:11156.603372, msg:'That is an eigenvalue of the covariance matrix. Feed EigCov with the correlation matrix.'},
+          {value:51.825583, msg:'That is the share of the variance kept by PC1, in percent. Report the eigenvalue itself.'}],
+     msg:'Row 1 of the EigCov output, first cell. EigCov needs the full correlation matrix: numbers only, no labels, no empty cell.'},
+    {id:'nox1', label:'Loading of NOX in the first eigenvector', value:0.604641,
+     alt:[{value:-0.604641, msg:SIGNMSG},
+          {value:0.576848, msg:'You read the first eigenvector along a row. Each eigenvector is a column of the EigCov output, below its eigenvalue.'},
+          {value:0.040187, msg:'That is the loading of NOX in the second eigenvector. Read the column below the first eigenvalue.'}],
+     msg:'Read the column below the first eigenvalue: its fourth cell is the loading of NOX (PREC, JANT, HC, NOX, SO).'},
+    {id:'k', label:'Smallest number of components keeping at least 80%', value:3, exact:true,
+     alt:[{value:2, msg:'Two components keep 75.04% of the total variance: not yet 80%. (If you found 98.8% with two, you used the covariance matrix.)'},
+          {value:1, msg:'One component keeps 51.83% of the total variance: far from 80%.'},
+          {value:4, msg:'Four components keep more than 80%, but fewer are enough: take the smallest number.'},
+          {value:5, msg:'Five components keep 100%, but then nothing is reduced. Take the smallest number that reaches 80%.'}],
+     msg:'Cumulate the eigenvalues, divide by their total (5), and stop at the first share that reaches 80%.'},
+    {id:'sh', label:'Share of the total variance they keep (%)', value:92.993461,
+     alt:[{value:75.037307, msg:'That is the share of two components, below 80%.'},
+          {value:0.92993461, msg:'That is a proportion. Give the share in percent: multiply by 100.'},
+          {value:99.879320, msg:'That is the share of four components. Take the smallest number that reaches 80%.'},
+          {value:17.956154, msg:'That is the share of the third component alone. Report the cumulative share of the first components.'}],
+     msg:'(λ₁ + … + λk) / (λ₁ + … + λ₅) × 100.'}],
+  hint:`EigCov returns a block : select the 6 × 5 cells first, type the formula, then press <b>Ctrl + Shift +
+  Enter</b> (in recent Excel, Enter is enough). Its input is the <b>full</b> 5 × 5 matrix, numbers only.
+  The eigenvalues of a correlation matrix add up to the number of variables, 5.`,
+  code:`select an empty block of 6 rows × 5 columns, then type
+=EigCov(???)                         ← your full 5 × 5 correlation matrix
+Ctrl + Shift + Enter
+=SUM($I$1:I1)/5*100                  ← row of eigenvalues in I1:M1; copy to the right`,
+  say:'λ₁ ≈ 2.59, NOX loads 0.60 on the first eigenvector, and 3 components keep 92.99%.',
+  right:`${L1} ≈ <strong>2.59</strong>, and <strong>three</strong> components keep <strong>92.99%</strong>
+  of the total variance ; two stop at 75.04%. Look at the last eigenvalue : <strong>0.006</strong>. A
+  direction in which the five variables almost do not vary : the difference between HC and NOX. That
+  near-zero eigenvalue is the signature of multicollinearity.
+  <span class="fx">The Master writes on the board : λ₅ = 0.006.</span>
+  The first eigenvector loads HC and NOX almost equally, 0.60 each : PC1 treats them as one.`,
+  widgetAfter:'scree', note:'lambda1 = 2.59, lambda5 = 0.006; 3 components keep 92.99% (2 keep 75.04%)' },
+
+{ id:'t7', type:'numeric', bg:'lab', who:'master', qn:'5',
+  title:'TRIAL VIII · REGRESSION ON THE COMPONENTS',
+  text:`Standardize the five explanatory variables : subtract the average of each column, divide by its
+  standard deviation. Compute PC1, PC2 and PC3 for the 60 cities : each one is the standardized row
+  times an eigenvector. Then regress MORT on <strong>PC1, PC2 and PC3</strong>, intercept included.
+  <strong>Report the R², the coefficient of PC3, and compare the R² with the 50.69% of question 1.</strong>`,
+  q:'Read the regression of MORT on PC1, PC2 and PC3.',
+  fields:[
+    {id:'r2', label:'R² (%)', value:48.545871,
+     alt:[{value:0.48545871, msg:'That is a proportion. Give the R² in percent: multiply by 100.'},
+          {value:45.789400, msg:'That is the Adjusted R Square. Report R Square.'},
+          {value:2.876153, msg:'That regression uses two components only. Question 4 asked for three to reach 80% of the variance.'},
+          {value:50.686996, msg:'That is the R² of question 1, or of a regression on all five components. Use PC1, PC2 and PC3 only.'},
+          {value:42.371591, msg:'Your components were computed from the raw data. Standardize the five variables first: (value − average) / standard deviation.'},
+          {value:40.268392, msg:'Those are the components of the covariance matrix. Use the eigenvectors of the correlation matrix, applied to the standardized data.'}],
+     msg:'Regress MORT on the three columns PC1, PC2, PC3 (adjacent), and read R Square.'},
+    {id:'b3', label:'Coefficient of PC3', value:44.366652,
+     alt:[{value:-44.366652, msg:SIGNMSG},
+          {value:1.757326, msg:'Your components were computed from the raw data. Standardize the five variables first.'},
+          {value:2.109108, msg:'Those are the components of the covariance matrix. Use the eigenvectors of the correlation matrix.'},
+          {value:7.050144, msg:'That is the t Stat of PC3. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, row PC3.'},
+    {id:'cmp', kind:'select', label:'Compared with the 50.69% of question 1, the R² is', correct:'close',
+     options:[['close','Close: a little lower, with 3 regressors instead of 5'],['higher','Clearly higher'],['lower','Much lower: the components lost most of the explanation']],
+     msg:'Compare your R² with 50.69%.'}],
+  hint:`Standardize with $ anchors, e.g., <b>STANDARDIZE</b>. Then <b>MMULT</b> of a standardized row (5 cells)
+  and an eigenvector column (5 cells) gives one score ; anchor the eigenvector with $ and copy down. Put
+  PC1, PC2, PC3 in adjacent columns, MORT next to them, and run the regression.`,
+  code:`=STANDARDIZE(A2, A$63, A$64)        ← A63 = AVERAGE(A2:A61), A64 = STDEV.S(A2:A61)
+=MMULT($H2:$L2, ???$10:???$14)       ← standardized row × eigenvector
+Regression: Y = MORT, X = PC1:PC3 (adjacent), [x] Labels`,
+  say:'R² ≈ 48.55%, close to 50.69%, and PC3 has a coefficient of about 44.37.',
+  right:`R² ≈ <strong>48.55%</strong> with three uncorrelated regressors, against 50.69% with five collinear
+  ones. Almost nothing lost.
+  But look at which component works : PC3, with a t Stat of 7.05, significant at the 5% significance
+  level, while PC1 and PC2 are not. PC3 carries only 18% of the variance of the explanatory variables,
+  yet it does all the explaining. Keep PC1 and PC2 only, 75% of the variance, and the R² falls to 2.9%.
+  <span class="fx">The Master raises an eyebrow.</span>
+  The components that summarize X best are not always those that explain Y. Remember it.`,
+  hud:{r5:'48.55%'}, note:'PCR on PC1-PC3: R2 = 48.55% (vs 50.69%); only PC3 significant (t = 7.05)' },
+
+{ id:'t8', type:'choice', bg:'lab', who:'master', qn:'6',
+  title:'TRIAL IX · FACTORS WITH A NAME',
+  text:`A component mixes all five variables, which makes it hard to name. Let us simplify. For each of
+  the first three eigenvectors, keep the loadings larger than <strong>0.4 in absolute value</strong>,
+  with their value and their sign, and set all the others to 0. That gives three <strong>factors</strong>,
+  F1, F2 and F3, each built from a few variables only.
+  <strong>Which variables enter each factor ?</strong>`,
+  q:'Read your three eigenvectors with the 0.4 rule.',
+  options:[
+    {id:'a', label:'F1: PREC, HC and NOX. F2: JANT and SO. F3: PREC and SO.'},
+    {id:'b', label:'F1: HC and NOX. F2: JANT and SO. F3: PREC and SO.'},
+    {id:'c', label:'F1: HC, NOX and SO. F2: PREC and JANT. F3: PREC and SO.'},
+    {id:'d', label:'F1: HC and NOX. F2: PREC and JANT. F3: SO.'}
+  ], correct:'b',
+  hint:`Apply the rule cell by cell on the 5 × 3 block of the first three eigenvectors : keep the value when
+  its absolute value exceeds 0.4, write 0 otherwise.`,
+  code:`=IF(ABS(I10)>0.4, I10, 0)     ← French: =SI(ABS(I10)>0,4;I10;0)
+copy over the 5 rows × 3 columns of the first three eigenvectors`,
+  right:`F1 = 0.60·HC + 0.60·NOX : the <strong>exhaust pollution</strong> factor, the two twins together.
+  F2 = 0.81·JANT − 0.48·SO : <strong>warm winters</strong>, with little sulfur dioxide : less heating, less coal
+  burnt, perhaps. F3 = 0.64·PREC + 0.74·SO : <strong>rain and sulfur</strong>.
+  <span class="fx">The Master names the three columns on the board.</span>
+  Three factors, three stories. Now regress MORT on them.`,
+  wrong:{a:`PREC loads −0.39 in the first eigenvector : |−0.39| is below 0.4, so PREC stays out of F1.`,
+  c:`SO loads 0.27 in the first eigenvector : below 0.4, out of F1. And in the second eigenvector PREC
+  loads 0.32, below 0.4 too.`,
+  d:`Read the second eigenvector again : JANT 0.81 and SO −0.48 pass the rule, PREC (0.32) does not. And
+  the third holds PREC (0.64) as well as SO (0.74).`},
+  widgetAfter:'loadings',
+  note:'F1 = HC & NOX (pollution); F2 = JANT & -SO (warm winters); F3 = PREC & SO (rain & sulfur)' },
+
+{ id:'t9', type:'numeric', bg:'lab', who:'master', qn:'6',
+  title:'TRIAL X · REGRESSION ON THE FACTORS',
+  text:`Compute F1, F2 and F3 for the 60 cities : the standardized row times the new loadings, exactly as
+  for the components. Then regress MORT on <strong>F1, F2 and F3</strong>, intercept included.
+  <strong>Report the R², the coefficient of F3, and which factors are significant at the 5% significance
+  level.</strong>`,
+  q:'Read the regression of MORT on F1, F2 and F3.',
+  fields:[
+    {id:'r2', label:'R² (%)', value:48.708124,
+     alt:[{value:0.48708124, msg:'That is a proportion. Give the R² in percent: multiply by 100.'},
+          {value:45.960345, msg:'That is the Adjusted R Square. Report R Square.'},
+          {value:48.545871, msg:'That is the R² of the regression on the components. Use the factors F1, F2, F3, built with the 0.4 rule.'},
+          {value:49.177261, msg:'Your loadings are +1 and −1. Keep the value of each loading above 0.4 in absolute value, not just its sign.'},
+          {value:39.283681, msg:'Your factors were computed from the raw data. Apply the loadings to the standardized data.'}],
+     msg:'Regress MORT on the three factor columns (adjacent), and read R Square.'},
+    {id:'b3', label:'Coefficient of F3', value:47.151030,
+     alt:[{value:-47.151030, msg:SIGNMSG},
+          {value:44.366652, msg:'That is the coefficient of PC3. Use the factor F3, built with the 0.4 rule.'},
+          {value:32.629208, msg:'Your loadings are +1 and −1. Keep the value of each loading above 0.4 in absolute value, not just its sign.'},
+          {value:1.882068, msg:'Your factors were computed from the raw data. Apply the loadings to the standardized data.'},
+          {value:6.794128, msg:'That is the t Stat of F3. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, row F3.'},
+    {id:'sig', kind:'select', label:'Factors significant at the 5% significance level', correct:'f3',
+     options:[['f3','F3 only'],['f13','F1 and F3'],['all','F1, F2 and F3'],['none','None of them']],
+     msg:'Compare each |t Stat| with the critical value =T.INV.2T(0.05, 56), or each P-value with 0.05.'}],
+  hint:`Same recipe as for the components : <b>MMULT</b> of the standardized row and the column of the new
+  loadings (with its zeros). The regression has 60 − 4 = 56 degrees of freedom : critical value
+  <b>T.INV.2T(0.05, 56)</b> at the 5% significance level.`,
+  code:`=MMULT($H2:$L2, ???$20:???$24)   ← standardized row × loadings of F1 (zeros included)
+Regression: Y = MORT, X = F1:F3 (adjacent), [x] Labels
+=T.INV.2T(0.05, 56)`,
+  say:'R² ≈ 48.71%, F3 has a coefficient of about 47.15, and only F3 is significant at the 5% significance level.',
+  right:`R² ≈ <strong>48.71%</strong> : as much as the components, slightly more, and now every regressor has a
+  name. Only <strong>F3</strong>, rain and sulfur, is significant at the 5% significance level, with a t Stat
+  of 6.79 against a critical value of 2.00. One more unit of F3, about <strong>47</strong> more deaths per
+  100,000.
+  <span class="fx">The Master looks at the row F1 for a long time.</span>`,
+  hud:{r6:'48.71%'}, note:'Factors: R2 = 48.71%; only F3 (rain & sulfur) significant, b_F3 = 47.15' },
+
+{ id:'t10', type:'numeric', bg:'court', who:'master', qn:'7',
+  title:'TRIAL XI · THE POLLUTION FACTOR',
+  text:`Back to my claim. HC and NOX now live together in F1. Test
+  <br><span class="kbd">${H0} : ${BF1} = 0</span> against <span class="kbd">${H1} : ${BF1} ≠ 0</span>,
+  at the <strong>5% significance level</strong>.<br>
+  <strong>Report the coefficient of F1, its P-value, and your decision.</strong>`,
+  q:'Read the row F1 of the factor regression.',
+  fields:[
+    {id:'b1', label:`Estimate of ${BF1}`, value:-4.118897,
+     alt:[{value:4.118897, msg:SIGNMSG},
+          {value:-0.824815, msg:'That is the t Stat of F1. Read the Coefficients column.'},
+          {value:-5.822830, msg:'That is the coefficient of PC1. Use the factor F1.'}],
+     msg:'Read the Coefficients column, row F1.'},
+    {id:'p1', label:'P-value of F1', value:0.412976,
+     alt:[{value:4.993721, msg:'That is the standard error of F1. Read the P-value column.'}],
+     msg:'Read the P-value column, row F1.'},
+    {id:'d1', kind:'select', label:'Decision at the 5% significance level', correct:'not', options:DECISION,
+     msg:'Compare the P-value with 0.05: we use a 5% significance level.'}],
+  hint:`Reject ${H0} at the 5% significance level when the P-value is below 0.05, or, equivalently, when |t
+  Stat| is above <b>T.INV.2T(0.05, 56)</b>.`,
+  code:`=T.INV.2T(0.05, 56)     ← critical value, two-sided, 5% significance level`,
+  say:'β_F1 ≈ −4.12, P-value 0.41 : not significant at the 5% significance level.',
+  right:`${BF1} ≈ <strong>−4.12</strong>, P-value <strong>0.41</strong>. We fail to reject ${H0} at the 5%
+  significance level. With a 95% confidence level, the effect of the pollution factor lies anywhere between
+  −14.1 and +5.9 deaths per 100,000 for one more unit of F1.`,
+  widgetAfter:'tstats', note:'b_F1 = -4.12, p = 0.41: not significant at the 5% significance level' },
+
+{ id:'t11', type:'choice', bg:'court', who:'master', qn:'7',
+  title:'TRIAL XII · THE VERDICT',
+  text:`So. <strong>Do the HC and NOX pollutants increase the mortality rate ?</strong>`,
+  q:'Choose the conclusion these data support.',
+  options:[
+    {id:'a', label:'No, they decrease it: HC has a negative coefficient in question 1, and F1 a negative one now.'},
+    {id:'b', label:'Yes: NOX has a positive coefficient in question 1.'},
+    {id:'c', label:'These data cannot tell. The pollution factor F1 is not significant at the 5% significance level, and with a 95% confidence level its effect may be negative, zero or positive. No evidence of an effect is not evidence of no effect.'},
+    {id:'d', label:'Yes: F3 is strongly significant, and F3 is a pollution factor.'}
+  ], correct:'c',
+  hint:`Separate what an estimate says from what a test allows you to say. And check which variables enter
+  F3.`,
+  right:`Neither the claim nor its opposite. With 60 cities and two pollutants that move together, the data
+  cannot isolate their effect : the pollution factor is not significant at the 5% significance level,
+  and, with a 95% confidence level, its effect lies between −14 and +6. My negative coefficient was noise, inflated by
+  multicollinearity.
+  <span class="fx">The Master strikes out his claim, without pleasure.</span>
+  The sulfur dioxide is another story : it sits in F3, with the rain, and F3 is strongly significant.`,
+  wrong:{a:`A negative estimate is not a negative effect. Neither ${BHC} in question 1 nor ${BF1} is
+  significant at the 5% significance level : the sign may be noise.`,
+  b:`${BNOX} was not significant at the 5% significance level (t = 1.19), and it changed sign with HC.
+  An insignificant positive estimate proves no more than an insignificant negative one.`,
+  d:`F3 is made of PREC and SO, the rain and the sulfur dioxide. HC and NOX do not enter it : they live in
+  F1.`},
+  note:'HC & NOX: no evidence either way at the 5% significance level' },
+
+{ id:'t12', type:'choice', bg:'lab', who:'master', qn:'8',
+  title:'TRIAL XIII · THE ONE THAT MATTERS',
+  text:`Last question. Draw the scatter plot of the mortality, MORT, on the vertical axis, against the third
+  factor F3, on the horizontal axis.
+  <strong>What does it show ?</strong>`,
+  q:'Choose the description of your plot.',
+  options:[
+    {id:'a', label:'A shapeless cloud: F3 is significant, but the plot shows no relationship.'},
+    {id:'b', label:'A clear upward cloud: cities with more rain and more sulfur dioxide have a higher mortality, roughly along a straight line, with a fair scatter around it.'},
+    {id:'c', label:'A clear downward cloud: the higher F3, the lower the mortality.'},
+    {id:'d', label:'All the points exactly on a straight line: F3 explains all the mortality.'}
+  ], correct:'b',
+  hint:`Insert → Charts → Scatter. Select Data → Add : X values = your F3 column, Y values = MORT. You can
+  add a trendline (right-click a point → Add Trendline) and check its slope with <b>CORREL</b>.`,
+  code:`Insert → Charts → Scatter
+   Series X values:  your F3 column
+   Series Y values:  F2:F61   ← MORT
+=CORREL(???, F2:F61)`,
+  right:`Upward. The correlation between MORT and F3 is 0.69 : F3 alone explains 48% of the variance of the
+  mortality, almost as much as the five variables together.
+  <span class="fx">The Master pins the plot next to his crossed-out claim.</span>
+  Rain and sulfur, not hydrocarbons, carry the signal in these data.`,
+  wrong:{a:`Look again : the cloud rises from left to right. A significant t Stat of 6.79 rarely hides a
+  shapeless cloud.`,
+  c:`Check the sign of the coefficient of F3 : about +47. Higher F3, higher mortality.`,
+  d:`The R² is 48%, not 100% : the points scatter around the line.`},
+  widgetAfter:'mortf3', note:'MORT against F3: upward, corr = 0.69' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · CASE CLOSED',
+  text:`I claimed that hydrocarbons save lives. My coefficient was negative, but not significant at the 5%
+  significance level, and it vanished as soon as NOX left the model.
+  <span class="fx">The Master throws the crumpled printout in the bin.</span>
+  Four rules to take home.
+  <strong>One.</strong> When two explanatory variables are almost collinear, their coefficients are
+  unstable and imprecise : remove one, and the other changes completely. Look at the correlation matrix, and
+  at the smallest eigenvalue.
+  <strong>Two.</strong> Principal components are uncorrelated : a regression on them is free of
+  multicollinearity, and loses little R².
+  <strong>Three.</strong> The components that summarize the explanatory variables best are not always those
+  that explain Y. Here PC3, 18% of the variance, did all the work.
+  <strong>Four.</strong> Not significant at the 5% significance level means no evidence of an effect, not
+  evidence of no effect.`,
+  banner:'NO EVIDENCE IS NOT EVIDENCE OF NO EFFECT', cont:'Close the case file', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {r1:'—', r5:'—', r6:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the first rows of the file, the estimates of HC and
+   SO with and without NOX, the correlation matrix, the share of the
+   variance kept by each component, the first three eigenvectors with
+   the ±0.4 rule, the t Stats of the factor regression, and the
+   mortality against the third factor. Points are never connected;
+   hovering a point shows its city.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const eur = v => Math.round(v).toLocaleString('en-US') + ' €';
+const sgn = (v,d) => (v<0?'−':'') + Math.abs(v).toFixed(d);
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series, straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="${l.dash===true?'7 6':l.dash}"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||4}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.8}" stroke="${s.stroke||PLOT.paper}" stroke-width="${s.sw===undefined?1:s.sw}">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{ labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:p.sz||16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* legend rows, drawn inside a panel (pixel coordinates): a line or a point */
+function legendRow(x, y, color, dash, text){
+  return `<line x1="${x}" y1="${y-5}" x2="${x+28}" y2="${y-5}" stroke="${color}" stroke-width="2.5" ${dash?`stroke-dasharray="${dash}"`:''}/>`
+    + TXT(x+36, y, text, {sz:16, col:color, anchor:'start'});
+}
+function legendDot(x, y, color, alpha, text){
+  return `<circle cx="${x+14}" cy="${y-5}" r="4.5" fill="${color}" fill-opacity="${alpha}"/>`
+    + TXT(x+36, y, text, {sz:16, col:color, anchor:'start'});
+}
+function withLegend(svg, rows){ return svg.replace('</svg>', rows + '</svg>'); }
+
+/* ---- the cold open: the first rows of the file ---- */
+function playTable(host){
+  const names=['PREC','JANT','HC','NOX','SO','MORT'];
+  const cx=i=>80+i*108;
+  let head='', rows='';
+  names.forEach((n,i)=>{ head += TXT(cx(i),62,'ABCDEF'[i],{sz:15,col:PLOT.axis}) + TXT(cx(i),84,n,{sz:17,col:PLOT.ink}); });
+  for(let r=0;r<5;r++){
+    const y=118+r*24;
+    DATA.FIRST[r].forEach((v,i)=>{ rows += TXT(cx(i),y,v,{sz:18}); });
+  }
+  const svg=`<svg viewBox="0 0 700 270" style="width:100%;height:auto;display:block">
+    <rect width="700" height="270" fill="${PLOT.paper}"/>
+    ${TXT(16,30,'DATA_PCA.XLSX · SHEET1 · THE FIRST FIVE OF 60 CITIES',{sz:17,anchor:'start'})}
+    <line x1="14" y1="94" x2="686" y2="94" stroke="${PLOT.axis}"/>
+    ${head}${rows}
+    ${TXT(350,240,'PREC: rain (inches a year) · JANT: January temperature (°F) · HC, NOX, SO: pollution potentials',{sz:15})}
+    ${TXT(350,258,'MORT: age-adjusted deaths per 100,000 inhabitants',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE FILE', svg,
+    'Five explanatory variables, one dependent variable, 60 cities (McDonald and Schwing, 1973).');
+  return 600;
+}
+
+/* ---- two estimates, with and without NOX, and their 95% confidence level intervals ---- */
+function playCoefs(host){
+  const panel=(x0, w, name, lo, hi, rows, ticks)=>{
+    const px=v=>x0+(v-lo)/(hi-lo)*w;
+    let g = TXT(x0, 58, name, {sz:18, col:PLOT.ink, anchor:'start'})
+      + `<line x1="${px(0).toFixed(1)}" y1="70" x2="${px(0).toFixed(1)}" y2="196" stroke="${PLOT.axis}" stroke-dasharray="4 4"/>`
+      + `<line x1="${x0}" y1="196" x2="${x0+w}" y2="196" stroke="${PLOT.axis}"/>`;
+    ticks.forEach(v=>{ g += `<line x1="${px(v).toFixed(1)}" y1="196" x2="${px(v).toFixed(1)}" y2="201" stroke="${PLOT.axis}"/>` + TXT(px(v).toFixed(1), 216, sgn(v, Number.isInteger(v)?0:1), {sz:14}); });
+    rows.forEach((r,k)=>{
+      const y=104+k*58, col=k?PLOT.fit:PLOT.ink;
+      g += `<line x1="${px(r.lo).toFixed(1)}" y1="${y}" x2="${px(r.hi).toFixed(1)}" y2="${y}" stroke="${col}" stroke-width="3"/>`
+        + `<line x1="${px(r.lo).toFixed(1)}" y1="${y-7}" x2="${px(r.lo).toFixed(1)}" y2="${y+7}" stroke="${col}" stroke-width="2"/>`
+        + `<line x1="${px(r.hi).toFixed(1)}" y1="${y-7}" x2="${px(r.hi).toFixed(1)}" y2="${y+7}" stroke="${col}" stroke-width="2"/>`
+        + `<circle cx="${px(r.b).toFixed(1)}" cy="${y}" r="6" fill="${col}" stroke="${PLOT.paper}" stroke-width="1.5"><title>${r.lab}: ${r.b}</title></circle>`
+        + TXT(x0, y-14, r.lab, {sz:15, col, anchor:'start'});
+    });
+    return g;
+  };
+  const C=REG.COEF;
+  const svg=`<svg viewBox="0 0 700 250" style="width:100%;height:auto;display:block">
+    <rect width="700" height="250" fill="${PLOT.paper}"/>
+    ${TXT(16,28,'Estimates and intervals at the 95% confidence level, with and without NOX',{sz:17,anchor:'start'})}
+    ${panel(30, 300, 'HC', -2, 0.6, [
+        {lab:'with NOX: −0.689', b:C.hc1[0], lo:C.hc1[1], hi:C.hc1[2]},
+        {lab:'without NOX: −0.0045', b:C.hc2[0], lo:C.hc2[1], hi:C.hc2[2]}], [-2,-1.5,-1,-0.5,0,0.5])}
+    ${panel(380, 300, 'SO', -0.1, 0.8, [
+        {lab:'with NOX: 0.334', b:C.so1[0], lo:C.so1[1], hi:C.so1[2]},
+        {lab:'without NOX: 0.476', b:C.so2[0], lo:C.so2[1], hi:C.so2[2]}], [0,0.2,0.4,0.6,0.8])}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE DANCING COEFFICIENTS', svg,
+    'With NOX in the model, the interval of HC is six times wider than without it: two collinear variables share one piece of information.');
+  return 900;
+}
+
+/* ---- the correlation matrix of the explanatory variables ---- */
+function playCorr(host){
+  const x0=130, cw=108, y0=74, ch=34;
+  let cells='', labs='';
+  PCA.NAMES.forEach((n,j)=>{ labs += TXT(x0+j*cw+cw/2, y0-12, n, {sz:16, col:PLOT.ink}); });
+  PCA.NAMES.forEach((n,i)=>{
+    labs += TXT(x0-10, y0+i*ch+22, n, {sz:17, col:PLOT.ink, anchor:'end'});
+    PCA.R[i].forEach((r,j)=>{
+      const a=Math.abs(r), col = r>=0 ? PLOT.ink : PLOT.fit;
+      cells += `<rect x="${x0+j*cw}" y="${y0+i*ch}" width="${cw-3}" height="${ch-3}"
+        fill="${col}" fill-opacity="${(0.06+0.86*a).toFixed(2)}"><title>${PCA.NAMES[i]} and ${PCA.NAMES[j]}: ${sgn(r,4)}</title></rect>`
+        + TXT(x0+j*cw+cw/2-1, y0+i*ch+22, sgn(r,2), {sz:18, col:a>0.5?PLOT.paper:PLOT.ink});
+    });
+  });
+  const H=y0+5*ch+16;
+  const svg=`<svg viewBox="0 0 700 ${H}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(16,26,'Correlation matrix of the five explanatory variables',{sz:17,anchor:'start'})}
+    ${labs}${cells}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE CORRELATION MATRIX', svg,
+    'Blue: positive correlation; red: negative; the darker, the stronger. HC and NOX: 0.98, almost one variable.');
+  return 900;
+}
+
+/* ---- the share of the variance kept by each component ---- */
+function playScree(host){
+  const W=700, H=330, L=64, R=684, T=46, B=264;
+  const n=PCA.LAM.length, bw=(R-L)/n, py=v=>B-v/100*(B-T), tot=PCA.LAM.reduce((a,b)=>a+b,0);
+  let bars='', dots='', ticks='', cum=0;
+  PCA.LAM.forEach((l,k)=>{
+    const s=100*l/tot; cum+=s;
+    const cx=L+bw*k+bw/2, win=(k===2);
+    bars += `<rect x="${(cx-22).toFixed(1)}" y="${py(s).toFixed(1)}" width="44" height="${Math.max(B-py(s),0.8).toFixed(1)}" fill="${PLOT.ink}" fill-opacity=".8">
+      <title>PC${k+1}: λ = ${l.toFixed(3)}, ${s.toFixed(2)}% of the variance</title></rect>`;
+    dots += `<circle cx="${(cx+40).toFixed(1)}" cy="${py(cum).toFixed(1)}" r="${win?7:5}" fill="${win?PLOT.fit:PLOT.second}" stroke="${PLOT.paper}" stroke-width="1.5">
+      <title>PC1 to PC${k+1}: ${cum.toFixed(2)}%</title></circle>`
+      + TXT((cx+40).toFixed(1), (cum>66 && cum<80 ? py(cum)+22 : py(cum)-11).toFixed(1), cum.toFixed(1), {sz:15, col:win?PLOT.fit:PLOT.second});
+    ticks += TXT(cx.toFixed(1), B+19, 'PC'+(k+1), {sz:15, col:PLOT.ink}) + TXT(cx.toFixed(1), B+37, 'λ '+l.toFixed(3), {sz:14});
+  });
+  let yt='';
+  [0,20,40,60,80,100].forEach(v=>{ yt += `<line x1="${L-5}" y1="${py(v)}" x2="${L}" y2="${py(v)}" stroke="${PLOT.axis}"/>` + TXT(L-9, py(v)+5, v, {sz:15, anchor:'end'}); });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,'Share of the total variance of the explanatory variables (%)',{sz:17,anchor:'start'})}
+    <line x1="${L}" y1="${py(80)}" x2="${R}" y2="${py(80)}" stroke="${PLOT.fit}" stroke-width="1.6" stroke-dasharray="6 5"/>
+    ${TXT(L+6, py(80)-6, '80%', {sz:16, col:PLOT.fit, anchor:'start'})}
+    ${bars}${dots}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}${yt}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">percent of the total variance</text>
+    ${legendDot(420, 150, PLOT.second, 1, 'cumulative share, PC1 to PCk')}
+    <rect x="427" y="164" width="14" height="11" fill="${PLOT.ink}" fill-opacity=".8"/>${TXT(456, 174, 'share of each component: λj / 5', {sz:16, col:PLOT.ink, anchor:'start'})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · HOW MANY COMPONENTS', svg,
+    'Three components are the first to pass 80%: 93.0%. The fifth eigenvalue, 0.006, is almost zero: the signature of HC and NOX moving together.');
+  return 900;
+}
+
+/* ---- the first three eigenvectors, with the ±0.4 rule ---- */
+function playLoadings(host){
+  const y0=78, rh=30, sc=105, centers=[205, 400, 595];
+  let g='';
+  PCA.NAMES.forEach((n,i)=>{ g += TXT(92, y0+i*rh+16, n, {sz:17, col:PLOT.ink, anchor:'end'}); });
+  PCA.V.forEach((vec,j)=>{
+    const c=centers[j];
+    g += TXT(c, 60, 'v'+(j+1)+' · λ'+(j+1)+' = '+PCA.LAM[j].toFixed(2), {sz:17, col:PLOT.ink})
+      + `<line x1="${c}" y1="${y0-4}" x2="${c}" y2="${y0+5*rh}" stroke="${PLOT.axis}"/>`
+      + `<line x1="${c-0.4*sc}" y1="${y0-4}" x2="${c-0.4*sc}" y2="${y0+5*rh}" stroke="${PLOT.fit}" stroke-dasharray="3 4"/>`
+      + `<line x1="${c+0.4*sc}" y1="${y0-4}" x2="${c+0.4*sc}" y2="${y0+5*rh}" stroke="${PLOT.fit}" stroke-dasharray="3 4"/>`;
+    vec.forEach((v,i)=>{
+      const y=y0+i*rh, w=v*sc, keep=Math.abs(v)>0.4, col=v>=0?PLOT.ink:PLOT.second;
+      const big=Math.abs(v)>=0.3;
+      const lx = big ? (w>=0 ? c+w-4 : c+w+4) : (w>=0 ? c+w+5 : c+w-5);
+      g += `<rect x="${(w>=0?c:c+w).toFixed(1)}" y="${y+4}" width="${Math.max(Math.abs(w),0.8).toFixed(1)}" height="17" fill="${col}" fill-opacity="${keep?0.9:0.3}"/>`
+        + TXT(lx.toFixed(1), y+17, sgn(v,2), {sz:14, col:big?(keep?PLOT.paper:PLOT.ink):col, anchor:big?(w>=0?'end':'start'):(w>=0?'start':'end')});
+    });
+  });
+  const H=y0+5*rh+36;
+  const svg=`<svg viewBox="0 0 700 ${H}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(16,28,'The first three eigenvectors of the correlation matrix',{sz:17,anchor:'start'})}
+    ${g}
+    ${TXT(350, H-12, 'dotted lines: −0.4 and +0.4 · solid bars pass the rule, pale bars do not', {sz:15, col:PLOT.fit})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE LOADINGS', svg,
+    'Signs follow the convention: HC > 0 in v1, JANT > 0 in v2, PREC > 0 in v3.');
+  return 900;
+}
+
+/* ---- the t Stats of the factor regression, against the critical value ---- */
+function playTStats(host){
+  const L=110, R=650, top=74, step=40, xmax=8;
+  const px=v=>L+v/xmax*(R-L);
+  let bars='', ticks='';
+  REG.FT.forEach(([name,t],k)=>{
+    const y=top+k*step, a=Math.abs(t), sig=a>REG.FCRIT, col=sig?PLOT.fit:PLOT.ink;
+    bars += TXT(L-12, y+18, name, {sz:18, col:PLOT.ink, anchor:'end'})
+          + `<rect x="${L}" y="${y+4}" width="${(px(a)-L).toFixed(1)}" height="20" fill="${col}" fill-opacity="${sig?0.85:0.5}"/>`
+          + (px(a) > R-200
+             ? TXT((px(a)-8).toFixed(1), y+19, '|t| = '+a.toFixed(2)+' · significant', {sz:16, col:PLOT.paper, anchor:'end'})
+             : TXT((Math.max(px(a)+8, px(REG.FCRIT)+16)).toFixed(1), y+19, '|t| = '+a.toFixed(2)+(sig?' · significant':' · not significant'), {sz:16, col, anchor:'start'}));
+  });
+  const B=top+REG.FT.length*step+2;
+  [0,2,4,6,8].forEach(v=>{ ticks += `<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>` + TXT(px(v),B+21,v,{sz:15}); });
+  const H=B+40;
+  const svg=`<svg viewBox="0 0 700 ${H}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(30,28,'Regression on the factors: |t Stat| of each factor, H0: β = 0',{sz:17,anchor:'start'})}
+    ${bars}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${px(REG.FCRIT)}" y1="${top-10}" x2="${px(REG.FCRIT)}" y2="${B}" stroke="${PLOT.second}" stroke-width="2" stroke-dasharray="6 5"/>
+    ${TXT(px(REG.FCRIT)+6, top-14, 'critical value 2.00 (5% significance level)', {sz:16, col:PLOT.second, anchor:'start'})}
+    ${ticks}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · WHICH FACTOR MATTERS', svg,
+    'F1 (HC and NOX) and F2 (warm winters) stay below the critical value at the 5% significance level; F3 (rain and sulfur) is far above it.');
+  return 900;
+}
+
+/* ---- the mortality against the third factor ---- */
+function playMortF3(host){
+  const o = {
+    H:360, B:300,
+    series:[{x:DATA.F3, y:DATA.MORT, r:4.5, alpha:0.75, color:PLOT.ink,
+             tip:i=>`row ${i+2}: F3 ${sgn(DATA.F3[i],2)}, MORT ${DATA.MORT[i]}`}],
+    lines:[{x1:-2.4, y1:REG.F3A+REG.F3B*-2.4, x2:2.6, y2:REG.F3A+REG.F3B*2.6, color:PLOT.fit}],
+    labels:[{x:-2.3, y:1110, text:'MORT = 940.36 + 46.60 × F3', col:PLOT.fit}],
+    xmin:-2.5, xmax:2.7, ymin:770, ymax:1130,
+    xticks:[-2,-1,0,1,2], yticks:[800,850,900,950,1000,1050,1100], xfmt:v=>sgn(v,0),
+    title:'Mortality against the third factor, 60 cities',
+    xlab:'F3 = 0.64 · PREC + 0.74 · SO  (standardized)', ylab:'MORT (deaths per 100,000)'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · RAIN AND SULFUR', panelSVG(o),
+    'Correlation 0.69: F3 alone explains 48% of the variance of the mortality. Hover a point to see its city.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')    return playTable(host);
+  if(name==='coefs')    return playCoefs(host);
+  if(name==='corr')     return playCorr(host);
+  if(name==='scree')    return playScree(host);
+  if(name==='loadings') return playLoadings(host);
+  if(name==='tstats')   return playTStats(host);
+  if(name==='mortf3')   return playMortF3(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your workbook step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+/* the course margin rule: exact integers; ±0.01 when 0.1 ≤ |value| < 1e6;
+   ±1% of the value otherwise. The tiny extra absorbs floating-point error. */
+function marginOf(value, exact){
+  if(exact) return 0;
+  const a = Math.abs(value);
+  return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
+}
+function tolerance(f){ return marginOf(f.value, f.exact); }
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02 or 2.1E+09, without thousands separators.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){
+    const at = (a.tol !== undefined) ? a.tol : marginOf(a.value, f.exact);
+    if(Math.abs(v-a.value) <= at) return a.msg;
+  }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE10PRA',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise X, Part 2</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+/* the data file: the button names its file in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — no password: this exercise is not graded
+   ================================================================ */
+function finish(){
+  $('#endblurb').innerHTML =
+    `You replicated a regression of mortality on pollution and climate in 60 cities, saw its coefficients
+     jump when NOX left the model, traced the instability to a 0.98 correlation and a near-zero eigenvalue,
+     and repaired the regression with three principal components, then with three factors that have a
+     name. Only rain and sulfur carry a significant signal at the 5% significance level; hydrocarbons and
+     nitrogen oxides, together, show no evidence of an effect either way.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: HYDROCARBONS SAVE LIVES';
+  show('scr-end');
+}
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v10.20  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE X-2 ....... POLLUTION, 1973",
+  "DATA ........................ 60 CITIES, 5 + 1 COLUMNS",
+  "COLLINEARITY ................ SUSPECTED",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
