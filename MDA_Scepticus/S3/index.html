@@ -1,1 +1,1748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 3: A Curved Future</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 3
+  "A Curved Future"
+  EDHEC · Multivariate Data Analysis · Empirical Session 3
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Excel version of "Exercise 5" of the Statistical Models course (Python),
+  on the engine of Empirical Exercise 2.
+
+  HOW THE EXERCISE WORKS
+  ----------------------
+  The game does NOT compute anything. Students work in two windows:
+     Excel      open the data file and compute every number;
+     this game  report numbers, choose interpretations, get feedback.
+  There is no questions PDF: Master Scepticus asks the questions one
+  after the other. Every question has a HINT button. No answer is ever
+  shown: there is no SHOW THE ANSWER button.
+
+  DATA FILE  (set the Dropbox link in CONFIG.DATA_FILES)
+  ---------
+  Frontier_AI_compute.xlsx  71 frontier AI models: Year (decimal year),
+                            Compute (training compute, FLOP).
+  The left-handers part (Lefthanders_1986.xlsx) has been removed.
+
+  TOLERANCE
+  ---------
+  Small numbers are accepted within 0.01 of the target, so the first
+  two decimals shown by Excel are enough. Very large numbers, typed as
+  in Excel (e.g., -4.76E+25), are accepted within CONFIG.RTOL (2%).
+
+  CHECKPOINTS
+  -----------
+        CP1  raw scatter plot and correlation done
+        CP2  raw linear model fitted and rejected
+        CP3  log transformation done
+        CP4  log-linear model fitted and read
+        CP5  2029 prediction done = exercise completed
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ---------- checkpoint: always visible at the top of the notebook ---------- */
+#cpbox{padding:7px 9px; background:#fff6d6; border-bottom:2px solid var(--panel-dk); font-family:var(--mono); color:#111}
+#cpbox .cphead{display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:16px; color:#5a4a1a}
+#cpbox .cpcode{display:block; margin-top:2px; font-size:22px; letter-spacing:1px; color:#000080; word-break:break-all}
+#cpbox .cpnone{font-size:16px; color:#777}
+#cpbox .toolbtn{padding:3px 7px; font-size:9px}
+.cpcard{margin:10px 0 4px; padding:12px 14px; background:#2a2005; border:2px solid; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.cpcard .cptitle{font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.5px; color:var(--amber)}
+.cpcard .cpcode{display:inline-block; margin:6px 10px 4px 0; font:28px/1.1 var(--mono); letter-spacing:1.5px; color:#fff;
+  background:#0c0c18; border:2px solid #6b4a00; padding:4px 10px}
+.cpcard p{margin:6px 0 0; font-size:14px; line-height:1.55; color:var(--cream)}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE III</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="frontier">DATA · AI COMPUTE</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>A CURVED FUTURE</h1>
+      <h2>Empirical Exercise III &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus will hand you the training compute of frontier AI models and a straight
+      line that predicts negative compute. You will fit your first regressions, replace the line
+      with a log-linear model, make a conditional prediction for 2029, and say out loud what that
+      extrapolation assumes.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>Frontier_AI_compute.xlsx</code> with the
+        <strong>DATA</strong> button at the top and open it in Excel. Compute every number there, and
+        keep your workbook: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, choose the interpretations, and defend them in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example Excel formula, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p><strong style="color:var(--amber)">Checkpoints.</strong> Five times during the exercise, the
+      Master gives you a password. The latest one always stays at the top of your notebook. If you
+      cannot finish, submit the latest password on Blackboard: it shows how far you got. If you close
+      this window, you can resume from your last checkpoint on the same computer.</p>
+      <p>Type numbers with a dot or a comma as the decimal separator, e.g., <code>0.12</code> or
+      <code>0,12</code>. Two decimals are enough. Very large numbers can be typed exactly as Excel
+      displays them, e.g., <code>-4.76E+25</code>.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">In <code>Frontier_AI_compute.xlsx</code>, the data are in the sheet
+        <code>Data</code>, with the names of the columns in row 1: <code>A</code> Year,
+        <code>B</code> Compute, rows 2 to 72. English Excel separates the arguments of a function with
+        a comma; French Excel uses a semicolon, e.g.,
+        <code>=COEFFICIENT.CORRELATION(A2:A72;B2:B72)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code></td><td><code>=NB(plage)</code></td><td>Counts the cells that contain numbers.</td><td><code>=COUNT(B2:B72)</code></td></tr>
+            <tr><td><code>=AVERAGE(range)</code></td><td><code>=MOYENNE(plage)</code></td><td>Sample average.</td><td><code>=AVERAGE(B2:B72)</code></td></tr>
+            <tr><td><code>=CORREL(r1, r2)</code></td><td><code>=COEFFICIENT.CORRELATION(r1; r2)</code></td><td>Empirical correlation.</td><td><code>=CORREL(A2:A72, B2:B72)</code></td></tr>
+            <tr><td>Insert → Charts → Scatter</td><td>Insertion → Graphiques → Nuage de points</td><td>Scatter plot. Right-click → Select Data → Add, once per series, to choose the X and the Y values.</td><td>X: A2:A72, Y: B2:B72</td></tr>
+            <tr><td>A new column</td><td>Une nouvelle colonne</td><td>Type the formula in row 2, then double-click the small square at the bottom-right corner of the cell to copy it down.</td><td><code>=A2-2010</code></td></tr>
+            <tr><td><code>=LN(x)</code>, <code>=EXP(x)</code></td><td><code>=LN(x)</code>, <code>=EXP(x)</code></td><td>Natural logarithm, and its inverse. Careful: <code>LOG</code> is the logarithm in base 10.</td><td><code>=LN(B2)</code></td></tr>
+            <tr><td>Data → Data Analysis → Regression</td><td>Données → Utilitaire d’analyse → Régression</td><td>Full regression output: Coefficients, R Square. If it is missing: File → Options → Add-ins → Analysis ToolPak.</td><td>Y range: B1:B72, X range: C1:C72, tick Labels</td></tr>
+            <tr><td><code>=INTERCEPT(y, x)</code></td><td><code>=ORDONNEE.ORIGINE(y; x)</code></td><td>OLS intercept of the regression of y on x.</td><td><code>=INTERCEPT(B2:B72, C2:C72)</code></td></tr>
+            <tr><td><code>=SLOPE(y, x)</code></td><td><code>=PENTE(y; x)</code></td><td>OLS slope of the regression of y on x.</td><td><code>=SLOPE(B2:B72, C2:C72)</code></td></tr>
+            <tr><td><code>=RSQ(y, x)</code></td><td><code>=COEFFICIENT.DETERMINATION(y; x)</code></td><td>Coefficient of determination R².</td><td><code>=RSQ(B2:B72, C2:C72)</code></td></tr>
+            <tr><td><code>4.28E+28</code></td><td><code>4,28E+28</code></td><td>Scientific notation: 4.28 × 10²⁸. Excel uses it for very large numbers, and so can you.</td><td><code>-4.76E+25</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn primary" id="btn-begin">BEGIN</button>
+        <button class="btn amber" id="btn-resume" style="display:none"></button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>case</span><b id="hud-subject">—</b></div>
+            <div class="hudrow"><span>key</span><b id="hud-r">—</b></div>
+            <div class="hudrow"><span>shape</span><b id="hud-shape">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div id="cpbox"></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:400px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise III &nbsp;·&nbsp; A Curved Future</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">CHECKPOINT</span><b id="pw-cp"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, dashes included. It replaces the checkpoint passwords you received
+      along the way.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA button.
+     Paste the Dropbox link here, ending with &raw=1 (or ?dl=1).       */
+  DATA_FILES: {
+    frontier: "https://www.dropbox.com/scl/fi/e9dccvqiwk13h4th5ubfq/Frontier_AI_compute.xlsx?rlkey=lmgpna0lmc9f4pzpusjc046tu&raw=1"      // Frontier_AI_compute.xlsx
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { server:'' },
+  FALLBACK: {
+    server: "linear-gradient(180deg,#041014,#0f3540 60%,#1a616f)"
+  },
+  /* how forgiving the numerical checks are, in relative terms.
+     0.02 = an answer within 2% of the target is accepted, unless the
+     field is marked 'strict', in which case its own 'tol' applies.   */
+  RTOL: 0.02,
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2,
+  /* browser storage key for the checkpoint passwords received; v2 since
+     the left-handers part was removed and the checkpoints moved         */
+  STORE_KEY: 'academyDoubt.E3.progress.v2'
+};
+
+/* ================================================================
+   CHECKPOINT PASSWORDS — personal, because each one contains the time
+   at which the student reached the checkpoint. The rule differs from
+   the one of Empirical Exercise 2:
+       S3-CPk-hhmmss-cccccc
+     k    = checkpoint number, 1 to 5
+     m    = h*3600 + min*60 + sec
+     a    = (m*m + 211*m + 30011*k + 77777) mod 999983
+     b    = (a*(m + 101 + 29*k) + 3*m*m + k) mod 999983
+     code = (48271*b + 16807*a + 69069*m + 2147*k + 123457) mod 1e6
+   The code depends on both k and the time, so neither can be edited.
+   Every intermediate value stays below 2^53, so the arithmetic is exact.
+   Checked by check_passwords_E3.py.
+   ================================================================ */
+const N_CP = 5;
+function makeCheckpointPassword(k, d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const a = (m*m + 211*m + 30011*k + 77777) % 999983;
+  const b = (a*(m + 101 + 29*k) + 3*m*m + k) % 999983;
+  const code = (48271*b + 16807*a + 69069*m + 2147*k + 123457) % 1000000;
+  return { time:`${hh}h ${mm}min ${ss}s`,
+           code:`S3-CP${k}-${hh}${mm}${ss}-${String(code).padStart(6,'0')}` };
+}
+/* the passwords received, by checkpoint: each is created once, at the
+   moment the checkpoint is first reached, and never regenerated       */
+let cpPw = {};
+function cpPassword(n){ return cpPw[n] ? cpPw[n].code : '—'; }
+
+/* ================================================================
+   DATA — the Excel file, embedded for the pictures only. The
+   student computes everything in Excel.
+   ================================================================ */
+const DATA = {
+  YEAR:[2025.517454,2025.257358,2025.156057,2025.128679,2024.616016,2024.558522,2024.468172,2024.451745,2023.928131,2023.889802,2023.73922,2023.678987,2023.52293,2023.44627,2023.353183,2023.199863,2022.799452,2022.799452,2022.490075,2022.25462,2022.199863,2021.974675,2021.933607,2021.77755,2021.774812,2021.689938,2021.670773,2021.607803,2021.027379,2020.80219,2020.495551,2020.405202,2020.073922,2019.947296,2019.859685,2019.843258,2019.826831,2019.807666,2019.807666,2019.709103,2019.709103,2019.495551,2019.413415,2018.33128,2017.793977,2017.607803,2017.520192,2016.845996,2016.766598,2016.736482,2016.071184,2015.91718,2015.821355,2015.747433,2015.098563,2014.919918,2014.689938,2014.673511,2014.673511,2014.665298,2014.459959,2013.925394,2013.862423,2013.041068,2012.922656,2012.747433,2012.528405,2012.421629,2011.711841,2011.323066,2010.733744],
+  COMPUTE:[5e+26,5.184e+25,3.8e+26,3.5e+26,2.96e+25,3.8e+25,2.7e+25,1.8e+25,5e+25,1.001e+25,4.8e+24,3.76e+24,3.866e+24,2.1e+25,7.34e+24,2.1e+25,2.53e+24,2.54e+24,2.7415e+24,2.5272e+24,2.578e+24,1.0421e+24,6.31e+23,3.538e+23,8.586e+23,2e+23,2.047e+24,3.7e+23,8.22e+22,8.2e+22,4.765e+22,3.14e+23,1.12e+23,6.7e+22,2.612e+22,2.076e+22,1.07734e+23,3.3e+22,9e+21,9.1e+21,2.2e+22,8.5067e+21,6.19e+21,8.74395e+21,6.494399e+20,6.046095e+20,8.43e+20,2.2e+21,4.36e+20,6.62e+21,1.9e+21,1e+20,1.231108e+19,3.8e+20,2.397403e+19,2.976e+20,5.6e+19,1.1e+19,1.2291e+19,1.5552e+18,3.411072e+18,1.340928e+18,5.32e+17,2.612736e+18,4.78e+17,4.7e+17,6e+17,2.731968e+17,5.2e+16,3.672864e+16,5.396e+16]
+};
+/* the fitted models, for the pictures */
+const FIT = {
+  raw:   { a:-4.756552e25, b:7.481357e24 },
+  log:   { a:36.839417, b:1.530893 }
+};
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   A number field is accepted within CONFIG.RTOL of its target or within
+   its own 'tol', whichever is larger; 'strict:true' keeps 'tol' alone.
+   'alt' lists common wrong values, each with its own feedback. 'pct:true'
+   catches a proportion typed as a percentage.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   'cp:n' awards checkpoint n once the step is solved: its password is
+   shown under the Master's reply and pinned at the top of the notebook.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const STEPS = [
+{ id:'open', type:'info', bg:'server', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE III',
+  text:`<span class="fx">A room of humming servers, and one very large forecasting
+  problem.</span>
+  A regression can be perfectly computed and still answer the wrong question. Today I give you the
+  right business question, fed to the wrong scale.
+  You advise an organization planning future AI training runs. Download
+  <span class="kbd">Frontier_AI_compute.xlsx</span> with the DATA button. It contains the training
+  compute of the frontier AI models released since 2010, measured in floating-point operations, or
+  FLOP.
+  Your question is concrete : how much compute might a frontier model require in 2029 ? We will
+  compare a raw linear model with a model of the natural logarithm of compute.
+  <span class="fx">Today, the Master never gives an answer away. He gives hints, and a password at
+  every checkpoint.</span>`,
+  banner:'FILE: FRONTIER AI MODELS', hud:{subject:'FRONTIER AI', r:'—', shape:'—'},
+  cont:'Take the brief' },
+
+{ id:'t6', type:'numeric', bg:'server', who:'master', qn:'1',
+  title:'TRIAL I · PLOT THE IMPOSSIBLE SCALE',
+  text:`The first rule of the Academy : plot first.
+  Column A holds <span class="kbd">Year</span>, as a decimal year : 2025.517 is early July 2025.
+  Column B holds <span class="kbd">Compute</span>, in FLOP : Excel shows numbers such as 5.000E+26,
+  i.e., 5 × 10²⁶.
+  <strong>Plot Compute against Year on raw axes. Then count the models and compute the correlation
+  between Year and Compute.</strong>`,
+  q:'Describe the raw picture.',
+  fields:[
+    {id:'n', label:'Number of models', value:71, tol:0, strict:true,
+     alt:[{value:72, tol:0, msg:'Row 1 holds the names, not a model. Count the numbers only, i.e., =COUNT(B2:B72).'}],
+     msg:'Use =COUNT(B2:B72).'},
+    {id:'r', label:'Correlation between Year and Compute', value:0.3681, tol:0.01, strict:true,
+     alt:[{value:0.9858, tol:0.01, msg:'That is the correlation with the logarithm of compute. Use Compute itself, column B.'},
+          {value:0.1355, tol:0.01, msg:'That is the squared correlation. Report the correlation itself.'}],
+     msg:'Use =CORREL(A2:A72, B2:B72).'},
+    {id:'shape', kind:'select', label:'On raw axes, the cloud…', correct:'curved',
+     options:[['curved','…is curved: a handful of recent models fill the vertical axis, and a decade of earlier models is squashed near zero'],
+              ['line','…lies close to an increasing straight line'],
+              ['none','…shows no relationship between year and compute']],
+     msg:'Look at where most of the points sit on your vertical axis, and at the few points at the top right.'}],
+  hint:`Select A2:B72 and insert a scatter chart : here column A, Year, is on the left, so it goes on
+  the horizontal axis, which is what we want. <b>CORREL</b> gives the correlation, and <b>COUNT</b>
+  the number of models.`,
+  code:`=COUNT(B2:B72)
+=CORREL(A2:A72, ???)`,
+  say:'71 models and a correlation of 0.368. On raw axes, the cloud is strongly curved.',
+  right:`The plot is not empty, although it tries hard to look empty. A handful of recent models
+  occupy most of the vertical axis, while a decade of earlier observations is squashed flat near
+  zero. And a correlation of only <strong>0.368</strong>, for a trend that nobody can miss.
+  The relationship is curved rather than linear. Remember that the next time somebody offers you
+  a straight line.`,
+  widgetAfter:'rawscatter', hud:{subject:'FRONTIER AI', r:'r = 0.368', shape:'curved'},
+  cp:1, note:'71 models; on raw axes the compute trend is strongly curved; r = 0.368' },
+
+{ id:'t7a', type:'numeric', bg:'server', who:'master', qn:'2',
+  title:'TRIAL II · A FAIR TRIAL FOR A STRAIGHT LINE',
+  text:`Ignore the curvature. Fit the raw straight line anyway. Even a bad model deserves a fair
+  trial.
+  In column C, create <span class="kbd">Years_since_2010 = Year − 2010</span>. Then regress
+  <span class="kbd">Compute</span> (Y) on <span class="kbd">Years_since_2010</span> (X).
+  <strong>Report the intercept, the slope and the R².</strong> Type the large numbers as Excel shows
+  them, e.g., 1.23E+25.`,
+  q:'Read the regression output.',
+  fields:[
+    {id:'a', label:'Intercept, in FLOP', value:-4.7566e25, tol:0,
+     alt:[{value:-1.5085e28, tol:3e26, msg:'You used Year itself as X. Use Years_since_2010 = Year − 2010, in column C.'}],
+     msg:'Read the Coefficients column, Intercept row. Type it as Excel shows it, e.g., -4.7E+25.'},
+    {id:'b', label:'Slope of Years_since_2010, in FLOP per year', value:7.4814e24, tol:0,
+     alt:[{value:3.289, tol:0.01, msg:'That is the t Stat of the slope. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Years_since_2010 row. Type it as Excel shows it, e.g., 7.4E+24.'},
+    {id:'r2', label:'R²', value:0.1355, tol:0.01, strict:true, pct:true,
+     alt:[{value:0.3681, tol:0.01, msg:'That is Multiple R, i.e., the correlation. R² is the line R Square.'},
+          {value:0.1230, tol:0.01, msg:'That is the Adjusted R Square. Use R Square.'}],
+     msg:'Read the line R Square of the regression output.'}],
+  hint:`Type <b>=A2-2010</b> in C2 and copy it down to C72. Then Data → Data Analysis → Regression,
+  with Input Y Range B1:B72 (Compute), Input X Range C1:C72 (Years_since_2010) and <b>Labels</b>
+  ticked. INTERCEPT, SLOPE and RSQ give the same three numbers.`,
+  code:`C1:  Years_since_2010
+C2:  =A2 - ???              ← copy down to C72
+
+=INTERCEPT(B2:B72, C2:C72)
+=SLOPE(???, ???)
+=RSQ(???, ???)`,
+  say:'Intercept ≈ −4.76E+25, slope ≈ 7.48E+24, and R² ≈ 0.136.',
+  right:`An R² near <strong>0.136</strong>, and an intercept of about
+  <strong>−4.76 × 10²⁵ FLOP</strong>.
+  Read that intercept slowly. Year zero in this model is 2010, so it is the fitted compute of
+  2010, and it is negative.
+  <span class="fx">In 2010, according to this line, the computers of the world were busy
+  un-computing.</span>
+  The Excel output also displays standard errors, t Stat and P-values. Ignore them with a clear
+  conscience for today; they are the subject of a later session.`,
+  widgetAfter:'rawfit', banner:'FITTED 2010: NEGATIVE COMPUTE', hud:{r:'R² = 0.136', shape:'straight line?'},
+  note:'raw line: Compute = -4.76e25 + 7.48e24 x Years_since_2010; R2 = 0.136' },
+
+{ id:'t7b', type:'choice', bg:'server', who:'master', qn:'2',
+  title:'TRIAL II · THE VERDICT',
+  text:`The straight line has had its fair trial. Use the scatter plot and the regression output.
+  <strong>Which verdict is defensible ?</strong>`,
+  q:'Choose the verdict on the raw linear model.',
+  options:[
+    {id:'a', label:'Keep the raw line because the output printed a coefficient for the year.'},
+    {id:'b', label:'Negative compute is a meaningful technological prediction.'},
+    {id:'c', label:'Delete early observations until the line becomes positive.'},
+    {id:'d', label:'Reject the raw linear form: it fits poorly, contradicts non-negativity, and misses the visible curvature.'}
+  ], correct:'d',
+  hint:`Three pieces of evidence : the shape of the cloud, the R², and the sign of the fitted value in
+  2010.`,
+  right:`Exactly. And now the uncomfortable part. In a later session you will study formal
+  tests for regression coefficients. As a preview, the P-value of the slope printed in the Excel
+  output is about 0.0016, i.e., statistically significant.
+  <span class="fx">The model is significantly wrong.</span>
+  Significance says that the data are hard to reconcile with a zero slope. It does not say that
+  a straight line is an adequate description.`,
+  wrong:{a:`A printed coefficient is not a certificate. Every regression prints one, including the
+  wrong ones.`, b:`FLOP counts operations, and a count cannot be negative. An impossible fitted
+  value is evidence against the model, not a technological breakthrough.`, c:`Deleting valid
+  observations until the line behaves is not analysis, it is negotiation. It also changes the
+  question.`},
+  cp:2, note:'a significant slope would not make an inadequate linear form correct' },
+
+{ id:'t8', type:'numeric', bg:'server', who:'master', mood:'raised', qn:'3',
+  title:'TRIAL III · CHANGE THE RULER, NOT THE DATA',
+  text:`Investment, cluster size and hardware capability compound. Compute grows by multiplying,
+  not by adding, and a process that multiplies deserves a ruler on which equal distances mean
+  equal ratios.
+  So change the ruler, not the observations. In column D, create
+  <span class="kbd">Ln_compute</span>, the natural logarithm of compute, which Excel calls
+  <span class="kbd">LN</span>.
+  <strong>Report the average of Ln_compute, its correlation with Year, and its correlation with
+  Years_since_2010.</strong>`,
+  q:'Same models, new ruler.',
+  fields:[
+    {id:'lnmean', label:'Average of Ln_compute', value:50.998, tol:0.01, strict:true,
+     alt:[{value:22.148, tol:0.01, msg:'You used LOG, i.e., the logarithm in base 10. The natural logarithm is LN.'},
+          {value:2.1628e25, tol:5e23, msg:'That is the average of Compute itself. Take the average of the new column, Ln_compute.'}],
+     msg:'Create D2 = LN(B2), copy it down to D72, then use =AVERAGE(D2:D72).'},
+    {id:'rln', label:'Correlation between Year and Ln_compute', value:0.9858, tol:0.01, strict:true,
+     alt:[{value:0.3681, tol:0.01, msg:'That is the correlation on the raw scale. Use the new column, Ln_compute.'},
+          {value:0.9718, tol:0.01, msg:'That is a squared correlation. Report the correlation itself.'}],
+     msg:'Use =CORREL(A2:A72, D2:D72).'},
+    {id:'rln2', label:'Correlation between Years_since_2010 and Ln_compute', value:0.9858, tol:0.01, strict:true,
+     alt:[{value:0.3681, tol:0.01, msg:'That is the correlation on the raw scale. Use the new column, Ln_compute.'},
+          {value:0.9718, tol:0.01, msg:'That is a squared correlation. Report the correlation itself.'}],
+     msg:'Use =CORREL(C2:C72, D2:D72).'}],
+  hint:`Type <b>=LN(B2)</b> in D2 and copy it down to D72. Careful : in Excel, <b>LOG</b> is the
+  logarithm in base 10; the natural logarithm is <b>LN</b>.`,
+  code:`D1:  Ln_compute
+D2:  =LN(???)               ← copy down to D72
+
+=AVERAGE(D2:D72)
+=CORREL(A2:A72, ???)
+=CORREL(C2:C72, ???)`,
+  say:'The average of Ln_compute is about 51.0, and its correlation with Year, and with Years_since_2010, is 0.986.',
+  right:`From <strong>0.368</strong> on the raw scale to <strong>0.986</strong> on the
+  natural-log scale. Same seventy-one models, not one of them deleted.
+  The observations now lie close to a straight line, because equal vertical distances represent
+  equal proportional changes in compute.
+  Notice the order of events. The reason for the logarithm came first, and the better
+  correlation came afterwards. That is the only order in which a transformation is honest.
+  And look at your last two answers : they are identical. Years_since_2010 is Year − 2010, a
+  linear transformation of Year, and a correlation does not change when either variable is
+  shifted or multiplied by a positive constant. Moving the origin of the ruler to 2010 changes
+  where the numbers start, not how tightly the points hug a line.`,
+  widgetAfter:'logscatter', banner:'NATURAL-LOG SCALE: r = 0.986', hud:{r:'r = 0.986', shape:'log scale'},
+  cp:3, note:'corr(Year, Compute) = 0.368; corr(Year, ln Compute) = corr(Years_since_2010, ln Compute) = 0.986' },
+
+{ id:'t9', type:'numeric', bg:'server', who:'master', qn:'4',
+  title:'TRIAL IV · FIT THE LOG-LINEAR MODEL',
+  text:`The points have granted their permission. Now you may fit the line.
+  Regress <span class="kbd">Ln_compute</span> (Y) on <span class="kbd">Years_since_2010</span> (X).
+  <strong>Report the intercept, the slope and the R².</strong>`,
+  q:'Read the regression output.',
+  fields:[
+    {id:'a', label:'Intercept', value:36.839, tol:0.01, strict:true,
+     alt:[{value:-3040.26, tol:1, msg:'You used Year itself as X. Use Years_since_2010, in column C.'},
+          {value:15.999, tol:0.01, msg:'Your column contains the logarithm in base 10 (LOG). Use LN.'},
+          {value:-4.7566e25, tol:1e24, msg:'That is the intercept of the raw model. Y is now Ln_compute, column D.'}],
+     msg:'Read the Coefficients column, Intercept row, or use =INTERCEPT(D2:D72, C2:C72).'},
+    {id:'b', label:'Slope of Years_since_2010', value:1.5309, tol:0.01, strict:true,
+     alt:[{value:0.6649, tol:0.01, msg:'Your column contains the logarithm in base 10 (LOG). Use LN.'},
+          {value:7.4814e24, tol:2e23, msg:'That is the slope of the raw model. Y is now Ln_compute, column D.'}],
+     msg:'Read the Coefficients column, Years_since_2010 row, or use =SLOPE(D2:D72, C2:C72).'},
+    {id:'r2', label:'R²', value:0.97179, tol:0.01, strict:true, pct:true,
+     alt:[{value:0.9858, tol:0.01, msg:'That is Multiple R, i.e., the correlation. R² is the line R Square.'}],
+     msg:'Read the line R Square of the regression output.'}],
+  hint:`Data → Data Analysis → Regression, with Input Y Range D1:D72 (Ln_compute) and Input X Range
+  C1:C72 (Years_since_2010), Labels ticked. Or INTERCEPT, SLOPE and RSQ, with y first.`,
+  code:`=INTERCEPT(D2:D72, C2:C72)
+=SLOPE(???, ???)
+=RSQ(???, ???)`,
+  say:'Intercept ≈ 36.839, slope ≈ 1.531 and R² ≈ 0.972.',
+  right:`An intercept of <strong>36.839</strong>, a slope of <strong>1.531</strong>, and an R² of
+  <strong>0.972</strong>, against 0.136 for the raw line.
+  At last, a straight line that has earned its place on the plot. Now, what exactly does it
+  say ?`,
+  widgetAfter:'logfit', banner:'A STRAIGHTER MODEL ON THE LOG SCALE', hud:{r:'R² = 0.972', shape:'log-linear'},
+  note:'ln Compute = 36.839 + 1.531 x Years_since_2010; R2 = 0.972' },
+
+{ id:'t9b', type:'choice', bg:'server', who:'master', qn:'4',
+  title:'TRIAL IV · READ THE LOG-LINEAR MODEL',
+  text:`<span class="kbd">ln(Compute) = 36.839 + 1.531 × Years_since_2010</span>, with R² = 0.972.
+  <strong>Which reading of this model is correct ?</strong>`,
+  q:'Choose the correct reading.',
+  options:[
+    {id:'a', label:'In 2010, the fitted ln(compute) is 36.839; each additional year adds about 1.531 to ln(compute); the line accounts for about 97% of the variation of ln(compute) in this sample.'},
+    {id:'b', label:'Each additional year adds 1.531 FLOP to the training compute.'},
+    {id:'c', label:'In 2010, the fitted training compute is 36.839 FLOP.'},
+    {id:'d', label:'An R² of 0.972 proves that the trend will continue after 2025.'}
+  ], correct:'a',
+  hint:`Y is not compute any more : it is the natural logarithm of compute. Every coefficient speaks
+  in that unit.`,
+  right:`Correct. At Years_since_2010 = 0, i.e., in 2010, the model predicts ln(compute) =
+  36.839. Each additional year adds 1.531 natural-log units, and the line explains about 97.2%
+  of the variation in ln(compute) in this historical sample.
+  To speak in FLOP again, we shall have to undo the logarithm. That is the next question.`,
+  wrong:{b:`The outcome is ln(compute), not compute. The slope adds natural-log units, and a model
+  trained on 1.531 extra operations per year would not make the news.`,
+  c:`36.839 is ln(compute), not compute. Undo the logarithm before you speak in FLOP.`,
+  d:`R² describes the fit inside the sample, from 2010 to 2025. It says nothing about years the data
+  have never seen.`},
+  cp:4, note:'log model: intercept 36.839 and slope 1.531 are in natural-log units' },
+
+{ id:'t10', type:'numeric', bg:'server', who:'master', qn:'5',
+  title:'TRIAL V · THE 2029 PREDICTION',
+  text:`The organization wants a planning number for 2029. The observed sample ends in July 2025,
+  so we are about to leave the data. We may extrapolate, but the word must stay attached to the
+  answer.
+  2029 is 19 years after 2010. Use the log-linear model to predict ln(compute) for 2029.
+  <strong>Then undo the natural logarithm to obtain the predicted compute in FLOP.</strong>`,
+  q:'Predict, then return to FLOP.',
+  fields:[
+    {id:'ln', label:'Predicted ln(compute) in 2029', value:65.926, tol:0.01, strict:true,
+     alt:[{value:3143.02, tol:1, msg:'You used 2029 itself. The explanatory variable is Years_since_2010, i.e., 2029 − 2010 = 19.'},
+          {value:4.2802e28, tol:1e27, msg:'That is already the compute in FLOP. The first field asks for ln(compute).'}],
+     msg:'Compute intercept + slope × 19 with the log-linear model.'},
+    {id:'flop', label:'Predicted compute in 2029, in FLOP', value:4.2802e28, tol:0,
+     alt:[{value:65.926, tol:0.01, msg:'That is ln(compute). Undo the logarithm with EXP.'},
+          {value:8.44e65, tol:1e64, msg:'You computed 10 to the power of the prediction. The natural logarithm is undone with EXP.'},
+          {value:9.458e25, tol:2e24, msg:'That is the prediction of the raw straight line. Use the log-linear model, then EXP.'}],
+     msg:'Use =EXP(…) on your predicted ln(compute). Type the result as Excel shows it, e.g., 1.23E+28.'}],
+  hint:`Predicted ln(compute) = intercept + slope × 19, with the cells of your regression output rather
+  than rounded numbers. Then <b>EXP</b> returns from ln(compute) to compute.`,
+  code:`=??? + ??? * (2029 - 2010)     ← intercept + slope × years since 2010
+=EXP(???)                      ← back to FLOP`,
+  say:'ln(compute) ≈ 65.926 in 2029, i.e., about 4.28E+28 FLOP.',
+  right:`The model predicts ln(compute) of about <strong>65.926</strong> for 2029. Returning to
+  the original scale gives about <strong>4.28 × 10²⁸ FLOP</strong>.
+  <span class="fx">He checks the transformation, then underlines the word extrapolation.</span>
+  This is what the fitted historical trend predicts if it continues beyond the observed data;
+  it is not a guaranteed future value.`,
+  widgetAfter:'forecast', banner:'2029: 4.28e28 FLOP, CONDITIONAL', hud:{r:'2029: 4.28e28'},
+  note:'2029 conditional prediction: ln Compute = 65.926, or about 4.28e28 FLOP' },
+
+{ id:'t10b', type:'choice', bg:'server', who:'master', qn:'5',
+  title:'TRIAL V · WHAT EXACTLY DID THE LINE PROMISE ?',
+  text:`The arithmetic is exact given its inputs. The future is under no obligation to agree.
+  <strong>Which statement describes the result correctly ?</strong>`,
+  q:'Choose the defensible interpretation.',
+  options:[
+    {id:'a', label:'Every frontier model released in 2029 will require exactly 4.28E+28 FLOP.'},
+    {id:'b', label:'If the fitted historical log-linear trend continues, the model predicts about 4.28E+28 FLOP for 2029.'},
+    {id:'c', label:'The prediction is only 65.926 FLOP because that is the value computed first.'},
+    {id:'d', label:'No transformation is needed because the regression outcome and compute are on the same scale.'}
+  ], correct:'b',
+  hint:`Two things to keep : the unit of each number, and the fact that 2029 lies outside the
+  observed years.`,
+  right:`Exactly. The first prediction is in natural-log units and must be exponentiated. The
+  resulting FLOP value is conditional on extending the fitted historical trend beyond July 2025.
+  A forecast is not weakened by stating its conditions. It becomes usable.`,
+  wrong:{a:`One conditional scenario is not a law for every future model. "Exactly" is a word that
+  forecasts should avoid.`, c:`65.926 is ln(compute), not compute in FLOP. A frontier model
+  trained with 66 operations would be a pocket calculator with ambitions.`, d:`The regression
+  predicts ln(compute). Use EXP to return to compute measured in FLOP.`},
+  cp:5, note:'forecast = a conditional extrapolation of the historical log-linear trend' },
+
+{ id:'close', type:'info', bg:'server', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`A straight line that computed negative operations. A beautiful log-linear fit that still
+  could not certify the future.
+  Four rules leave with you.
+  <strong>One.</strong> Plot before you fit. The cloud tells you whether a straight line deserves
+  to exist.
+  <strong>Two.</strong> Read the coefficients and the fit from the regression output, in the
+  units of Y and X. A line must earn its place on the plot.
+  <strong>Three.</strong> A transformation should match how the process changes. It needs a
+  reason in the world, not only a better R².
+  <strong>Four.</strong> A forecast inherits every assumption used to fit and extrapolate it. It
+  is a conditional sentence, not a prophecy.
+  <span class="fx">Plot. Fit. Read the output. Predict conditionally. Then say what would have to
+  remain true.</span>`,
+  banner:'PLOT. FIT. READ. PREDICT CONDITIONALLY.', cont:'See your final password', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook'), cpbox:$('#cpbox')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let cpReached = 0;               // latest checkpoint reached (0 = none)
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- checkpoints: the latest password stays pinned in the notebook ---- */
+function loadProgress(){
+  try{
+    const v = JSON.parse(localStorage.getItem(CONFIG.STORE_KEY) || 'null');
+    return (v && v.cp >= 1 && v.cp <= N_CP && v.pw && v.pw[v.cp]) ? v : null;
+  }catch(e){ return null; }
+}
+function saveProgress(){
+  try{ localStorage.setItem(CONFIG.STORE_KEY, JSON.stringify({cp:cpReached, pw:cpPw, name:playerName})); }catch(e){}
+}
+function renderCP(){
+  if(!cpReached){
+    el.cpbox.innerHTML = `<div class="cphead"><span>CHECKPOINT</span><span>0 / ${N_CP}</span></div>
+      <span class="cpnone">no password yet</span>`;
+    return;
+  }
+  el.cpbox.innerHTML = `<div class="cphead"><span>CHECKPOINT ${cpReached} / ${N_CP}</span>
+      <button class="toolbtn" data-cpcopy>COPY</button></div>
+    <span class="cpcode">${cpPassword(cpReached)}</span>`;
+  const b = el.cpbox.querySelector('[data-cpcopy]');
+  b.onclick = ()=>copyText(cpPassword(cpReached), ()=>{ b.textContent='COPIED'; setTimeout(()=>b.textContent='COPY',1600); });
+}
+function awardCP(n){
+  if(!cpPw[n]) cpPw[n] = makeCheckpointPassword(n, new Date());
+  if(n > cpReached) cpReached = n;
+  saveProgress();
+  renderCP();
+}
+/* the card under the Master's reply, when a step carries a checkpoint */
+function cpCard(n){
+  if(!cpPw[n]) return;
+  const d=document.createElement('div'); d.className='cpcard';
+  d.innerHTML = `<div class="cptitle">CHECKPOINT ${n} OF ${N_CP} REACHED</div>
+    <span class="cpcode">${cpPassword(n)}</span><button class="toolbtn" data-copy>COPY</button>
+    <p>${n<N_CP ? 'If you cannot finish the exercise, submit this password on Blackboard. It stays at the top of your notebook until you reach the next checkpoint.'
+             : 'It is the password of a completed exercise. Submit it on Blackboard.'}</p>`;
+  const b=d.querySelector('[data-copy]');
+  b.onclick=()=>copyText(cpPassword(n), ()=>{ b.textContent='COPIED'; setTimeout(()=>b.textContent='COPY',1600); });
+  el.zone.appendChild(d);
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {subject:'—', r:'—', shape:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: raw and log compute plots, and a fitted line that is solid inside the
+   sample and dashed beyond the last observation. Where two series share
+   a panel they carry a legend and a colourblind-safe pair, i.e., dark
+   navy and rust, so identity is never colour alone. Points are never
+   connected; hovering a point shows its values.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: one or more point series, plus optional straight lines */
+function panelSVG(o){
+  const W=700, H=o.H||300, L=o.L||84, R=684, T=44, B=(o.B||236);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      if(s.x[i]<o.xmin || s.x[i]>o.xmax) continue;
+      const tip = s.tip ? `<title>${s.tip(i)}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||3}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.85}">${tip}</circle>`;
+    }
+  });
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}"
+      x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}"
+      ${l.dash?`stroke-dasharray="8 6"`:''}/>`;
+  });
+  let pins='';
+  (o.pins||[]).forEach(p=>{
+    /* the label sits above the pin, unless lx / ly give it its own place */
+    const tx = px(p.lx!==undefined ? p.lx : p.x), ty = (p.ly!==undefined ? py(p.ly) : py(p.y)-13);
+    pins += `<circle cx="${px(p.x).toFixed(1)}" cy="${py(p.y).toFixed(1)}" r="5.5" fill="none"
+      stroke="${PLOT.fit}" stroke-width="2.5"/>
+      <text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" fill="${PLOT.fit}" font-size="16"
+        text-anchor="${p.anchor||'middle'}" font-family="VT323,monospace">${p.label}</text>`;
+  });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>
+      <text x="${px(v).toFixed(1)}" y="${B+21}" fill="${PLOT.label}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${o.xfmt?o.xfmt(v):v}</text>`;
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>
+      <text x="${L-9}" y="${(py(v)+5).toFixed(1)}" fill="${PLOT.label}" font-size="15" text-anchor="end" font-family="VT323,monospace">${o.yfmt?o.yfmt(v):v}</text>`;
+  });
+  let legend='';
+  if(o.legend){
+    o.legend.forEach((g,i)=>{
+      const lx = L + 330 + i*120;
+      legend += `<circle cx="${lx+5}" cy="19" r="4.5" fill="${g.color}"/>
+        <text x="${lx+16}" y="24" fill="${PLOT.label}" font-size="15" font-family="VT323,monospace">${g.label}</text>`;
+    });
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    <text x="${L}" y="24" fill="${PLOT.label}" font-size="17" font-family="VT323,monospace">${o.title||''}</text>
+    ${legend}
+    ${marks}${lines}${pins}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    <text x="${(L+R)/2}" y="${H-12}" fill="${PLOT.label}" font-size="15" text-anchor="middle" font-family="VT323,monospace">${o.xlab||''}</text>
+    <text x="16" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 16 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* ---- frontier compute: raw, raw+fit, log, log+fit, forecast ---- */
+function playCompute(host, mode){
+  const isLog = (mode!=='raw' && mode!=='rawfit');
+  const x = DATA.YEAR, y = isLog ? DATA.COMPUTE.map(v=>Math.log(v)) : DATA.COMPUTE;
+  const XMIN=2009.5, XMAX=(mode==='forecast')?2030:2026.5;
+  const o = {
+    series:[{x:x, y:y, color:PLOT.ink, r:3.4, alpha:0.7,
+             tip:i=>`${x[i].toFixed(2)}: ${DATA.COMPUTE[i].toExponential(2)} FLOP` + (isLog ? `, ln = ${y[i].toFixed(2)}` : '')}],
+    lines:[], pins:[],
+    xmin:XMIN, xmax:XMAX,
+    xticks:[2010,2014,2018,2022,2026,2030].filter(v=>v<=XMAX),
+    xlab:'Publication year'
+  };
+  if(isLog){
+    o.ymin=35; o.ymax=(mode==='forecast')?69:64;
+    o.yticks=(mode==='forecast')?[35,40,45,50,55,60,65]:[35,40,45,50,55,60];
+    o.ylab='Natural log of training compute (FLOP)';
+    o.title='Natural log of the training compute of 71 frontier models';
+  } else {
+    o.ymin=-6e25; o.ymax=5.4e26;
+    o.yticks=[0,1e26,2e26,3e26,4e26,5e26];
+    o.yfmt=v=>(v===0?'0':(v/1e26).toFixed(0)+'e26');
+    o.ylab='Training compute (FLOP)';
+    o.title='Training compute of 71 frontier models, raw scale';
+  }
+  let foot='One point is one model. Points are never connected.';
+
+  if(mode==='rawfit'){
+    const i0=FIT.raw.a, s0=FIT.raw.b;
+    o.lines.push({x1:2010, y1:i0, x2:2026, y2:i0+16*s0});
+    o.lines.push({x1:XMIN, y1:0, x2:XMAX, y2:0, color:PLOT.axis, w:1});
+    o.pins.push({x:2010, y:i0, lx:2010.2, ly:1.2e26, label:'fitted 2010 = -4.76e25, below zero', anchor:'start'});
+    o.title='The raw fitted line, and where it sits in 2010';
+    foot='The fitted line is below zero until 2016.4. Compute cannot be negative.';
+  }
+  if(mode==='logfit' || mode==='forecast'){
+    const i0=FIT.log.a, s0=FIT.log.b;
+    const yAt = yr => i0 + (yr-2010)*s0;
+    o.lines.push({x1:2010, y1:yAt(2010), x2:2025.52, y2:yAt(2025.52)});
+    if(mode==='forecast'){
+      o.lines.push({x1:2025.52, y1:yAt(2025.52), x2:2029, y2:yAt(2029), dash:true});
+      o.pins.push({x:2029, y:yAt(2029), label:'2029: ' + yAt(2029).toFixed(2) + ' ln FLOP', anchor:'end'});
+      o.title='Fitted inside the sample, dashed beyond it';
+      foot='The last observation is July 2025. Everything dashed is extrapolation.';
+    } else {
+      o.title='ln compute = 36.839 + 1.531 x Years_since_2010';
+      foot='The natural-log scale turns the exponential-looking curve into a near-straight line.';
+    }
+  }
+  const titles = {raw:'EVIDENCE · THE RAW SCALE', rawfit:'EVIDENCE · A SIGNIFICANT IMPOSSIBLE LINE',
+                  log:'EVIDENCE · THE SAME DATA, NEW RULER', logfit:'EVIDENCE · THE LOG-LINEAR FIT',
+                  forecast:'EVIDENCE · THE 2029 EXTRAPOLATION'};
+  let inner = panelSVG(o);
+
+  if(mode==='rawfit'){           // a residual panel underneath
+    const res = DATA.COMPUTE.map((c,i)=>c - (FIT.raw.a + FIT.raw.b*(DATA.YEAR[i]-2010)));
+    let mx=0; res.forEach(v=>{ mx=Math.max(mx, Math.abs(v)); });
+    inner += panelSVG({
+      H:170, B:118,
+      series:[{x:DATA.YEAR, y:res, color:PLOT.second, r:3, alpha:0.75}],
+      lines:[{x1:XMIN, y1:0, x2:XMAX, y2:0, color:PLOT.fit, w:1.5, dash:true}],
+      xmin:XMIN, xmax:XMAX, ymin:-mx*1.1, ymax:mx*1.1,
+      xticks:[2010,2014,2018,2022,2026],
+      yticks:[-2e26,0,2e26], yfmt:v=>(v===0?'0':(v/1e26).toFixed(0)+'e26'),
+      title:'Residuals of the raw model against year',
+      xlab:'Publication year', ylab:'Residual (FLOP)'
+    });
+    foot='The residuals are not an unstructured band around zero. Their spread explodes in the recent years.';
+  }
+  host.innerHTML = plotFrame(titles[mode]||'EVIDENCE', inner, foot);
+  return (mode==='rawfit') ? 1800 : 1200;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='rawscatter') return playCompute(host, 'raw');
+  if(name==='rawfit')     return playCompute(host, 'rawfit');
+  if(name==='logscatter') return playCompute(host, 'log');
+  if(name==='logfit')     return playCompute(host, 'logfit');
+  if(name==='forecast')   return playCompute(host, 'forecast');
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your workbook step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  if(s.cp) cpCard(s.cp);
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one, and a password at a checkpoint */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  if(s.cp) awardCP(s.cp);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>{ if(s.cp) cpCard(s.cp); contButton('Continue', next); }); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+function tolerance(f){
+  const abs = f.tol || 0;
+  if(f.strict) return abs;
+  return Math.max(abs, CONFIG.RTOL * Math.abs(f.value));
+}
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){ if(Math.abs(v-a.value) <= a.tol) return a.msg; }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE3',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise III</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+/* two data files: the button names its file in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — the final password is the password of the last checkpoint
+   ================================================================ */
+function finish(){
+  $('#pw-name').textContent = playerName;
+  $('#pw-cp').textContent = `${cpReached} / ${N_CP}`;
+  $('#pw-code').textContent = cpPassword(cpReached);
+  $('#endblurb').innerHTML =
+    `You fitted your first regressions in Excel, gave a straight line a fair trial and rejected it
+     when it predicted negative compute, and changed the ruler rather than the data. Then you used
+     the log-linear model to make a conditional 2029 compute prediction, with the extrapolation
+     clearly identified.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: A STRAIGHT LINE WILL DO';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  copyText($('#pw-code').textContent,
+    ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); },
+    ()=>{ $('#copymsg').textContent='select and copy manually'; });
+};
+
+/* ---- start, replay, resume ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes(); renderCP();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+/* resume just after the step that awarded checkpoint cp: everything
+   before it counts as solved, and its notes are back in the notebook */
+function resumeFrom(cp){
+  const ci = STEPS.findIndex(s=>s.cp===cp);
+  if(ci<0) return startAt(0);
+  solved = new Set(); notes = [];
+  for(let k=0; k<=ci; k++){ solved.add(STEPS[k].id); if(STEPS[k].note) notes.push(STEPS[k].note); }
+  cpReached = Math.max(cpReached, cp);
+  startAt(ci+1);
+}
+
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v3.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "CERTAINTY MODULE ............ NOT FOUND",
+  "OPENING CASE FILE III ....... FRONTIER AI",
+  "DATA ........................ 71 MODELS",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "CHECKPOINTS ................. 5 PASSWORDS ON THE WAY",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+/* a checkpoint saved in this browser: offer to resume from it */
+(function offerResume(){
+  const p = loadProgress();
+  if(!p) return;
+  cpReached = p.cp;
+  cpPw = p.pw;
+  if(p.name){ playerName = p.name; $('#playername').value = p.name; }
+  const b = $('#btn-resume');
+  b.textContent = p.cp < N_CP ? `RESUME FROM CHECKPOINT ${p.cp}` : 'REVIEW THE COMPLETED EXERCISE';
+  b.style.display = '';
+  b.onclick = ()=>{ readName(); resumeFrom(p.cp); };
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
