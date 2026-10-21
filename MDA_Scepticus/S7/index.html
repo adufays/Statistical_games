@@ -1,1 +1,2100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 7: What Is a Used Corolla Worth?</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 7
+  "What Is a Used Corolla Worth?"  (Toyota Corolla.tex: multiple regression)
+  EDHEC · Multivariate Data Analysis · Empirical Session 7
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine as Empirical Exercise 6: no checkpoints, no passwords,
+  no SHOW THE ANSWER button. Every question has a HINT button.
+  Numbers follow the course margin rule: counts exact; ±0.01 when
+  0.1 <= |value| < 1e6; ±1% otherwise.
+
+  QUESTIONS (Toyota Corolla.tex)
+  ---------
+  setup  number of cars, average price                         -> numbers
+  SLR 1-2  Price_i = b0 + b1 Age_i + e_i: b0 and b1             -> numbers
+  SLR 3    interpretation of b0 and b1                          -> MCQ
+  SLR 4    t-test of b1 = -200 at 5% significance               -> numbers + decision
+  M1 1     Diesel dummy: number of diesel cars                  -> number
+  M1 2     Model 1 (9 variables): b1 (Age), b3 (Diesel), adj R2 -> numbers
+           + interpretation (ceteris paribus, dummy)            -> MCQ
+  M1 3     residuals against fitted values: homoskedasticity?   -> MCQ
+  M1 4     QQ plot of the standardized residuals: normality?    -> MCQ
+  M1 5     significant parameters at 5% significance            -> tick all
+  M2 1     Model 2 (+ Age^2): b1 (Age), b10 (Age^2)             -> numbers
+           + reading of the quadratic term                      -> MCQ
+  M2 2     M1 or M2? adjusted R2 of M2, best model              -> number + choice
+  M2 3     F-test of b5 = b8 = 0 in M2 (restricted = M2 without
+           MetColor and Doors): SSR_U, SSR_R, F, critical value -> numbers + decision
+           + what the joint test adds                           -> MCQ
+
+  DATA
+  ----
+  ToyotaCorolla_with_data_Models.xlsx: 1,419 second-hand Corollas.
+  Sheet ToyotaCorolla: A Price (EUR), B Age (months), C KM, D FuelType
+  (Petrol/Diesel), E HP, F MetColor, G Automatic, H CC, I Doors, J Weight.
+  Sheets Model SLR (Price, Age), Model 1 (Diesel dummy in D, 9 X in B:J),
+  Model 2 (Model 1 + Age_sq in K).
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE VII</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="toyota">DATA (XLSX)</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>WHAT IS A USED<br>COROLLA WORTH ?</h1>
+      <h2>Empirical Exercise VII &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus wants to sell his old Toyota Corolla, and he has a rule of thumb: a Corolla
+      loses 200 euros of value every month. The prices of 1,419 second-hand Corollas will judge him. You
+      will start with a simple regression on the age, then explain the price with nine characteristics,
+      check the assumptions of the model, add the square of the age, choose the best model, and test two
+      constraints at once with an F-test.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>ToyotaCorolla_with_data_Models.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and open it in Excel. Compute every number and
+        draw every plot there, and keep your workbook: each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your plots, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example Excel formula, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers with a dot or a comma as the decimal separator, e.g., <code>36.18</code>
+      or <code>36,18</code>. Give two decimals: your answer is accepted within 0.01 of the
+      exact value. Very small or very large numbers can be typed as Excel displays them, e.g.,
+      <code>-8.54E-05</code> or <code>2.10E+09</code>, and are accepted within 1%. Counts must be exact.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">The file has four sheets. <code>ToyotaCorolla</code> holds the raw data:
+        column <code>A</code> the price in euros, <code>B</code> the age in months, <code>C</code> the
+        kilometres, <code>D</code> the fuel type, then HP, MetColor, Automatic, CC, Doors and Weight up
+        to column <code>J</code>. Row 1 holds the names; rows 2 to 1420 hold the 1,419 cars. The sheets
+        <code>Model SLR</code>, <code>Model 1</code> and <code>Model 2</code> hold the same cars with the
+        price in column A and the explanatory variables of each model in adjacent columns. English Excel
+        separates the arguments of a function with a comma; French Excel uses a semicolon, e.g.,
+        <code>=INVERSE.LOI.F.DROITE(0,05;2;1408)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code>, <code>=AVERAGE(range)</code>, <code>=MIN(range)</code></td><td><code>=NB(plage)</code>, <code>=MOYENNE(plage)</code>, <code>=MIN(plage)</code></td><td>Number of values; sample average; smallest value.</td><td><code>=AVERAGE(A2:A1420)</code></td></tr>
+            <tr><td><code>=IF(test, a, b)</code>, <code>=SUM(range)</code></td><td><code>=SI(test; a; b)</code>, <code>=SOMME(plage)</code></td><td>Returns a if the test is true, b otherwise: builds a dummy variable. SUM adds up a column.</td><td><code>=IF(D2="Diesel",1,0)</code></td></tr>
+            <tr><td><code>=COUNTIF(range, value)</code>, <code>=AVERAGEIF(range, value, avg_range)</code></td><td><code>=NB.SI(plage; valeur)</code>, <code>=MOYENNE.SI(plage; valeur; plage_moy)</code></td><td>Counts the cells equal to a value; averages a column over the rows that match.</td><td><code>=COUNTIF(D2:D1420,"Diesel")</code></td></tr>
+            <tr><td><code>=CORREL(x, y)</code></td><td><code>=COEFFICIENT.CORRELATION(x; y)</code></td><td>Correlation between two columns.</td><td><code>=CORREL(B2:B1420,C2:C1420)</code></td></tr>
+            <tr><td>Insert → Charts → Scatter</td><td>Insertion → Graphiques → Nuage de points</td><td>Scatter plot. Right-click → Select Data to choose which column goes on which axis.</td><td>X: Predicted Price, Y: Residuals</td></tr>
+            <tr><td>Data → Data Analysis → Regression</td><td>Données → Utilitaire d’analyse → Régression</td><td>Full regression output. The X range must be <b>adjacent columns</b> (up to 16). Tick <b>Labels</b> and <b>Residuals</b>. If it is missing: File → Options → Add-ins → Analysis ToolPak.</td><td>Y: A1:A1420, X: B1:J1420</td></tr>
+            <tr><td><code>=STDEV.S(range)</code></td><td><code>=ECARTYPE.STANDARD(plage)</code></td><td>Empirical standard deviation: to standardize the residuals, or to compare the spread of groups of residuals.</td><td><code>=STDEV.S(C33:C174)</code></td></tr>
+            <tr><td>Data → Sort</td><td>Données → Trier</td><td>Sorts a table by one of its columns: for the QQ plot, or to group the residuals by fitted value.</td><td>Sort by Predicted Price</td></tr>
+            <tr><td><code>=NORM.S.INV(p)</code></td><td><code>=LOI.NORMALE.STANDARD.INVERSE.N(p)</code></td><td>Quantile of N(0, 1), for the horizontal axis of the QQ plot.</td><td><code>=NORM.S.INV((1-0.5)/1419)</code></td></tr>
+            <tr><td><code>=T.INV.2T(α, df)</code></td><td><code>=LOI.STUDENT.INVERSE.BILATERALE(α; df)</code></td><td>Critical value of a two-sided t-test at significance level α.</td><td><code>=T.INV.2T(0.05, 1417)</code></td></tr>
+            <tr><td><code>=F.INV.RT(α, df1, df2)</code>, <code>=F.DIST.RT(F, df1, df2)</code></td><td><code>=INVERSE.LOI.F.DROITE(α; df1; df2)</code>, <code>=LOI.F.DROITE(F; df1; df2)</code></td><td>Critical value of an F-test at significance level α (right tail); p-value of an F-statistic.</td><td><code>=F.INV.RT(0.05, 2, 1408)</code></td></tr>
+            <tr><td><code>=SUMSQ(range)</code></td><td><code>=SOMME.CARRES(plage)</code></td><td>Sum of the squares: the SSR of a column of residuals. It is also printed in the ANOVA table, row Residual, column SS.</td><td><code>=SUMSQ(C33:C1451)</code></td></tr>
+            <tr><td><code>2.10E+09</code></td><td><code>2,10E+09</code></td><td>Scientific notation: 2.10 × 10⁹ = 2,100,000,000.</td><td><code>2.1042E+09</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>age slope, SLR</span><b id="hud-b1">—</b></div>
+            <div class="hudrow"><span>adj. R², M1</span><b id="hud-a1">—</b></div>
+            <div class="hudrow"><span>adj. R², M2</span><b id="hud-a2">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise VII &nbsp;·&nbsp; What Is a Used Corolla Worth ?</h2>
+      <p id="endblurb"></p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button */
+  DATA_FILES: {
+    toyota: "https://www.dropbox.com/scl/fi/ah7b8cqwvxu2x1odr6dpc/ToyotaCorolla_with_data_Models.xlsx?rlkey=vewjvyrtwwvplzw2y6p24nnty&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 1,419 cars of ToyotaCorolla_with_data_Models.xlsx,
+   embedded for the pictures only (prices, ages, and the fitted values
+   and residuals of Model 1 and Model 2, rounded to the euro). The
+   student computes everything in Excel.
+   ================================================================ */
+const DATA = {
+  FIRST:[[10500, 42, 92204, "Petrol", 110, 1, 0, 1600, 5, 1075], [18950, 8, 7000, "Petrol", 110, 0, 0, 1600, 5, 1115], [7950, 78, 91399, "Petrol", 110, 1, 0, 1600, 5, 1070], [8500, 77, 71825, "Petrol", 110, 0, 0, 1600, 5, 1075], [10750, 57, 45000, "Petrol", 110, 1, 0, 1600, 5, 1050]],
+  AGE:[42,8,78,77,57,26,47,48,42,52,78,28,55,71,50,49,77,65,73,65,65,48,46,44,38,65,76,61,76,71,79,41,70,11,48,36,77,25,8,20,48,67,62,68,77,32,80,66,49,73,61,80,63,67,39,76,74,77,35,62,74,78,59,55,55,74,54,65,73,60,53,61,73,65,4,65,43,44,49,77,69,56,63,49,68,75,76,79,56,69,59,54,50,49,34,80,19,40,50,62,52,28,76,72,71,62,65,66,41,64,48,65,79,71,59,57,70,17,54,35,70,77,64,47,44,11,80,80,4,72,67,20,77,19,33,38,70,41,48,55,80,62,45,30,72,62,62,55,2,40,43,60,48,20,68,16,44,50,59,50,55,76,65,66,25,38,77,65,77,67,67,44,61,13,80,74,72,71,27,69,67,51,74,53,68,41,57,68,33,33,38,74,50,80,73,54,19,80,69,36,68,76,45,64,17,39,28,78,47,65,56,16,72,39,27,61,56,27,48,54,68,62,66,19,80,79,51,75,67,64,75,67,78,20,71,54,50,30,65,79,42,58,65,76,78,70,63,54,70,74,69,76,66,42,58,62,54,75,78,72,68,74,19,38,39,56,67,32,80,67,13,78,16,41,52,71,80,32,62,1,50,61,65,42,80,62,68,25,75,54,39,40,64,20,56,62,67,57,65,80,63,62,1,39,38,60,67,59,26,73,23,17,59,38,20,18,35,43,8,65,62,75,65,39,75,26,50,49,78,28,63,51,80,58,78,65,68,43,52,44,20,44,78,62,56,68,46,22,72,75,75,68,60,40,48,78,16,73,42,80,75,80,63,52,56,34,7,28,74,74,70,58,59,27,75,62,19,68,58,8,62,64,63,69,55,41,50,42,65,58,73,75,80,19,74,53,17,66,42,75,67,54,15,49,39,55,73,61,62,60,53,55,22,54,67,8,65,68,66,35,39,62,33,79,65,69,67,61,43,79,49,80,33,59,68,77,76,73,38,75,49,77,52,76,52,69,61,38,51,63,69,79,79,37,79,48,78,64,78,62,68,73,67,44,64,71,65,63,70,77,51,48,79,33,71,57,57,80,41,80,28,76,69,78,19,60,57,25,68,49,66,77,79,48,58,44,41,67,48,62,80,50,51,78,78,72,33,71,51,25,60,42,25,74,68,67,69,15,65,59,7,69,77,37,68,78,23,61,66,73,47,79,54,8,75,75,68,77,9,24,67,54,59,67,47,20,51,59,50,67,54,41,68,32,74,79,20,39,65,54,40,49,33,78,51,71,22,58,69,62,39,54,39,77,50,38,65,67,70,76,55,13,40,53,75,31,61,69,77,44,79,33,61,20,78,73,54,68,13,80,52,68,72,66,60,70,29,66,56,80,65,79,61,66,41,46,80,23,78,68,54,80,39,60,50,43,35,68,80,51,28,65,7,78,54,69,68,58,54,76,61,63,23,42,44,77,69,56,46,17,13,60,72,72,62,68,71,17,73,47,37,55,54,55,75,39,33,64,68,60,71,8,80,80,71,62,43,16,49,55,32,38,57,78,19,69,78,80,61,65,66,78,74,44,79,38,69,35,77,57,68,58,63,76,78,53,76,60,68,80,50,64,60,80,11,54,71,74,66,68,42,49,74,67,27,33,80,19,14,29,61,34,51,34,52,67,80,23,49,47,61,65,37,76,53,64,66,66,13,68,40,70,74,55,19,80,63,58,41,44,51,78,57,54,42,68,74,68,73,79,27,65,78,68,44,62,56,63,61,35,47,8,65,22,80,74,77,63,65,71,45,64,80,50,65,55,56,48,33,31,80,68,79,62,14,72,31,27,53,39,61,63,62,38,62,65,75,52,46,46,60,75,70,64,41,57,57,61,47,63,72,70,63,69,16,61,59,59,74,78,11,73,65,71,19,54,71,52,68,26,54,60,33,54,68,43,12,40,80,59,57,61,61,44,68,77,63,55,57,69,59,80,11,41,9,61,55,79,12,80,80,43,40,71,41,74,41,76,67,62,43,68,29,43,53,68,24,40,49,7,22,72,75,20,68,68,65,51,68,78,39,80,68,74,80,62,50,61,60,61,79,54,44,68,80,67,26,22,43,40,49,59,57,35,38,58,14,43,40,44,65,77,37,54,78,30,39,54,76,80,65,80,58,29,75,74,77,53,68,27,56,39,68,58,71,78,35,76,61,40,4,63,59,78,73,77,58,11,41,16,68,76,79,20,26,41,80,78,65,58,52,58,79,62,75,28,73,8,56,64,43,59,66,46,50,77,65,47,75,30,67,30,57,62,20,10,73,70,62,77,25,56,43,64,59,63,78,78,68,56,74,49,79,78,78,65,59,50,69,63,36,60,28,56,50,80,49,67,42,44,78,50,79,58,59,38,64,78,75,35,70,17,71,62,14,75,80,79,9,53,58,54,65,71,51,49,65,79,78,47,41,60,56,50,8,76,31,72,48,56,40,74,80,75,23,68,71,40,63,76,41,75,68,13,73,75,30,30,60,53,78,75,57,53,70,79,63,57,68,52,33,65,64,73,66,48,34,52,62,66,61,39,76,40,73,76,54,57,73,63,67,2,54,80,61,41,64,67,70,57,62,30,42,40,70,62,59,70,29,63,53,68,63,22,55,52,64,74,57,20,77,53,71,68,80,44,55,66,52,64,43,77,68,68,72,40,80,70,67,23,80,77,76,63,67,20,50,76,73,78,53,76,62,54,50,62,24,63,78,61,29,69,23,52,72,65,71,42,50,56,58,22,71,30,68,65,47,6,63,57,42,68,28,75,35,50,55,64,38,75,13,25,65,55,52,30,65,59,35,63,78,58,80,62,59,8,58,69,25,59,65,20,51,44,76,68,60,60,66,77,42,27,77,73,61,20,73,70,54,79,67,60,49,27,72,48,73,77,78,50,66,31,65,65,40,62,56,63,14,68,64,19,37,63,67,68,73,71,68,59,54,73,65,65,27,22,48,39,75,72,27,59,49,68,78,40,73,68,60,68,60,35,54,65,59,68,22,61,70,22,61,67,65,53,41,14,59,50,65,65,22,61,59,39,76,40,65,43,77,73,74,60,74,58,80,64,54,77,79,44,38,57,39,62,60,61,68,61,61,60,77,50,66,60,53,33,66,80,65,67,41,43,67,52,64,38,40,64,20,64,44,65,75,77,65,41,35,43,7,33,30,74,47,14,65,58,72,68,75],
+  PRICE:[10500,18950,7950,8500,10750,20500,9950,11500,12450,9950,8950,19950,11950,7950,10500,8900,7600,8250,7950,9950,7350,7750,10750,11495,11950,8950,6900,8950,8250,5950,8250,13250,8500,18750,10450,12500,7450,16650,21950,16500,12500,7950,9250,9250,9450,12995,7950,8950,9950,6550,9950,9000,9500,7950,12950,8250,8750,6750,10500,9950,7750,7750,8250,8950,11950,4400,11950,7250,8500,8500,9900,9500,8950,9950,31275,11500,13950,10950,11950,6950,7500,11950,8950,12950,8750,6950,7450,8750,9900,7950,10500,10250,8695,12500,13450,8450,16500,13450,12950,10950,11895,16950,7750,5950,8500,9950,10950,8250,13950,9450,9000,8750,9950,6999,9950,10950,8500,22250,10750,12950,7250,8400,8900,11750,12495,17650,9250,6750,32500,8950,9950,20500,7950,18450,13500,10950,8950,12200,9950,11500,6750,7500,9950,15950,6950,8950,10950,11500,21125,14750,14950,11950,10450,15950,8100,16450,4750,10750,9500,10500,9950,7500,8750,9500,15500,12500,7990,8950,7450,8250,9900,11900,8950,18950,7750,5740,6950,7750,17950,9750,9950,11950,7950,10950,9950,14950,9500,5950,11750,12950,13750,8050,7900,9450,8750,9950,15950,7300,5950,10750,7950,6950,12950,9950,20750,9940,17450,5950,10950,6950,11450,18950,8450,12950,15950,9450,9750,21950,9950,13750,6950,8950,9245,19950,8250,9450,11450,7950,10295,8250,7950,10950,7450,16450,8950,11250,10950,14900,8450,6950,11950,8950,10500,8950,8500,9450,9950,11750,8450,8950,7950,6750,8750,14950,6950,10900,11950,7450,6950,10845,8750,9250,15950,12950,10250,10000,9750,15750,6900,6250,24500,7250,19500,12900,10950,8500,7500,22500,12500,18245,10995,7950,10950,9950,8250,7995,9500,20950,8450,10750,13500,12950,9250,22250,10950,9500,8750,10950,10950,8250,9950,10450,17795,13450,9500,10450,9900,8750,14950,7500,14950,17950,10950,12450,17950,17450,13950,12750,21950,8950,9750,7950,8250,12000,7400,14950,12200,18950,8500,15950,9950,9799,6950,6950,8950,8990,9950,9950,10250,13950,18990,12950,6000,9450,5150,9895,11900,17950,7450,8950,6650,7900,10950,11750,10750,6500,19750,8950,12900,8950,8700,7499,10750,13950,10950,11690,18500,15950,6750,8500,8250,11950,8950,16950,7950,10950,16250,9750,10950,21950,8950,9750,8250,6750,8950,11480,9950,9900,7995,8500,7000,7750,8500,16950,8950,9250,16950,7950,9950,6750,10950,11500,16868,9980,11650,9990,9250,8750,8750,10950,11950,10750,13950,10900,9650,19500,8950,7750,8950,10450,11495,10500,12295,7500,7999,9400,8450,11250,12750,7950,11450,7950,13500,5950,10500,7950,8150,7750,10950,7950,10750,7750,10500,8950,11250,8950,9450,12900,12250,9250,8950,7750,8750,11450,8800,11750,8900,8250,7600,8950,9900,8500,8500,13950,10450,8250,8450,9950,7450,9800,6400,9475,7200,11690,7500,10900,9450,6750,10950,8950,22000,6900,9950,8900,23950,8200,10900,18950,6950,13000,9500,8500,7995,10950,9950,10950,11950,9250,8950,9950,7400,11250,13950,8000,7950,7350,13250,7950,10600,15950,9500,13500,15950,7950,9750,5751,6900,18950,10500,7500,19950,7250,8950,12750,8450,7500,13750,9250,10500,7500,11950,8750,9950,19950,8750,7900,8950,6950,19600,16750,9950,10250,9500,8250,8950,15950,11900,7500,12950,9895,13750,11450,9950,13250,7950,9500,18950,10950,7950,10950,11700,10995,12750,8500,9950,7950,13950,9500,7950,9900,12950,9450,12695,10500,10900,13500,8950,8950,8450,7950,9500,15950,11250,10895,7450,18750,9950,8500,8500,11895,7750,12950,8750,19250,7450,7800,9550,8495,15850,9000,8950,8950,8500,9250,7950,7150,16895,9750,10500,8250,10500,8750,9950,9500,14350,11500,6900,12950,8250,8950,10500,6150,11500,8950,10950,6950,11500,7900,6950,10950,15250,9250,18700,7250,9500,8950,8950,10950,10950,7750,10250,10500,15750,12450,11250,8250,6900,11950,9950,19750,18500,8400,7950,6500,9950,8950,7500,19950,7750,8750,9950,10250,8950,7750,9950,13750,14990,8950,9750,7750,8500,24950,9250,9900,9250,10495,12950,18500,11450,10950,12950,11750,10500,7950,19450,8250,8450,7250,8950,8950,9450,7750,7750,9950,8950,11650,8600,13995,8250,10950,8950,10450,9950,7900,7500,9850,7950,10500,7950,8500,10500,7750,6900,9250,18500,10850,8750,7950,8950,9500,13950,10450,6640,8900,16900,12900,7500,15950,20950,16250,9950,11790,11750,12450,11700,9450,8950,18950,10900,11250,10450,9950,13950,7995,10990,8000,9450,8900,21750,8950,13450,7450,6900,10500,21950,9950,9900,7350,11900,11950,9700,7250,10000,12450,11750,10495,8750,8800,7950,6990,14750,9750,7950,9000,11950,8950,10750,9950,10500,13950,11900,24990,8950,19950,6500,7750,8950,9950,7750,7950,8900,10950,7500,7500,8950,11500,11950,10495,10950,21950,7250,8950,9950,9500,19500,8250,21500,16500,7000,12850,9950,9450,10450,12950,9750,8950,7200,8250,10900,10450,7950,7450,8950,7950,13500,9750,10250,7950,10950,9750,7750,6500,9450,6900,19950,10950,7995,7750,7950,7600,19450,9900,8750,7250,19950,10950,8950,9450,8950,16950,11950,10250,13450,8950,11500,12950,20500,11750,9500,8250,9900,8895,9950,11950,10950,6750,7750,9950,7950,8750,10950,8250,18900,13250,18245,8900,10995,8950,19500,6950,7145,11695,11950,5950,11950,7500,11950,5750,9250,8500,13500,8600,16950,12950,9930,7950,17950,12950,8750,17900,22250,8250,8750,17950,9795,9950,7500,11950,9900,7750,12900,6950,8750,6495,7950,7950,10900,9995,8950,9250,8950,10750,11925,9950,8750,9950,15750,15750,10850,12850,10950,8900,8250,12450,11950,9750,19950,11950,12750,12450,8850,5950,11450,11950,7250,18600,13750,8950,9250,8950,8250,7450,8750,12950,7795,5950,7750,6500,8950,21500,4450,12495,9750,9750,8450,7500,12950,7950,10500,12500,31000,9950,10995,9250,7750,7750,10950,23000,10500,21750,9995,10950,6950,17200,15250,11950,7250,8500,9250,9950,12000,9250,8500,10250,5600,18950,7490,24950,8950,7800,11750,8950,8750,11450,11950,9500,8950,12450,8950,17950,12950,17950,8950,7900,16250,18450,8900,7750,10950,8450,15450,12000,13500,9950,9450,9950,5800,8750,8500,11250,6750,11290,8950,10500,8450,9750,9950,13500,9200,10950,12750,10495,16950,12500,11450,7250,10500,9130,14950,11750,6500,10750,6425,9950,6900,14990,9750,9950,8950,10950,6950,17450,6495,10250,18800,7400,7250,7950,17795,8950,8000,10950,8950,8950,9900,10950,11500,9500,8750,10950,11950,11950,10500,12950,23750,6950,18750,6450,11500,10500,13950,7450,8750,9950,16950,9450,8950,11950,8950,8750,12500,7500,10750,19950,7750,7900,22750,14900,8950,10250,6500,5950,9950,9940,7950,9000,8950,10950,8950,12900,12950,9900,9750,6950,9950,11450,12400,10950,9500,9390,8900,14750,8950,12950,5950,7750,11950,8750,7950,9500,8995,21500,10950,8250,8750,11895,9900,8750,9750,10950,10500,15999,11750,11950,8950,8750,10950,6500,17250,9450,12950,9500,8950,15800,9950,11750,7950,7250,9995,16500,7750,9650,7750,10400,6800,13250,10500,8250,10500,9950,11950,7250,8900,6900,8950,14750,6250,7900,8950,19000,6490,8500,8600,8900,10950,16450,10950,7950,8500,7250,8950,6750,10450,7750,12950,6900,13950,10995,7950,9500,15750,8750,13500,9750,5250,10450,8950,11950,10450,10750,9500,14950,6500,15750,9900,9950,11950,22500,8450,9695,11950,8950,18950,8450,13995,9950,11450,8450,12450,10000,16250,19600,8745,9950,11500,13750,9850,9950,13500,8250,7450,9950,9950,8490,10950,18950,8950,8450,15950,8900,7450,19900,12950,4350,8500,9950,8750,8500,8250,6950,10950,17495,7250,6750,9995,18900,8950,8950,9400,7495,9750,12250,11930,17950,7950,11710,5750,7900,6650,11950,9450,17950,10450,8950,11990,8950,9750,9950,19950,9250,9950,16250,11950,8250,10500,8450,7950,8950,9750,10995,10500,8250,7800,9750,16750,16950,9750,13875,6450,7850,18450,9950,11950,9900,7750,11450,5900,7750,10900,9800,9250,12500,11450,9450,8900,7950,17950,8950,5845,14950,8950,9250,8150,9950,11000,16350,9900,10800,8250,6900,15500,9750,8950,11500,8750,11950,9950,10950,6950,7950,7950,10350,7250,10500,7950,8750,12500,8750,5950,13995,10950,8950,11895,8950,10750,8950,6950,9950,10450,10750,6750,10500,9950,10500,9950,13500,9900,8250,9950,9750,11900,12750,9800,10750,7950,12950,11950,9500,15950,8250,11500,10950,7900,8495,9500,11950,11950,13500,22950,13500,16950,8950,11000,20950,8250,9950,8950,7950,8700],
+  FIT1:[12245,18516,7759,8243,10666,17263,11744,11309,13103,10510,8908,16037,11198,7061,11567,11674,6911,9437,7727,9475,7755,9948,11913,11927,13633,8697,7620,9634,7484,7917,7687,11683,9227,18033,11802,13067,6943,16304,18826,16601,11452,7674,10067,9192,8604,14222,6043,9739,10763,5945,10071,7838,9500,7969,13367,8115,9827,6311,13344,10478,8062,7691,8932,9229,11038,6047,10516,7578,9278,10383,10712,10843,8574,9422,27431,10062,12521,12456,10502,6602,8898,11191,9960,12803,8762,7251,6667,6758,10462,8018,10174,10590,10739,10671,13031,7260,16785,12819,12010,9988,11684,15833,7795,6911,8456,9471,9869,9671,13243,8483,11172,9383,8298,9053,10496,10956,8405,20462,10631,13582,8632,7993,8462,11936,12788,18162,6923,5066,27402,8443,9270,18218,7790,17295,14858,12666,9132,12703,11219,10273,7309,7919,11265,14719,8892,9256,9944,11057,19357,15163,12604,10527,11268,16438,7793,17275,11006,11704,10259,11819,10746,7955,8785,9938,17140,13540,8056,8633,7818,9210,9485,10627,9694,17103,6408,6707,9252,8449,17269,9432,8126,11100,8179,11645,9252,13635,9819,5672,13882,13829,13760,7469,10346,8009,8541,10599,16263,6598,9070,13874,8617,10299,13061,9301,17175,13230,16402,6603,11192,12125,9818,17331,8190,13535,15643,9729,10412,21314,12737,10752,6654,9345,9932,18700,7317,7694,11386,7028,9178,9080,8026,9421,9218,16800,8225,11500,12128,15626,7965,5436,13239,9110,9770,8397,6870,9180,9807,11266,8416,8671,6976,8132,8040,12803,9655,10509,10220,6806,5796,8302,7631,8476,16622,13439,12840,10179,9392,15100,8818,8854,18051,7131,17299,12272,11924,8405,7806,20765,11211,18731,11777,9221,10463,13033,7555,10241,8287,21610,8575,11291,13192,13806,9365,18907,10447,9691,7879,9743,9723,8046,10160,9872,19348,13085,12346,9917,10022,10736,15715,8044,16445,17490,10285,12885,18133,16833,12848,12415,20990,9225,9235,7644,8830,13034,8413,16042,10726,12687,8395,15446,9205,10731,8024,7265,6877,8893,9369,12099,11217,12591,16955,12980,5315,10280,9665,9153,12805,17995,7810,8849,7618,8298,10437,12753,12259,5445,19141,7604,12815,7706,8084,7571,9911,11535,10207,13399,17913,15716,6648,8252,9657,11170,9293,16719,8675,10679,16812,9358,10020,18902,9863,9151,9503,8970,9657,13086,10281,12182,8542,9614,7625,7881,8250,16873,8033,10751,17253,9062,11082,6836,9689,11361,17064,11308,13229,10580,7823,9158,8542,11014,10690,11558,15922,10716,9373,18466,8260,9193,8431,12336,12595,9608,14136,7397,8899,8436,8424,10723,11844,6622,10841,7426,12679,8566,9674,7675,9307,7856,12796,8076,10738,6896,10995,7643,10970,7009,10355,13845,12064,8852,7517,7567,8812,13084,8015,11396,7661,8259,8124,10033,9344,8082,7960,13555,9355,7337,8825,8943,8464,8220,8312,11134,6704,13905,8003,10523,10421,6622,11685,7641,21447,7009,9246,8348,22542,9041,10500,17962,8027,12338,9489,8448,8805,11865,10785,11332,12069,7652,11234,9488,7870,11843,11870,7546,7406,6865,14806,7725,11402,15907,10778,12406,16260,7920,9840,6595,7168,17802,9040,9047,18703,8829,7952,13696,8226,7639,16062,10145,8806,8806,12767,7768,10518,18845,8804,6778,9052,6851,18436,15269,7559,11234,9348,8924,11541,15834,11868,7675,12375,8690,11582,12542,8649,14212,7334,6850,16890,12559,8264,10308,13249,10741,14385,6920,10118,8310,15888,10595,7641,10363,13004,8956,13768,6154,11442,13362,8425,8638,7812,7573,10069,17404,11474,11047,7740,15768,11029,6686,8225,12515,6759,14362,10691,18387,6549,8537,11198,9076,16729,7267,11012,8479,9088,8500,9146,8525,15753,9691,10172,6288,9416,6918,9236,8316,12547,12689,7642,13974,7372,9468,10753,5095,13896,9842,10573,8879,13193,6309,7681,10735,15439,8949,18743,6388,10255,7825,7914,10170,10934,8102,9385,11178,16343,12789,12207,8358,7707,11515,11138,17691,16409,9883,7783,6887,10245,8811,8744,19409,6749,11822,12616,10142,10284,9419,7485,13788,14036,8080,8502,8892,8381,23537,7423,8342,8861,10160,12470,16876,10848,10707,15201,13700,11025,8066,17292,9652,7412,7617,9402,9302,10261,8069,7396,11906,9291,13237,8312,14289,7956,10357,7914,11277,10051,8062,8614,10278,8273,8965,7837,7619,11353,8895,8319,7876,17866,11047,7028,6443,7531,8744,13141,11453,7957,9245,16835,14325,7135,16678,18944,15813,9799,14414,11793,13217,11388,9271,7157,17891,10711,13308,10108,9930,14127,8479,10507,8318,8966,9459,18160,8358,13588,9433,7638,10941,20144,7774,9306,9843,12814,12838,11747,7212,9990,11124,12782,8778,7462,7794,8078,7817,15623,8879,7726,9351,13284,8888,10115,9237,8857,14150,11573,21269,8761,21782,6904,8395,6739,9932,8580,7051,9480,9706,7912,15842,9425,11000,10971,11919,13583,20583,7400,8504,8261,8340,17547,8613,21066,16013,8629,13605,9647,9637,9425,13125,9393,8264,7789,10150,12119,12486,8780,6905,8789,8340,12077,10677,12242,8539,12315,8770,7866,6472,9525,8987,19465,10948,8939,8354,7653,8255,19267,8494,8053,7230,17313,11162,9416,9875,8531,15162,10446,10459,13990,9343,9567,11975,18414,11699,7455,9623,11288,10485,9840,11645,9470,6607,8862,10624,9286,9099,11463,8895,18114,12361,17754,9767,10752,8131,17974,6357,7781,13070,13066,7448,12513,7478,13300,5667,9034,8638,12831,8832,16848,12901,10560,7836,16188,13332,10869,18613,20288,8566,7872,16909,8761,9505,8512,11016,8115,7349,12297,7830,8914,6872,6457,8916,11008,10295,10098,9525,6225,9606,11462,8866,6759,9993,15497,16163,11773,13405,11069,10174,9294,13437,13418,9894,18100,12074,13155,23150,10138,6256,12711,10680,7777,16769,13057,10623,7993,7610,9232,7486,10394,15716,7594,8227,7176,8089,8875,21554,9521,13274,9212,9111,8115,7420,14045,7939,10149,12599,27391,9752,9867,8219,7928,8302,11866,22982,12473,17428,8383,8617,6673,16884,15687,13119,7022,8271,9335,10599,10887,9417,7326,10425,5898,16086,7317,23537,10515,9501,12739,8768,8788,11229,12089,7740,9424,12417,8064,15927,9548,15758,10503,9160,16639,18163,8581,7659,10520,8423,16278,10543,13186,10103,10029,9921,5335,7267,8578,11181,6744,11863,7220,7658,7113,9914,10382,12209,9198,10277,13185,10727,15589,11386,11985,6153,11013,7992,13837,11697,8174,11271,6550,10774,8809,13078,9943,9258,8915,13227,8449,17178,8380,10654,16367,8012,6912,8043,17667,9934,10145,10817,9993,9716,10373,10832,9293,7435,5215,12070,13125,9273,10840,11414,18806,6227,15587,7589,11796,10702,14211,7913,8330,8480,16400,8355,9292,13386,9667,7933,12617,7107,9250,18028,7626,8890,21012,15587,9177,9843,5780,7098,9730,12017,8109,8523,9959,9996,9566,11637,14284,7905,8410,7610,7595,11605,13926,10518,9269,17877,9644,14326,7121,13448,7113,7834,11152,9981,7842,9403,8779,19715,11548,7691,8964,12906,10221,8144,8830,10749,9788,15671,12112,12805,9091,9834,11331,7431,15795,8961,11227,9109,9341,15715,10409,10957,8039,7238,10190,16644,6414,11525,7965,9000,6519,13242,9458,9750,10864,9195,12410,7280,9493,7482,9643,14659,6195,8549,8113,17933,6984,5451,6495,9360,9614,16201,11621,8717,8680,7847,9587,8159,9768,8248,12652,8519,16440,10266,6293,9428,15563,7517,16478,11022,7232,9839,8426,11894,11510,11155,10310,16318,7843,15025,9353,10139,12799,19126,9583,11148,12281,10134,16042,8271,13921,10856,10124,9112,13790,9014,17466,21598,9636,10420,11874,15806,9368,10790,12931,7938,7474,10347,7806,9292,11281,18467,8914,9430,16075,9762,8201,17148,11563,10520,6949,8187,9236,9132,8944,6733,12237,15918,7399,6427,10027,16763,7784,7712,10508,7788,9834,8713,11455,15781,8806,11982,7227,6925,7687,11817,9488,17289,10145,8553,13630,9977,10017,11275,18162,8386,8925,16786,12440,9638,9600,8548,7143,8866,8587,10210,10229,7393,8457,9179,15410,17493,11730,13396,7958,8639,15930,10167,12543,9496,6862,12710,6374,8246,9820,9908,9986,13319,11295,9192,10562,7948,18148,9940,8785,16430,8875,8012,8108,9702,13687,17307,9697,11437,8238,7178,16070,10597,10425,12517,7405,10511,9871,11931,6762,7276,7061,11380,7238,11367,6830,7702,10848,7831,6609,12962,13269,9997,13399,11675,10829,8792,7706,9166,10016,10644,5011,11493,9658,10255,10503,13161,9032,6703,9008,8586,13733,13307,8063,10885,8381,13021,13123,9694,16684,8432,11448,9422,7137,7565,9790,12498,12828,12912,22705,15084,14772,7900,12518,18742,8938,9761,7287,8311,7956],
+  RES1:[-1745,434,191,257,84,3237,-1794,191,-653,-560,42,3913,752,889,-1067,-2774,689,-1187,223,475,-405,-2198,-1163,-432,-1683,253,-720,-684,766,-1967,563,1567,-727,717,-1352,-567,507,346,3124,-101,1048,276,-817,58,846,-1227,1907,-789,-813,605,-121,1162,0,-19,-417,135,-1077,439,-2844,-528,-312,59,-682,-279,912,-1647,1434,-328,-778,-1883,-812,-1343,376,528,3844,1438,1429,-1506,1448,348,-1398,759,-1010,147,-12,-301,783,1992,-562,-68,326,-340,-2044,1829,419,1190,-285,631,940,962,211,1117,-45,-961,44,479,1081,-1421,707,967,-2172,-633,1652,-2054,-546,-6,95,1788,119,-632,-1382,407,438,-186,-293,-512,2327,1684,5098,507,680,2282,160,1155,-1358,-1716,-182,-503,-1269,1227,-559,-419,-1315,1231,-1942,-306,1006,443,1768,-413,2346,1423,-818,-488,307,-825,-6256,-954,-759,-1319,-796,-455,-35,-438,-1640,-1040,-66,317,-368,-960,415,1273,-744,1847,1342,-967,-2302,-699,681,318,1824,850,-229,-695,698,1315,-319,278,-2132,-879,-10,581,-2446,1441,209,-649,-313,702,-3120,-3124,-667,-3349,-111,649,3575,-3290,1048,-653,-242,-5175,1632,1619,260,-585,307,-279,-662,636,-2787,2998,296,-395,-687,1250,933,1756,64,922,1117,-830,-76,1529,-1768,-350,725,-250,-1178,-726,485,1514,-1289,-160,730,553,1630,270,143,484,34,279,974,-1382,710,2147,-2705,391,1730,644,1154,2543,1119,774,-672,-489,-2590,-179,358,650,-1918,-2604,6449,119,2201,628,-974,95,-306,1735,1289,-486,-782,-1271,487,-3083,695,-2246,1213,-660,-125,-541,308,-856,-115,3343,503,-191,871,1207,1227,204,-210,578,-1553,365,-2846,533,-122,-1986,-765,-544,-1495,460,665,-435,-183,617,1102,335,960,-275,515,306,-580,-1034,-1013,-1092,1474,6263,105,504,745,-932,-1074,-315,2073,97,581,-2149,-967,1359,2035,-30,685,-830,-4515,742,-905,-45,-360,101,-968,-398,513,-1003,-1509,1055,609,1346,85,1244,616,-72,839,2415,743,-1709,587,234,102,248,-1407,780,-343,231,-725,271,-562,392,930,3048,-913,599,-1253,-2220,-707,-1606,-331,-2282,-547,-1114,-625,-131,250,77,917,-1501,-303,-1112,-1132,-86,1261,139,-196,-1328,-1579,-590,1427,-408,208,-64,1260,-808,-1972,184,277,1034,690,-1443,519,-1886,-1100,892,-1841,103,-900,964,26,527,906,1328,609,524,821,-2616,826,275,-1157,-106,-1846,-126,12,854,-495,1307,280,1941,-905,-945,186,398,1433,183,-62,-1634,785,354,1239,-9,-524,-1083,556,418,540,395,1095,913,-375,1007,-1014,1580,-1912,-1659,496,-2215,-503,377,-971,128,-735,1309,553,-109,704,552,1408,-841,400,988,-1077,662,11,52,-810,-915,-835,-382,-119,1598,-2284,462,-470,-593,2080,454,544,485,-1556,225,-802,43,-1278,1094,-310,30,-90,-844,-268,1148,1460,-1547,1247,-1579,998,-946,224,-139,-2312,-895,1694,-1306,-817,982,-568,1105,-54,1122,-102,99,1164,1481,2391,-984,152,-674,-2591,116,32,-175,575,1205,2168,-1092,1301,-962,616,2650,2060,-1609,-314,642,-1549,254,-1635,1580,-168,-360,-1938,-1095,309,-463,-54,494,-1073,4346,-542,138,525,312,638,377,-569,-1454,-224,-152,-290,2982,-1079,1814,275,-620,991,-1412,-1941,863,901,-737,-1648,-581,-879,1733,-2062,471,-588,750,-1196,-1375,1142,59,328,1962,1084,1832,714,1184,1803,-1189,-742,-1024,878,-518,-253,1055,-2396,-892,377,-1929,-1693,1591,-731,215,-189,301,-43,862,-755,1125,1036,780,16,-352,865,-678,-593,-339,-957,-108,-807,435,-1188,2059,2091,-1483,167,-387,-295,139,-1244,541,1001,-3072,-2666,108,-1334,-1669,2465,-38,954,870,1248,-1142,119,1413,1827,1558,389,335,480,1624,602,243,-2251,-1950,-525,-116,2158,-1402,1038,-367,-452,-352,-811,-319,354,-1956,-341,-1587,288,-294,294,593,1036,-827,-101,-162,-1114,-428,-323,1535,113,881,-853,-1145,-1419,1374,634,-197,1722,1507,1419,756,809,-1003,-1317,-345,65,-1425,365,-728,2006,437,151,-2624,-43,-767,312,179,1793,1059,189,-2058,342,20,-177,-484,483,-318,484,-559,3590,592,-138,-1983,-738,-441,1806,2176,594,-2493,-914,-888,-2047,38,10,1326,-1032,1717,1288,1006,-128,-827,-873,871,224,-351,-1334,62,635,713,1643,-200,327,3721,189,-1832,-404,-645,2211,18,-830,899,-580,1244,-412,-8342,-475,500,979,-1424,-2633,1367,-150,446,1689,1160,1953,-363,434,487,-1629,-755,303,-187,1025,-175,357,686,-589,-1900,-1219,-2036,-830,545,161,-390,1423,-927,-1992,-589,-1365,980,-116,28,-75,-2087,485,2,-944,-604,297,-655,183,1406,697,20,2637,-212,-466,-425,419,1788,1504,-209,-540,-393,1933,975,2086,51,2045,-1373,-1388,-1590,110,305,1480,143,-1112,-674,-1336,-349,-513,-645,786,889,491,-867,243,819,1526,593,-636,-1375,-1116,-1498,-563,22,-1350,83,216,-138,669,-232,102,49,-630,114,1762,-382,-2119,-713,1962,-316,878,1041,1034,445,-1012,934,1785,401,603,-880,-164,-377,1493,-966,-108,-300,-1148,-275,2725,1144,463,1084,1991,-43,253,-413,-923,-555,-119,-1274,-1044,-987,-1468,-144,1850,-124,-405,-10700,-1288,-306,-1261,1270,-527,1831,693,-1673,1257,1340,-982,-36,-1644,-2766,201,-2277,574,-1589,75,-54,-5071,-779,538,639,335,80,-1095,11,351,-99,3609,198,1128,1031,-178,-552,-916,18,-1973,4322,1612,2333,277,316,-437,-1169,228,229,-85,-649,1113,-167,1174,-175,-298,2864,173,1413,-1565,-1701,-989,182,-38,221,-139,1760,-474,33,886,2023,3402,2192,-1553,-1260,-389,287,319,91,430,27,-828,1457,314,-153,-579,29,465,1483,-78,69,6,-573,1730,2842,1337,-164,-432,1291,2,673,-435,-232,1361,1114,-535,1097,-513,1138,1113,53,-1674,-521,-125,-824,-1909,1912,-193,692,35,-2277,-1499,272,-1885,-404,2433,-612,338,-93,128,-984,-2145,133,-1043,-766,-473,118,2207,2065,3535,-1120,-1175,2677,-340,1536,4944,723,3163,-1139,-296,-202,-261,-463,420,1470,550,1095,-342,-1436,-717,817,-117,393,1500,1922,124,-990,1738,-687,-227,407,720,-1148,220,-2077,-159,477,-1009,954,-616,1263,-1334,1995,1340,-660,2355,-155,-1526,432,231,-8487,-744,424,1829,-498,-1163,-84,798,-1231,108,97,216,1785,-598,559,-214,-1011,-321,606,920,201,712,328,-362,-855,-141,-1084,-381,-931,1455,489,1723,391,-391,85,-459,793,-89,12,-195,-144,1336,-1875,-215,1400,281,8,1042,-1500,-364,755,-460,-30,-593,-582,-693,91,55,-649,837,1067,-494,3049,2105,-460,1336,249,-671,-767,-180,-597,-637,-1409,682,-498,298,-1619,-2490,729,1657,72,187,1233,-2978,-1272,-1982,611,524,56,-1060,-405,-810,-1368,-1343,725,547,-189,-849,3374,-1133,-1453,-331,-1184,2908,179,74,-906,1326,-662,-1340,986,-1216,-1998,-891,-470,-374,-2056,482,-840,569,312,-24,-397,2144,-802,-331,483,36,-980,-125,-862,-751,2752,1387,-6170,1551,1763,-486,-632,-694,217,-1287,1577,-149,323,-32,2137,1166,1238,-1108,-293,-84,3537,475,2169,-856,-272,-1477,975,-1037,133,-38,661,305,397,-1640,-1027,-267,-1325,1788,864,1025,-536,-490,-1388,900,-98,807,84,1163,785,271,857,-657,571,1340,-543,-1980,479,-1508,-789,2520,-217,-593,404,888,-1260,-474,-496,1080,-108,-736,-819,155,258,-1662,2,-198,-990,-2940,-1480,75,1238,42,248,-2687,-957,203,-637,12,-278,-570,-847,-1475,-1017,1345,1439,79,-981,188,674,889,-1030,12,-867,1120,1048,1652,919,-659,1033,-2319,-1047,-1504,-2725,-79,158,-756,784,434,106,1739,-993,292,245,-553,339,868,1547,942,1164,-1833,-557,1737,-135,-431,-71,-1173,-194,-734,-182,52,1528,763,930,-290,-548,-878,588,245,-1584,2178,1050,-1518,2208,-688,189,1663,-361,744],
+  FIT2:[11885,20239,8300,8700,10347,17052,11327,10810,12687,10113,9290,15919,10739,7281,11113,11192,7318,9276,8002,9326,7678,9670,11424,11529,13368,8531,8046,9377,7864,8042,8333,11329,9217,19298,11363,12986,7529,16323,20423,17023,11013,7766,9802,9104,8966,14134,6797,9507,10340,6317,9807,8520,9237,7920,13042,8508,9946,6885,13283,10127,8509,8236,8576,8865,10542,6363,10229,7519,9529,10024,10388,10422,8701,9298,27915,9816,12168,12058,10075,7121,8811,10677,9690,12106,8853,7610,7105,7375,10112,8233,9835,10321,10334,10465,13139,7970,17324,12583,11494,9728,11208,15666,8338,7169,8567,9222,9645,9526,12851,8302,10713,9226,8799,9123,10115,10535,8447,20808,10257,13370,8652,8476,8283,11468,12310,19413,7652,5919,27924,8573,9114,18550,8286,17682,14609,12466,9128,12450,10854,10038,8011,7710,10976,14562,9041,8982,9664,10664,21678,14473,12258,10089,10919,16845,7894,18076,10727,11243,9880,11351,10330,8380,8612,9738,17119,13191,8514,8471,8313,9164,9376,10461,9396,18335,7281,7135,9148,8615,16922,9426,8223,10646,8553,11113,9134,13183,9360,5946,13849,13763,13451,7837,10091,8644,8762,10154,16774,7294,9073,13649,8535,10378,12627,9156,18030,12914,16225,7186,10985,11238,9502,18206,8365,13199,15529,9596,10057,21181,11989,10254,6721,9257,9770,18924,8078,8361,10958,7460,9099,8914,8413,9282,9491,17209,8345,10925,11549,15381,7882,6132,12814,8782,9578,8748,7414,9204,9457,10812,8515,8950,7125,8524,7983,12463,9263,10202,9951,7229,6496,8470,7664,8662,17110,13151,12761,9839,9229,14692,9395,8873,19115,7841,18176,12012,11398,8481,8478,20313,10820,21525,11256,9012,9978,12567,8279,9906,8303,21617,8901,10801,12878,13390,9181,18929,10090,9544,7865,9376,9558,8702,9877,9596,21828,12723,12131,9753,9831,10340,15670,8297,16590,18023,9870,12654,18276,17402,12743,12105,22191,9114,8992,7991,8817,12676,8729,16235,10385,11925,8858,15305,8930,10326,8693,7185,7442,8876,9314,11766,10782,12094,17360,12489,5989,9942,9284,9031,12278,17996,8172,9064,7986,8366,10096,12521,11675,6118,19728,7840,12453,8418,8386,8279,9595,11011,9798,13252,19990,15552,7015,8545,9614,10745,8993,16443,8973,10311,17313,9233,9592,20495,9523,9129,9284,8980,9329,12704,9934,11864,8385,9246,7910,8253,8864,17345,8264,10233,17985,8882,10835,7257,9601,10866,18028,10922,12859,10241,8016,8876,8344,10626,10393,10806,16221,10301,9210,20056,8157,9163,8313,12265,12448,9260,14051,7973,8773,8456,8340,10266,11625,7289,10517,8238,12752,8278,9611,8181,9711,8103,12678,8411,10330,7397,10601,8088,10574,7121,10016,13530,11535,8541,7675,8207,9357,13075,8581,10968,8208,8128,8617,9747,9246,8333,8042,13034,9091,7514,8811,8742,8692,8700,8175,10739,7325,13834,8108,10018,10045,7338,11432,8323,21244,7531,9238,8861,23041,8773,10262,17781,8005,11824,9391,8857,9094,11477,10350,11010,11791,7630,10731,9354,8573,11284,11330,8157,7943,7092,14504,7827,10954,15962,10429,12127,16287,8270,9733,6802,7270,18668,9013,8699,20504,8956,8437,13436,8170,8244,16456,9817,8647,8965,12174,8338,10116,20441,9107,7102,9162,7409,20007,15735,7507,10748,8964,8921,11137,16597,11328,7474,11792,8727,11049,12207,8620,14179,7686,7518,17325,12414,8125,10034,12893,10383,14284,7590,9770,8484,16190,10172,7719,10020,12795,8729,13564,6710,10908,13079,8276,8594,7939,7978,9697,18591,11271,10609,8121,15434,10629,6833,8693,12024,7397,14262,10330,18539,7170,8758,10695,8948,18139,8103,10618,8517,9179,8413,8836,8713,15621,9476,9833,7026,9212,7501,8972,8241,12413,12193,8322,14660,8066,9396,10343,5951,13537,9575,10164,8746,13134,6463,8373,10264,15328,8766,20439,6985,9905,7834,7900,9809,10559,8532,9131,10743,16520,12369,11883,8796,7781,11027,10815,18359,17261,9686,7963,7112,9945,8827,8834,19683,7033,11298,12499,9856,9897,9050,7882,13412,13978,7930,8611,8687,8551,24514,8155,8941,8943,9804,12156,17850,10434,10301,15023,13341,10564,8587,17829,9608,7850,8299,9230,9105,10004,8589,7744,11546,9625,12962,8264,14086,8397,10020,7900,10809,9726,8516,8927,9892,8652,8619,7863,8267,10915,8722,8126,8564,19212,10629,7232,6800,7578,8720,12699,11113,8283,9197,16490,14228,7979,17162,19823,15580,9553,14227,11244,13229,10842,9094,7928,17876,10360,12815,9762,9716,13951,8825,10197,8115,8775,9307,19217,8476,13210,9433,8006,10374,20292,8377,8989,9474,12486,12379,11250,7951,9623,10666,12422,8686,7780,7852,8330,8384,15545,8719,8302,9311,12860,8644,9651,8960,8625,13933,11105,22404,8590,22023,7656,8693,7285,9593,8421,7253,9363,9513,8598,14535,9301,10476,10507,11380,13534,20229,8120,8414,8846,8162,18640,8770,20654,15967,8377,13092,9304,9516,9189,12857,9059,8133,8167,9675,11605,11948,8602,7394,8770,8211,11973,10284,11346,8320,11859,8557,8081,6697,9281,8996,19836,10535,8570,8085,7984,8785,20399,8718,7928,7414,17848,10692,9438,9519,8509,15470,10163,10046,13914,8978,9454,11537,19565,11380,8248,9323,10834,10137,9511,11338,9364,7126,8720,10191,8965,9100,11019,9288,19470,11963,19559,9595,10450,8689,19225,7062,8455,12625,12513,7632,12206,7767,12904,6251,8943,8389,12402,8891,16459,12467,10271,7988,16370,12947,10615,20394,20183,8691,8352,17388,8852,9396,8393,10478,8151,7928,12218,8500,8843,7200,7198,8665,10630,9910,9779,9240,6842,9378,11166,8820,7445,9816,15501,16411,11624,13015,10664,9836,9001,13290,13131,9670,19088,11763,12806,19472,9922,6995,12588,10242,8340,16222,12773,10166,8323,8328,9085,8308,10065,15457,7984,8521,7658,7848,8842,21414,9246,12955,9143,8766,8267,8018,13858,8365,9774,12285,27878,9517,9426,8705,8170,8673,11367,23637,12101,18215,8373,8977,7296,17288,15705,12735,7802,8752,9136,10176,10485,9050,8124,10078,6380,15928,7564,24514,10154,9308,12316,8443,8625,10980,11544,8240,9264,11826,8278,15620,9374,15488,10157,9024,17059,19531,8707,7678,10141,8774,16299,10152,12678,9826,9700,9759,6000,8003,8610,10680,7116,11431,7882,8128,7811,9713,9959,11657,9101,9962,12950,10346,15474,10872,11482,6890,10595,7936,13344,11350,8638,10748,7216,10339,8513,12835,9757,9728,9175,13166,8570,17823,8657,10292,17760,8375,7640,8607,19369,9606,9797,10334,9751,9693,9931,10385,9107,8098,6024,11574,12686,8968,10406,10937,20405,6682,15265,7822,11256,10329,13764,8206,8897,8791,16676,8419,9284,13002,9472,8199,12334,7475,9310,19094,7921,9174,20667,15298,8972,9419,6525,7467,9352,11303,8324,9051,9666,9581,9477,11150,14189,7825,8186,7866,7703,11211,13744,10105,9003,14984,9372,13730,7553,13055,7382,8192,10647,9633,8108,9137,8579,22044,10899,8427,8702,12516,9995,8055,8926,10295,9482,15407,11833,12478,9135,9549,10825,7529,15659,8737,10763,9085,9062,16018,9957,10646,7895,7585,9706,17099,6946,11056,8127,8921,7403,12734,9241,9579,10582,8977,12008,7788,9430,7496,9440,14002,6939,8604,8056,17817,7731,6217,6990,9110,9462,16623,11278,9107,8883,8368,9247,8571,9438,8082,12134,8299,16727,9905,6986,9170,15346,7675,16845,10590,7596,9687,8475,11570,11238,10703,9906,16582,8012,14772,9183,9988,12098,20991,9372,10715,11999,10021,15888,8526,13742,10361,9731,9052,13479,9274,18686,21606,9497,10061,11386,15712,9247,10425,12844,7874,8066,9985,8513,9100,10826,20057,8544,9318,16109,9450,8067,17566,11124,10308,7385,8220,9117,8823,8882,7244,11914,15817,7899,6710,9660,17216,8162,7935,10106,8392,9620,8602,11036,15684,8915,11551,7676,7551,8232,11412,9315,16734,9868,8396,13213,9683,9653,10711,19110,8502,8652,17263,12261,9517,9513,8581,7401,8924,8725,9765,9744,7689,8306,9035,15311,17562,11259,13069,8304,8759,15961,9758,12079,9423,7625,12390,6550,8245,9509,9747,9675,13307,10816,9012,10198,7932,18139,9649,8617,16687,8707,8097,7979,9394,13379,18381,9288,10996,8065,7139,16324,10219,10026,12284,7866,10361,9578,11541,7306,7504,7539,10919,7597,10894,7640,7715,10422,8325,7293,12473,12992,9791,13018,11511,10392,8522,7769,8850,9650,10207,5771,10956,9549,9882,10103,13167,8893,7449,8821,8470,13350,12823,8045,10464,8207,12760,12751,9488,17101,8238,11149,9191,7593,8218,9561,12227,12812,12430,24098,14844,14611,8215,12025,19634,8755,9451,7463,8302,8299],
+  RES2:[-1385,-1289,-350,-200,403,3448,-1377,690,-237,-163,-340,4031,1211,669,-613,-2292,282,-1026,-52,624,-328,-1920,-674,-34,-1418,419,-1146,-427,386,-2092,-83,1921,-717,-548,-913,-486,-79,327,1527,-523,1487,184,-552,146,484,-1139,1153,-557,-390,233,143,480,263,30,-92,-258,-1196,-135,-2783,-177,-759,-486,-326,85,1408,-1963,1721,-269,-1029,-1524,-488,-922,249,652,3360,1684,1782,-1108,1875,-171,-1311,1273,-740,844,-103,-660,345,1375,-212,-283,665,-71,-1639,2035,311,480,-824,867,1456,1222,687,1284,-588,-1219,-67,728,1305,-1276,1099,1148,-1713,-476,1151,-2124,-165,415,53,1442,493,-420,-1402,-76,617,282,185,-1763,1598,831,4576,377,836,1950,-336,768,-1109,-1516,-178,-250,-904,1462,-1261,-210,-1026,1388,-2091,-32,1286,836,-553,277,2692,1861,-469,-895,206,-1626,-5977,-493,-380,-851,-380,-880,138,-238,-1619,-691,-524,479,-863,-914,524,1439,-446,615,469,-1395,-2198,-865,1028,324,1727,1304,-603,-163,816,1767,140,4,-2099,-813,299,213,-2191,806,-12,-204,-824,6,-3123,-2899,-585,-3428,323,794,2720,-2974,1225,-1236,-35,-4288,1948,744,85,-249,421,-146,-307,769,-2039,3496,229,-307,-525,1026,172,1089,492,490,1196,-664,-463,1668,-2041,-759,605,325,-599,-481,568,818,-864,168,922,202,1086,246,493,938,-65,0,825,-1774,767,2487,-2313,698,1999,221,454,2375,1086,588,-1160,-201,-2511,161,521,1058,-2495,-2623,5385,-591,1324,888,-448,19,-978,2187,1680,-3280,-261,-1062,972,-2617,-29,-1911,1197,-667,-451,-51,622,-440,69,3321,860,-44,885,1574,1392,-452,73,854,-4033,727,-2631,697,69,-1590,-720,-797,-1640,-73,1080,-204,-326,48,1207,645,-241,-164,758,-41,-567,-676,-1329,-1285,1815,7025,-358,645,1020,-527,-1743,-235,1508,114,636,-1816,-532,1856,1630,461,11,-492,-4134,864,-378,-46,-722,-114,-1336,-466,854,-771,-925,382,22,1110,447,532,314,-780,1155,2939,1152,-1562,-1490,398,-265,-45,-1364,1205,-43,507,-1023,639,-1063,517,1358,1455,-573,621,-1034,-2230,-379,-1224,16,-1964,-390,-746,-910,-503,-364,-395,686,-983,-1035,-932,-885,-507,1349,634,-1160,-942,-1209,-251,1234,-126,406,324,1557,-56,-2271,599,440,-556,793,-1413,637,-1815,-953,1240,-1756,-473,-774,944,110,984,1125,661,933,-288,748,-2328,889,-231,-1561,-353,-1728,-461,420,353,-101,862,676,1829,-566,-630,715,709,1275,-457,-607,-1625,219,782,692,122,-1017,-797,654,167,458,916,1359,736,-361,1208,-1242,1100,-1775,-1264,-125,-2144,-608,882,-595,-588,-482,627,756,-631,712,39,909,-573,638,1169,-1055,1176,109,-357,-1099,-527,-400,-60,159,1620,-1781,596,-1173,-34,2620,-157,7,258,-1254,123,-354,-12,-929,1373,-337,-320,17,-1051,-370,282,1487,-1199,-554,-1706,513,-686,280,-744,-2706,-567,1853,-1465,-224,412,-166,-491,-357,798,-212,-459,-407,1015,2443,-498,536,-671,-2187,-647,572,26,1158,1168,2701,-757,1330,-929,264,1982,1625,-1464,-175,916,-1193,612,-1534,910,180,-534,-2240,-672,231,-120,155,721,-869,3790,-8,421,674,356,511,-28,-197,-2641,-21,286,-671,3316,-679,1667,-193,-129,353,-1312,-1580,711,280,-958,-1145,-453,-2289,897,-1668,433,-679,837,-886,-1563,1274,274,667,1224,1288,1249,978,1259,1937,-693,-1422,-1710,184,-446,157,199,-2037,-625,786,-1796,-1634,1437,-1423,686,-78,484,-1739,265,-405,1116,1050,1141,391,-782,1119,-243,-770,81,-633,-546,-881,923,-865,1391,1239,-1286,-13,-612,5,123,-1334,267,717,-2548,-2549,394,-947,-1300,2068,338,1012,1020,1139,-937,-51,436,1095,959,307,691,794,650,1016,649,-2073,-1591,-64,-637,1621,-1358,600,-1049,-280,-155,-554,-839,6,-1596,-675,-1312,336,-91,-147,930,1050,-359,224,-616,-1427,-42,-702,1881,87,233,-415,-972,-1226,686,-712,221,1518,1150,1372,780,1251,-663,-1643,-297,410,-1328,-479,-1212,1127,670,397,-2437,506,-779,858,356,1022,1074,540,-1565,688,234,-1,-830,793,-115,675,-407,2533,474,240,-1983,-1106,126,1658,1573,911,-2124,-586,-429,-1550,-701,377,1784,-672,1809,970,948,-380,-1394,-795,1031,-352,-311,-910,306,1099,990,1875,17,795,2586,360,-2073,-1156,-943,1665,357,-671,697,-463,1437,-1098,-7035,-351,1024,1443,-885,-2584,1721,-870,536,1104,1338,860,-520,846,533,-1377,-242,646,-66,1261,93,691,817,-967,-1425,-705,-1498,-652,56,180,-261,1527,-534,-1096,-370,-909,1193,-331,-197,169,-2096,114,415,-575,-335,-34,-1185,-949,1182,822,-164,2102,258,-488,-69,441,1480,1787,204,-464,-28,2046,1413,935,370,1252,-1073,-934,-1242,439,612,1586,-376,-970,-241,-1015,-350,-69,-1038,-570,1287,-1314,-695,545,261,275,-112,-1310,-930,-563,-1682,-256,-267,-954,-501,307,111,1098,-291,491,483,-341,-38,1580,3,-1865,-2494,2067,-441,398,562,943,554,-893,1472,1749,-178,682,-1550,-93,-705,752,-715,270,85,-829,10,2108,1372,759,1130,1305,134,249,-661,-774,-165,286,-936,-751,-840,-1181,80,862,187,-56,-7022,-1072,-1045,-1138,1708,-1090,2378,977,-1216,927,622,-835,-858,-1315,-2507,-189,-2571,92,-1348,108,86,-4796,-460,607,984,183,-518,-908,-415,726,215,3122,433,1569,545,-420,-923,-417,-637,-1601,3535,1622,1973,-346,-88,-455,-785,-552,-252,114,-226,1515,200,376,172,-780,3022,-74,436,-1204,-1508,-566,507,125,470,406,1260,-314,624,672,2330,3576,2462,-1207,-1124,-809,-1081,193,72,809,-324,-849,1848,822,124,-250,191,-200,747,-110,570,-366,-141,1068,2372,639,37,-9,1843,99,988,-200,149,1476,1628,-32,360,-95,1194,1606,400,-2138,2,-791,-389,-1613,2155,-7,222,-225,-2216,-1620,-373,-2162,-42,1040,-975,-390,-657,-1574,-656,-1797,616,-801,-743,-31,565,2393,1402,2726,-624,-736,2982,94,2013,3345,268,3485,-1372,244,171,186,-756,-147,1159,274,1031,-334,-1052,-522,551,166,25,1440,856,-171,-1274,2083,-398,-22,831,-25,-1517,598,-1363,-374,-51,-716,1369,-527,1750,-1239,2075,1564,-916,2247,239,-1344,845,497,-5594,-472,1020,1397,-105,-1432,-442,1303,-883,-158,363,416,-544,51,-177,48,-621,-95,695,824,655,1018,592,-83,-528,-185,-799,125,-1029,1591,713,2187,415,-112,-218,-7,1104,55,-335,289,-599,804,-1406,-377,1479,-603,516,1259,-1329,-82,973,-58,-538,-530,-596,-490,748,-689,-704,894,1183,-1241,2283,1610,-210,1488,-173,-328,-1157,-383,-1118,-297,-1821,1012,-332,816,-1399,-2777,1090,964,330,404,1075,-3345,-840,-2346,763,475,380,-788,47,-406,-1632,-1512,978,717,-38,-148,1509,-922,-1020,-49,-1071,3062,-76,253,-411,1719,-602,-1029,726,-2436,-2006,-752,-111,114,-1962,603,-475,656,376,-616,-35,1437,-610,124,-1107,406,-868,-159,-550,-617,2334,1826,-5958,1115,1730,-367,-323,-632,-294,-964,1678,-649,40,335,1684,788,1015,-706,-897,130,3648,894,2266,-965,159,-1926,349,-1582,538,135,1216,582,554,-1223,-733,97,-761,840,748,1298,-1013,-311,-1267,987,-131,549,26,1025,1230,756,561,-506,715,1439,-612,-1509,806,-1854,-909,2489,192,-129,477,125,-940,-650,-495,1391,53,-425,-807,634,438,-1298,18,-189,-699,-2772,-1737,243,1153,171,556,-2379,-2031,612,-196,185,-239,-824,-469,-1076,-784,884,1589,372,-591,-356,446,411,-569,-347,-394,310,1035,2078,425,-1343,1522,-2042,-841,-1123,-2561,358,428,-819,1100,800,543,979,-456,401,618,-153,333,1007,801,1129,1280,-1450,-73,1755,286,-257,190,-801,12,-1151,12,351,1759,307,277,-61,-277,-862,1070,-1148,-1344,2339,735,-1025,1316,-505,499,1487,-352,401]
+};
+/* the fitted models and the two tests, for the pictures */
+const FIT = { b0:20316.5638, b1:-171.07027, df:1417, crit:1.96164,
+              m2a:-259.23086, m2b:1.343777,
+              F:0.382828, fdf2:1408, fcrit:3.002115,
+              M1T:[["Age", -46.7921], ["KM", -12.0675], ["Diesel", 5.1374], ["HP", 10.57], ["MetColor", 0.7046], ["Automatic", 2.3554], ["CC", -7.6884], ["Doors", -0.1371], ["Weight", 16.7046]],
+              MODELS:[{"name": "Model 1", "k": 9, "r2": 87.0347, "adj": 86.9519}, {"name": "Model 2", "k": 10, "r2": 88.7768, "adj": 88.6971}, {"name": "Restricted", "k": 8, "r2": 88.7707, "adj": 88.707}] };
+
+
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   Every number field follows the course margin rule, applied by the
+   engine (marginOf): 'exact:true' integers (counts) must be exact;
+   values with 0.1 <= |value| < 1e6 are accepted within ±0.01; smaller
+   or larger values within ±1% of the target. Fields carry no tolerance
+   of their own. 'alt' lists common wrong values, each with its own
+   feedback, checked with the same rule around the wrong value.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const B0 = 'β<sub>0</sub>', B1 = 'β<sub>1</sub>', B2 = 'β<sub>2</sub>', B3 = 'β<sub>3</sub>',
+      B5 = 'β<sub>5</sub>', B8 = 'β<sub>8</sub>', B10 = 'β<sub>10</sub>',
+      H0 = 'H<sub>0</sub>', H1 = 'H<sub>1</sub>';
+
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE VII',
+  text:`My old Corolla has to go.
+  <span class="fx">The Master jingles a set of car keys.</span>
+  Before I put it on the market, I want to know what it is worth, and I already have a rule of thumb :
+  <strong>a Corolla loses 200 euros of value every month</strong>. Every month, the same 200 euros.
+  The file in front of you holds 1,419 second-hand Toyota Corollas : their price in euros, their age in
+  months, their mileage, their fuel, their horsepower, their colour, their gearbox, their engine volume,
+  their number of doors and their weight.
+  Today you leave the simple regression behind. One explanatory variable first, then nine, then ten. And
+  at the end, a test of two constraints at once.`,
+  widget:'table', banner:'CLAIM: A COROLLA LOSES 200 € A MONTH', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE FILE',
+  text:`Download <span class="kbd">ToyotaCorolla_with_data_Models.xlsx</span> with the DATA (XLSX) button
+  and open it. The first sheet, <strong>ToyotaCorolla</strong>, holds the raw data, with the names in row
+  1. The other sheets hold the same cars, with the columns already arranged for each model :
+  <strong>Model SLR</strong>, <strong>Model 1</strong> and <strong>Model 2</strong>.
+  <strong>How many cars does the file contain, and what is their average price ?</strong>`,
+  q:'Report what your workbook says (sheet ToyotaCorolla).',
+  fields:[
+    {id:'n', label:'Number of cars', value:1419, exact:true,
+     alt:[{value:1420, msg:'Row 1 holds the names, not a car. Count the numbers only, i.e., =COUNT(A2:A1420).'}],
+     msg:'Use =COUNT(A2:A1420) on the Price column.'},
+    {id:'mp', label:'Average price (€)', value:10746.5144,
+     alt:[{value:55.9422, msg:'That is the average age, in months. The price is in column A.'},
+          {value:67942.2452, msg:'That is the average mileage. The price is in column A.'}],
+     msg:'Use =AVERAGE(A2:A1420), and give two decimals.'}],
+  hint:`<b>COUNT</b> counts the cells that contain numbers, and <b>AVERAGE</b> computes the sample
+  average. The cars run from row 2 to row 1420.`,
+  code:`=COUNT(A2:A1420)
+=AVERAGE(???)`,
+  say:'1,419 cars, with an average price of about 10,746.51 €.',
+  right:`<strong>1,419</strong> cars, sold on average for <strong>10,746.51 €</strong>. The cheapest goes
+  for 4,350 €, the most expensive for 32,500 €, and their ages run from 1 to 80 months.
+  <span class="fx">The Master draws the cloud of prices against ages.</span>
+  The older the car, the cheaper, as expected. Let us measure it with the simplest model : the price
+  explained by the age alone.`,
+  widgetAfter:'scatter', note:'1,419 cars; average price 10,746.51 EUR; ages 1 to 80 months' },
+
+{ id:'s1', type:'numeric', bg:'lab', who:'master', qn:'SLR 1-2',
+  title:'TRIAL II · ONE VARIABLE',
+  text:`Estimate the simple linear regression
+  <br><span class="kbd">Price<sub>i</sub> = ${B0} + ${B1} · Age<sub>i</sub> + ε<sub>i</sub></span><br>
+  The price is the dependent variable (Y), the age in months the explanatory variable (X). The sheet
+  <strong>Model SLR</strong> holds exactly these two columns. Use Data → Data Analysis → Regression.
+  <strong>Report the estimates of ${B0} and ${B1}.</strong>`,
+  q:'Read the Coefficients column.',
+  fields:[
+    {id:'b0', label:`Estimate of ${B0} (intercept)`, value:20316.5638,
+     alt:[{value:104.3437, msg:'You swapped Y and X: that regression explains the age with the price. Y is the price, column A.'},
+          {value:146.2637, msg:'That is the standard error of the intercept. Read the Coefficients column.'},
+          {value:138.9036, msg:'That is the t Stat of the intercept. Read the Coefficients column.'},
+          {value:20029.6471, msg:'That is the lower bound of the 95% confidence interval of the intercept (column Lower 95%). Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Intercept row.'},
+    {id:'b1', label:`Estimate of ${B1} (Age)`, value:-171.0703,
+     alt:[{value:-0.0045041, msg:'You swapped Y and X: that regression explains the age with the price. Y is the price, column A.'},
+          {value:2.4803, msg:'That is the standard error of the slope. Read the Coefficients column.'},
+          {value:-68.9707, msg:'That is the t Stat of the slope. Read the Coefficients column.'},
+          {value:-175.9358, msg:'That is the lower bound of the 95% confidence interval of the slope (column Lower 95%). Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Age row.'}],
+  hint:`Data → Data Analysis → Regression, on the sheet Model SLR. Input Y Range : A1:A1420 (Price).
+  Input X Range : B1:B1420 (Age). Tick <b>Labels</b>, since row 1 holds the names.`,
+  code:`Data → Data Analysis → Regression   (sheet Model SLR)
+   Input Y Range:  A1:A1420     ← Price
+   Input X Range:  B1:B1420     ← Age
+   [x] Labels`,
+  say:`${B0} ≈ 20,316.56 and ${B1} ≈ −171.07.`,
+  right:`${B0} ≈ <strong>20,316.56 €</strong> and ${B1} ≈ <strong>−171.07 €</strong> per month. R² ≈ 0.77 :
+  the age alone explains about three quarters of the variation in prices.
+  <span class="fx">The Master frowns. 171 is not 200.</span>
+  Not so fast. First tell me what these two numbers mean.`,
+  widgetAfter:'fit', hud:{b1:'-171.07'}, note:'SLR: Price = 20316.56 - 171.07 x Age (R2 = 0.77)' },
+
+{ id:'s2', type:'choice', bg:'lab', who:'master', qn:'SLR 3',
+  title:'TRIAL II · WHAT THE LINE SAYS',
+  text:`${B0} ≈ 20,317 and ${B1} ≈ −171. <strong>How do you read them ?</strong>`,
+  q:'Choose the correct reading of the two estimates.',
+  options:[
+    {id:'a', label:'β₀ is the average price of the cars in the file, and β₁ says that every Corolla loses exactly 171.07 € each month.'},
+    {id:'b', label:'β₀ cannot be interpreted, because no car of the file is 0 months old. Only β₁ has a meaning.'},
+    {id:'c', label:'β₀ is the predicted price of a Corolla aged 0 months, i.e., about 20,317 € for a new car. β₁: one more month of age goes with a price lower by 171.07 € on average.'},
+    {id:'d', label:'β₁: a car that costs one euro more is 171 months younger.'}
+  ], correct:'c',
+  hint:`${B0} is what the line predicts when Age = 0. ${B1} is the change in the predicted price when the
+  age rises by one month. Check also the age of the youngest car of the file : <b>=MIN(B2:B1420)</b>.`,
+  right:`Exactly. ${B0} is the price the line predicts for a car of age zero : a new Corolla, about
+  20,300 €. The youngest cars of the file are 1 month old, so age zero sits at the very edge of the data,
+  and ${B0} keeps a meaning.
+  ${B1} is an average : across the file, a car one month older sells, on average, 171 € cheaper. It does
+  not say that each car loses the same amount every month.`,
+  wrong:{a:`The average price of the file is 10,747 €, not 20,317 €. And a regression gives an average
+  relationship : no car is forced to lose exactly 171 € a month.`,
+  b:`The youngest cars of the file are 1 month old. Age zero is right at the edge of the data, so ${B0},
+  the price of a new car, is a sensible number here.`,
+  d:`You read the regression backwards. Y is the price and X is the age : ${B1} is in euros per month.`},
+  note:'b0 = predicted price of a new car (~20,317 EUR); b1 = -171 EUR per extra month, on average' },
+
+{ id:'s3', type:'numeric', bg:'court', who:'master', qn:'SLR 4',
+  title:'TRIAL III · THE 200 EUROS',
+  text:`Now my rule of thumb.
+  <br><span class="kbd">${H0} : ${B1} = −200</span> against <span class="kbd">${H1} : ${B1} ≠ −200</span>,
+  at the 5% significance level, i.e., with 95% confidence.<br>
+  <strong>Report the t-statistic, the critical value and your decision.</strong>`,
+  q:'Run the t-test of β₁ = −200.',
+  fields:[
+    {id:'t', label:'t-statistic', value:11.6636,
+     alt:[{value:-11.6636, msg:'You subtracted in the wrong order: t = (estimate − (−200)) / standard error.'},
+          {value:-68.9707, msg:'That is the t Stat of Excel: it tests β₁ = 0. Here the value under H₀ is −200.'},
+          {value:-149.6049, msg:'You tested β₁ = +200. The value under H₀ is −200, so you must add 200 to the estimate.'},
+          {value:0.1978, msg:'You divided by the standard error of the intercept. Use the standard error of the Age row.'}],
+     msg:'t = (estimate − (−200)) / standard error, both from the Age row.'},
+    {id:'crit', label:'Critical value, two-sided, 5% significance level', value:1.96164,
+     alt:[{value:-1.96164, msg:'Report the positive critical value: we reject when the absolute value of t is larger than it.'},
+          {value:1.64593, msg:'That is a one-sided critical value. The test is two-sided: =T.INV.2T(0.05, 1417).'},
+          {value:2.57930, msg:'That is the critical value at the 1% significance level. The significance level here is 5%.'}],
+     msg:'Use =T.INV.2T(0.05, 1417): 1417 = 1,419 cars − 2 estimated coefficients.'},
+    {id:'d', kind:'select', label:'Decision at the 5% significance level', correct:'reject',
+     options:[['reject','Reject H₀: β₁ is not −200'],['fail','Fail to reject H₀: β₁ may be −200'],['accept','Accept H₀: β₁ = −200 is proven']],
+     msg:'Compare the absolute value of t with the critical value.'}],
+  hint:`The t-statistic is <b>(estimate − value under ${H0}) / standard error</b>, with the estimate and the
+  standard error of the Age row. The critical value of a two-sided test at the 5% significance level is
+  <b>T.INV.2T(0.05, df)</b>, with df = N − 2.`,
+  code:`=(??? - (-200)) / ???        ← (estimate − (−200)) / standard error
+=T.INV.2T(0.05, ???)         ← critical value, two-sided, 5% significance`,
+  say:'t ≈ 11.66, far above the critical value 1.96 : we reject H₀.',
+  right:`t ≈ <strong>11.66</strong>, against a critical value of <strong>1.96</strong>. We reject ${H0} at the
+  5% significance level : the data are not compatible with a loss of 200 € a month. The 95% confidence
+  interval of ${B1}, from −175.9 to −166.2, does not come close to −200 : a 95% confidence level and a 5%
+  significance level tell the same story.
+  <span class="fx">The Master pockets his keys, unconvinced.</span>
+  With 1,417 degrees of freedom, the t critical value is 1.9616 : the normal 1.96, for all practical
+  purposes. But one variable is a poor description of a car. A young car has also driven fewer
+  kilometres. Let us give the other characteristics a chance.`,
+  widgetAfter:'ttest', note:'t = (-171.07 + 200) / 2.48 = 11.66 > 1.96: reject b1 = -200' },
+
+{ id:'m1a', type:'numeric', bg:'lab', who:'master', qn:'M1 1',
+  title:'TRIAL IV · A DUMMY FOR DIESEL',
+  text:`Model 1 explains the price with nine characteristics. Eight of them are numbers. One is not : the
+  fuel, written <em>Petrol</em> or <em>Diesel</em>. A regression only eats numbers.
+  So we create a <strong>dummy variable</strong>, called Diesel : 1 for a diesel car, 0 otherwise. Build it
+  in the sheet ToyotaCorolla, next to the FuelType column, or check the column Diesel of the sheet
+  Model 1, where it is ready.
+  <strong>How many diesel cars does the file contain ?</strong>`,
+  q:'Count the diesel cars.',
+  fields:[
+    {id:'nd', label:'Number of diesel cars', value:155, exact:true,
+     alt:[{value:1264, msg:'That is the number of petrol cars. The dummy is 1 for the diesel cars.'},
+          {value:1419, msg:'That is the number of cars. Sum the dummy, or use COUNTIF: COUNT counts the zeros too.'}],
+     msg:'Sum the Diesel dummy, or use =COUNTIF(D2:D1420, "Diesel") on the sheet ToyotaCorolla.'}],
+  hint:`In an empty column of the sheet ToyotaCorolla, <b>IF</b> turns the text into 0 or 1, and the
+  <b>SUM</b> of the dummy counts the diesel cars. <b>COUNTIF</b> counts them directly.`,
+  code:`K2:  =IF(D2="Diesel", 1, 0)        ← copy down to row 1420
+=SUM(K2:K1420)
+=COUNTIF(D2:D1420, "???")`,
+  say:'155 diesel cars, and 1,264 petrol cars.',
+  right:`<strong>155</strong> diesel cars out of 1,419, about 11%. The other 1,264 run on petrol : petrol is
+  the <strong>reference category</strong>, the one with Diesel = 0.
+  One dummy is enough for two categories. With d categories, you would need d − 1 dummies.`,
+  note:'Diesel dummy: 155 diesel cars, 1,264 petrol (reference category)' },
+
+{ id:'m1b', type:'numeric', bg:'lab', who:'master', qn:'M1 2',
+  title:'TRIAL V · NINE VARIABLES',
+  text:`Estimate Model 1 :
+  <br><span class="kbd">Price = ${B0} + ${B1} Age + ${B2} KM + ${B3} Diesel + β<sub>4</sub> HP +
+  ${B5} MetColor + β<sub>6</sub> Automatic + β<sub>7</sub> CC + ${B8} Doors + β<sub>9</sub> Weight + ε</span><br>
+  Use the sheet <strong>Model 1</strong> : the regression tool needs all the explanatory variables in
+  adjacent columns, and there they are, from B to J. Tick <strong>Residuals</strong> : you will need them.
+  <strong>Report the estimates of ${B1} (Age) and ${B3} (Diesel), and the adjusted R², in percent.</strong>`,
+  q:'Read the Coefficients column and the Regression Statistics.',
+  fields:[
+    {id:'ba', label:`Estimate of ${B1} (Age)`, value:-122.1782,
+     alt:[{value:-171.0703, msg:'That is the slope of the simple regression. Estimate Model 1, with the nine variables of the sheet Model 1.'},
+          {value:2.6111, msg:'That is the standard error. Read the Coefficients column.'},
+          {value:-46.7921, msg:'That is the t Stat. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Age row, of the regression with the nine variables.'},
+    {id:'bd', label:`Estimate of ${B3} (Diesel)`, value:2255.2627,
+     alt:[{value:438.9865, msg:'That is the standard error. Read the Coefficients column.'},
+          {value:5.1374, msg:'That is the t Stat. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Diesel row.'},
+    {id:'a1', label:'Adjusted R², in percent', value:86.9519,
+     alt:[{value:0.869519, msg:'Report it in percent: multiply the Adjusted R Square by 100.'},
+          {value:87.0347, msg:'That is the R Square. The adjusted R² is the line below it.'},
+          {value:93.2924, msg:'That is the Multiple R. The adjusted R² is the third line of Regression Statistics.'},
+          {value:77.0325, msg:'That is the adjusted R² of the simple regression. Estimate Model 1.'}],
+     msg:'Read Adjusted R Square in Regression Statistics, and multiply it by 100.'}],
+  hint:`Input Y Range : A1:A1420. Input X Range : B1:J1420, the nine columns at once. Tick <b>Labels</b>
+  and <b>Residuals</b>. The adjusted R² is the third line of Regression Statistics; multiply it by 100.`,
+  code:`Data → Data Analysis → Regression   (sheet Model 1)
+   Input Y Range:  A1:A1420      ← Price
+   Input X Range:  B1:J1420      ← Age ... Weight, 9 columns
+   [x] Labels    [x] Residuals
+=100 * ???                       ← adjusted R², in percent`,
+  say:`${B1} ≈ −122.18, ${B3} ≈ 2,255.26, and an adjusted R² of 86.95%.`,
+  right:`${B1} ≈ <strong>−122.18</strong>, ${B3} ≈ <strong>2,255.26</strong>, and an adjusted R² of
+  <strong>86.95%</strong>, up from 77.03% with the age alone.
+  <span class="fx">The Master taps the age coefficient.</span>
+  In the simple regression, one more month cost 171 €. Here it costs 122 €. Same data, same cars. Which
+  one is right ?`,
+  hud:{a1:'86.95%'}, note:'M1: b1(Age) = -122.18, b3(Diesel) = 2255.26, adj R2 = 86.95%' },
+
+{ id:'m1c', type:'choice', bg:'lab', who:'master', mood:'raised', qn:'M1 2',
+  title:'TRIAL V · OTHER THINGS EQUAL',
+  text:`Two questions in one. <strong>What does ${B3} ≈ 2,255 mean, and why did the age coefficient move
+  from −171 to −122 ?</strong>`,
+  q:'Choose the correct explanation.',
+  options:[
+    {id:'a', label:'A diesel car sells on average 2,255 € more than a petrol car with the same age, mileage, horsepower, colour, gearbox, engine volume, doors and weight. In Model 1, −122 € is the effect of one more month with the mileage and the rest held fixed; in the simple regression, the age also carried the effect of the kilometres that older cars have driven.'},
+    {id:'b', label:'The diesel cars of the file are, on average, 2,255 € more expensive than the petrol cars. The age coefficient moved because the simple regression was badly estimated.'},
+    {id:'c', label:'2,255 € is the average price of a diesel Corolla. The age coefficient moved by chance, because the sample changed.'},
+    {id:'d', label:'A diesel car loses 2,255 € more per month than a petrol car. The two age coefficients measure the same thing, so their difference is a sign of an error.'}
+  ], correct:'a',
+  hint:`A coefficient of a multiple regression measures the change in the predicted price when its
+  variable moves by one unit <b>and all the other variables stay fixed</b>. For a dummy, one unit is the
+  jump from petrol to diesel. Compare with the raw gap between the two groups, and look at how the age
+  and the mileage move together.`,
+  code:`=AVERAGEIF(D2:D1420, "Diesel", A2:A1420) - AVERAGEIF(D2:D1420, "Petrol", A2:A1420)
+=CORREL(B2:B1420, C2:C1420)          ← Age and KM   (sheet ToyotaCorolla)`,
+  right:`Exactly. <strong>Ceteris paribus</strong> : other things equal. A diesel Corolla is worth about
+  2,255 € more than a petrol one <em>with the same characteristics</em>. The raw gap between the two
+  groups is only 615 € : the diesel cars of the file differ from the petrol ones in many other ways.
+  And the age : old cars have driven more, the correlation between Age and KM is 0.51. Alone, the age
+  carried both effects. With KM in the model, each one gets its own coefficient. Both regressions are
+  right; they answer different questions.`,
+  wrong:{b:`Compute the raw gap with AVERAGEIF : it is only 615 €. 2,255 € is the gap between a diesel and
+  a petrol car that are identical in everything else. And neither regression is badly estimated : they
+  answer different questions.`,
+  c:`A dummy coefficient is a difference between two groups, not a price. And the sample did not change :
+  same 1,419 cars. What changed is what the age is compared with.`,
+  d:`The dummy does not multiply the age : it enters alone, as a jump in the price level. And the two age
+  coefficients do not measure the same thing : one holds the mileage fixed, the other does not.`},
+  note:'b3: diesel +2,255 EUR vs petrol, ceteris paribus (raw gap 615); Age effect -122 with KM fixed' },
+
+{ id:'m1d', type:'choice', bg:'lab', who:'master', qn:'M1 3',
+  title:'TRIAL VI · IS THE VARIANCE CONSTANT ?',
+  text:`Now the assumptions. The third one says that the variance of the error term is the same for every
+  car : homoskedasticity. <strong>Draw the diagnostic plot : the residuals of Model 1 on the vertical
+  axis, the fitted values (Predicted Price) on the horizontal axis.</strong>
+  Remember the Kuznets case : a crowded zone of a plot always looks more spread than an empty one. So
+  compare zones that hold the same number of cars.
+  <strong>What do you conclude ?</strong>`,
+  q:'Read your diagnostic plot.',
+  options:[
+    {id:'a', label:'The funnel is a density illusion, as in the Kuznets case: compared group by group, the spread of the residuals is the same everywhere.'},
+    {id:'b', label:'The spread grows with the fitted values, even when groups of the same size are compared: about 1,000 € for the cheapest tenth of the cars, about 2,000 € for the most expensive tenth. The errors are heteroskedastic. The residuals also bend: positive at both ends, negative in the middle.'},
+    {id:'c', label:'The residuals average zero, which shows that their variance is constant.'},
+    {id:'d', label:'With an adjusted R² of 87%, the assumptions of the model necessarily hold.'}
+  ], correct:'b',
+  hint:`Plot Residuals (Y) against Predicted Price (X), both from the RESIDUAL OUTPUT of Model 1. Then sort
+  the residual output by Predicted Price, cut it into ten groups of about 142 cars, and compare the
+  standard deviation of the residuals of the first and of the last group. Look also at whether the cloud
+  is centred on zero everywhere.`,
+  code:`Scatter: X = Predicted Price, Y = Residuals   (RESIDUAL OUTPUT of Model 1)
+
+Sort the residual output by Predicted Price (Data → Sort), then:
+=STDEV.S(???)       ← residuals of the 142 cheapest cars
+=STDEV.S(???)       ← residuals of the 142 most expensive cars`,
+  right:`Exactly. This time the funnel is real. Cut the cars into ten groups of the same size : the standard
+  deviation of the residuals goes from about 1,000 € for the cheapest tenth to about 2,000 € for the most
+  expensive tenth. Expensive cars are harder to price : the error variance grows with the price. That is
+  <strong>heteroskedasticity</strong>.
+  And look at the centre of the cloud : the residuals are mostly positive for the cheapest and for the
+  most expensive cars, negative in between. A curve the model has missed. Keep it in mind; it comes back
+  in Model 2.`,
+  wrong:{a:`The Kuznets lesson cuts both ways : compare groups with the same number of cars. Here the tenth
+  of the most expensive cars has residuals about twice as spread as the cheapest tenth. The funnel
+  survives the fair comparison.`,
+  c:`Residuals always average zero in a regression with an intercept. Homoskedasticity is about their
+  spread, not their average.`,
+  d:`The R² says how much of the price the model explains, not whether the errors have a constant
+  variance. A model can fit well and still violate its assumptions.`},
+  widgetAfter:'resid1', note:'M1 residuals: spread doubles from cheap to expensive cars (heteroskedasticity); U-shaped pattern' },
+
+{ id:'m1e', type:'choice', bg:'lab', who:'master', qn:'M1 4',
+  title:'TRIAL VII · ARE THE ERRORS NORMAL ?',
+  text:`The fourth assumption : the errors are normally distributed. <strong>Draw the normal QQ plot of the
+  standardized residuals of Model 1</strong>, as in the lecture : standardize the residuals, sort them,
+  compute the matching quantiles of N(0, 1), and plot the sorted residuals against those quantiles.
+  <strong>What does your QQ plot show ?</strong>`,
+  q:'Read your QQ plot.',
+  options:[
+    {id:'a', label:'The points lie on the 45° line from one end to the other: the errors are normal.'},
+    {id:'b', label:'A QQ plot cannot be drawn for a multiple regression, only for a simple one.'},
+    {id:'c', label:'The points leave the line, so every test of Model 1 is worthless and must be thrown away.'},
+    {id:'d', label:'The middle follows the line, but both tails leave it: the lowest residuals fall far below it, down to about −8 standard deviations, and the highest rise above it. The tails are much heavier than normal: the normality assumption does not hold.'}
+  ], correct:'d',
+  hint:`Standardize each residual : (residual − average) / STDEV.S. Sort them in ascending order. Next to
+  the i-th one, compute the quantile NORM.S.INV((i − 0.5)/1419), with i = 1, …, 1419. Plot the sorted
+  residuals (Y) against the quantiles (X), and add the line y = x.`,
+  code:`=(??? - AVERAGE(???)) / STDEV.S(???)    ← standardized residual, copy down
+   copy the column as values, then sort it (Data → Sort)
+i in a new column: 1, 2, ..., 1419
+=NORM.S.INV((??? - 0.5) / 1419)           ← quantile of the i-th residual
+Chart: Scatter with X = quantiles, Y = sorted standardized residuals`,
+  right:`Exactly. The middle of the cloud follows the line; the tails do not. 14 cars sit more than 3
+  standard deviations away from their prediction, where a normal distribution would put about 4. The worst
+  one, row 941 of the file, weighs 1,615 kg, against about 1,065 kg for a typical Corolla. The model prices
+  it at 23,150 €; it sold for 12,450 €. Perhaps a typo in its weight.
+  <span class="fx">The Master shrugs.</span>
+  Still : with 1,419 cars, the central limit theorem makes the OLS estimator approximately normal even when
+  the errors are not. Non-normal errors are not what threatens these tests. The heteroskedasticity worries
+  me more : it makes the standard errors of Excel less reliable. Treat borderline p-values with care.`,
+  wrong:{a:`Look at the two ends of your plot : the lowest points fall far below the line, several standard
+  deviations away.`,
+  b:`The QQ plot compares any set of numbers with a distribution. Here, the standardized residuals of
+  Model 1 with N(0, 1) : the number of explanatory variables does not matter.`,
+  c:`With 1,419 cars, the central limit theorem makes the estimator approximately normal even if the errors
+  are not. Non-normal errors do not destroy the tests in a large sample.`},
+  widgetAfter:'qq1', note:'QQ plot M1: heavy tails (14 cars beyond 3 sd); worst: row 941, weight 1,615 kg' },
+
+{ id:'m1f', type:'multi', bg:'court', who:'master', qn:'M1 5',
+  title:'TRIAL VIII · WHO MATTERS ?',
+  text:`Back to the coefficients of Model 1. <strong>Which parameters are significant at the 5%
+  significance level ?</strong> For each one, <span class="kbd">${H0} : β<sub>j</sub> = 0</span> against
+  <span class="kbd">${H1} : β<sub>j</sub> ≠ 0</span>. The regression has N − K − 1 = 1419 − 9 − 1 = 1,409
+  degrees of freedom.`,
+  q:'Tick every variable whose coefficient is significantly different from zero at the 5% significance level.',
+  options:[
+    {id:'age', label:'Age (β₁)'}, {id:'km', label:'KM (β₂)'}, {id:'diesel', label:'Diesel (β₃)'},
+    {id:'hp', label:'HP (β₄)'}, {id:'met', label:'MetColor (β₅)'}, {id:'auto', label:'Automatic (β₆)'},
+    {id:'cc', label:'CC (β₇)'}, {id:'doors', label:'Doors (β₈)'}, {id:'weight', label:'Weight (β₉)'}
+  ], correct:['age','km','diesel','hp','auto','cc','weight'],
+  wrongHint:`Here the t Stat column is the right one : it tests β<sub>j</sub> = 0. Compare its absolute
+  value with T.INV.2T(0.05, 1409), or the P-value column with the 0.05 significance level. Look closely at the rows with small
+  t Stats, and remember that a P-value such as 3.6E-289 is a tiny number.`,
+  hint:`Excel's <b>t Stat</b> tests β<sub>j</sub> = 0 directly. Reject when |t Stat| is larger than
+  T.INV.2T(0.05, 1409), or, equivalently, when the P-value is below the 0.05 significance level. A P-value such as 3.6E-289 means
+  0.000…036, not 3.6.`,
+  code:`=T.INV.2T(0.05, 1409)       ← critical value, 5% significance
+=ABS(???) > ???             ← TRUE if significant
+=??? < 0.05                 ← same verdict with the P-value`,
+  right:`Exactly. Seven of the nine are significant : Age, KM, Diesel, HP, Automatic, CC and Weight.
+  <strong>MetColor</strong> (t ≈ 0.70) and <strong>Doors</strong> (t ≈ −0.14) are not : once the other
+  characteristics are known, the colour and the number of doors add nothing measurable. The intercept is
+  significant too (p ≈ 0.023).
+  <span class="fx">The Master points at CC.</span>
+  A bigger engine, a lower price, other things equal ? Diesel cars have big engines, the correlation between
+  CC and Diesel is 0.76, and HP and Weight are in the model too. Ceteris paribus can produce surprising
+  signs. And Automatic, with p ≈ 0.019, is the kind of borderline verdict that heteroskedasticity makes
+  fragile.`,
+  widgetAfter:'sig', note:'M1 significant at the 5% significance level: Age, KM, Diesel, HP, Automatic, CC, Weight; not MetColor, Doors' },
+
+{ id:'m2beat', type:'info', bg:'lab', who:'master', qn:'—',
+  title:'MODEL 2 · THE CURVE',
+  text:`The residuals of Model 1 bent : the predictions were too low for the cheapest and the most
+  expensive cars, that is, roughly, for the oldest and the youngest ones. A straight line in the age says
+  that a car loses the same amount in its first month as in its sixth year. Does that sound like a car to
+  you ?
+  <span class="fx">The Master sketches a price that falls fast, then slower and slower.</span>
+  Model 2 adds the square of the age, <span class="kbd">${B10} · Age²</span>. A model can be linear in its
+  parameters and still draw a curve in a variable. The sheet <strong>Model 2</strong> has the extra
+  column, Age_sq, in column K.`,
+  banner:'MODEL 2: + AGE²', cont:'Estimate Model 2' },
+
+{ id:'m2a', type:'numeric', bg:'lab', who:'master', qn:'M2 1',
+  title:'TRIAL IX · TEN VARIABLES',
+  text:`Estimate Model 2 : Model 1 plus <span class="kbd">${B10} Age²</span>, with the sheet Model 2. Tick
+  Residuals again.
+  <strong>Report the estimates of ${B1} (Age) and ${B10} (Age²).</strong>`,
+  q:'Read the Coefficients column.',
+  fields:[
+    {id:'ba2', label:`Estimate of ${B1} (Age)`, value:-259.2309,
+     alt:[{value:-122.1782, msg:'That is the age coefficient of Model 1. Estimate Model 2, with Age_sq among the explanatory variables (X range B1:K1420).'},
+          {value:9.5840, msg:'That is the standard error. Read the Coefficients column.'},
+          {value:-27.0482, msg:'That is the t Stat. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Age row, of the regression with the ten variables.'},
+    {id:'bsq', label:`Estimate of ${B10} (Age²)`, value:1.343777,
+     alt:[{value:0.0908985, msg:'That is the standard error. Read the Coefficients column.'},
+          {value:14.7833, msg:'That is the t Stat. Read the Coefficients column.'}],
+     msg:'Read the Coefficients column, Age_sq row (the last one).'}],
+  hint:`Same as Model 1, with one more column : Input X Range B1:K1420. The coefficient of Age_sq is the
+  last row of the coefficients table.`,
+  code:`Data → Data Analysis → Regression   (sheet Model 2)
+   Input Y Range:  A1:A1420
+   Input X Range:  B1:K1420      ← Age ... Weight, Age_sq: 10 columns
+   [x] Labels    [x] Residuals`,
+  say:`${B1} ≈ −259.23 and ${B10} ≈ 1.34.`,
+  right:`${B1} ≈ <strong>−259.23</strong> and ${B10} ≈ <strong>1.34</strong>, with a t Stat of 14.8 : the
+  square of the age is strongly significant.
+  <span class="fx">The Master draws the residual plot of Model 2.</span>
+  The bend is much flatter. The funnel is still there : the curve fixed the shape, not the variance.`,
+  widgetAfter:'resid2', note:'M2: b1(Age) = -259.23, b10(Age2) = 1.344 (t = 14.8)' },
+
+{ id:'m2b', type:'choice', bg:'lab', who:'master', mood:'raised', qn:'M2 1',
+  title:'TRIAL IX · A PRICE THAT FALLS SLOWER',
+  text:`${B1} ≈ −259 and ${B10} ≈ +1.34. The age now appears twice. <strong>How much does one more month
+  cost, according to Model 2 ?</strong>`,
+  q:'Choose the correct reading.',
+  options:[
+    {id:'a', label:'Always 259.23 €, the coefficient of Age. The Age² term only shifts the level of the price.'},
+    {id:'b', label:'Since β₁₀ is positive, old cars gain value: after some age, the price goes up again.'},
+    {id:'c', label:'About 259 − 2 × 1.34 × Age euros: around 257 € in the first month, about 98 € at 60 months. The older the car, the slower it loses value.'},
+    {id:'d', label:'β₁₀ ≈ 1.34 is so small next to 259 that the Age² term can be ignored.'}
+  ], correct:'c',
+  hint:`The predicted price contains ${B1}·Age + ${B10}·Age². When the age rises by one month, both terms
+  change. The slope of the curve at a given age is ${B1} + 2·${B10}·Age. Try it at Age = 1 and at
+  Age = 60.`,
+  code:`=??? + 2 * ??? * 1        ← change in the price per month, at 1 month
+=??? + 2 * ??? * 60       ← at 60 months`,
+  right:`Exactly. Per month, the car loses about 257 € at the start, 162 € at three years, 98 € at five
+  years. Depreciation slows down as the car ages : that is what the positive ${B10} says.
+  <span class="fx">The Master does the arithmetic twice.</span>
+  And my 200 € a month ? Model 2 says it holds for a car of about 22 months. For younger cars, it is too
+  little; for older ones, far too much. My rule of thumb was a single number for a curve.`,
+  wrong:{a:`The Age² term also grows with the age : 1.34 × Age² changes by about 2 × 1.34 × Age per month.
+  The slope depends on the age.`,
+  b:`The slope −259 + 2.69 × Age stays negative up to about 96 months, and the oldest car of the file is
+  80 months old. Within the data, prices keep falling, only more slowly.`,
+  d:`${B10} multiplies Age², which reaches 6,400 for an 80-month-old car : 1.34 × 6,400 ≈ 8,600 €. A small
+  coefficient on a big number is a big effect.`},
+  widgetAfter:'depr', note:'M2: monthly loss = 259 - 2.69 x Age: ~257 EUR at 1 month, ~98 at 60; 200 only at ~22 months' },
+
+{ id:'m2c', type:'numeric', bg:'lab', who:'master', qn:'M2 2',
+  title:'TRIAL X · WHICH MODEL FITS BEST ?',
+  text:`Model 1 or Model 2 ? In the mathematical framework of the regression, without any test, you have a
+  criterion for that.
+  <strong>Report the adjusted R² of Model 2, in percent, and choose the model that fits best.</strong> The
+  value of Model 1 is in your case file.`,
+  q:'Compare the two models.',
+  fields:[
+    {id:'a2', label:'Adjusted R² of Model 2, in percent', value:88.6971,
+     alt:[{value:0.886971, msg:'Report it in percent: multiply the Adjusted R Square by 100.'},
+          {value:88.7768, msg:'That is the R Square. The adjusted R² is the line below it.'},
+          {value:94.2214, msg:'That is the Multiple R. The adjusted R² is the third line of Regression Statistics.'},
+          {value:86.9519, msg:'That is the adjusted R² of Model 1. Read the output of Model 2.'}],
+     msg:'Read Adjusted R Square in the Regression Statistics of Model 2, and multiply it by 100.'},
+    {id:'best', kind:'select', label:'The model that fits best', correct:'m2',
+     options:[['m2','Model 2: its adjusted R² is higher'],['r2','Model 2: its R² is higher'],
+              ['m1','Model 1: it has fewer parameters, so it is always better'],['same','Neither: they fit equally well']],
+     msg:'Compare the adjusted R². The R² can never fall when a variable is added, so it always prefers the bigger model; the adjusted R² penalizes each extra parameter.'}],
+  hint:`The R² cannot go down when you add a variable, so it cannot compare models with different numbers of
+  parameters. The <b>adjusted R²</b> penalizes each extra parameter : the best model is the one with the
+  highest adjusted R².`,
+  code:`=100 * ???      ← Adjusted R Square of Model 2, in percent`,
+  say:'The adjusted R² of Model 2 is 88.70%, above the 86.95% of Model 1 : Model 2 fits best.',
+  right:`<strong>88.70%</strong> against 86.95%. The penalty for one extra parameter is tiny next to the
+  gain : Model 2 fits best. The R² rose too, from 87.03% to 88.78%, but the R² would have risen with any
+  variable, even a useless one.`,
+  widgetAfter:'cards2', hud:{a2:'88.70%'}, note:'adj R2: M1 86.95% < M2 88.70%: Model 2 fits best' },
+
+{ id:'fbeat', type:'info', bg:'court', who:'master', qn:'—',
+  title:'THE TRIAL OF COLOUR AND DOORS',
+  text:`One last question. In Model 2, do the metallic colour and the number of doors matter,
+  <em>together</em> ?
+  <br><span class="kbd">${H0} : ${B5} = ${B8} = 0</span> against <span class="kbd">${H1} : ${B5} ≠ 0 and/or
+  ${B8} ≠ 0</span><br>
+  Two constraints at once : a job for the <strong>F-test</strong>. It needs two models. The
+  <strong>unrestricted</strong> one is Model 2 itself. The <strong>restricted</strong> one imposes ${H0} :
+  it is Model 2 without MetColor and Doors. The test compares their sums of squared residuals :
+  <br><span class="kbd">F = [(SSR<sub>R</sub> − SSR<sub>U</sub>) / K*] / [SSR<sub>U</sub> / (N − K − 1)]</span><br>
+  with K* = 2 constraints and K = 10 explanatory variables in the unrestricted model. Under ${H0}, F
+  follows a Fisher distribution with K* and N − K − 1 degrees of freedom.`,
+  widget:'fdist', banner:'H0: β5 = β8 = 0', cont:'Open the trial' },
+
+{ id:'f1', type:'numeric', bg:'court', who:'master', qn:'M2 3',
+  title:'TRIAL XI · THE F-TEST',
+  text:`Estimate the restricted model : copy the sheet Model 2, delete the columns MetColor and Doors, and
+  run the regression on the eight remaining columns.
+  <strong>Report the two sums of squared residuals, the F-statistic, the critical value at the 5%
+  significance level and your decision.</strong>`,
+  q:'Run the F-test. Large numbers can be typed as Excel shows them, e.g., 2.1E+09.',
+  fields:[
+    {id:'ssru', label:'SSR<sub>U</sub>, unrestricted model (Model 2)', value:2104171812.28,
+     alt:[{value:16644191328.18, msg:'That is the Regression SS. The SSR is in the row Residual of the ANOVA table.'},
+          {value:18748363140.45, msg:'That is the Total SS. The SSR is in the row Residual of the ANOVA table.'},
+          {value:2430773957.34, msg:'That is the SSR of Model 1. The unrestricted model is Model 2, with Age².'},
+          {value:1494440.21, msg:'That is the Residual MS, i.e., SSR divided by its degrees of freedom. Use the SS column.'}],
+     msg:'Read the ANOVA table of Model 2: row Residual, column SS.'},
+    {id:'ssrr', label:'SSR<sub>R</sub>, restricted model', value:2105316038.35,
+     alt:[{value:2431646678.14, msg:'That SSR comes from Model 1. The restricted model is Model 2 (with Age²) without MetColor and Doors.'},
+          {value:16643047102.10, msg:'That is the Regression SS. The SSR is in the row Residual of the ANOVA table.'},
+          {value:18748363140.45, msg:'That is the Total SS. The SSR is in the row Residual of the ANOVA table.'},
+          {value:1493131.94, msg:'That is the Residual MS, i.e., SSR divided by its degrees of freedom. Use the SS column.'}],
+     msg:'Copy the sheet Model 2, delete MetColor and Doors, run the regression (X range B1:I1420), and read row Residual, column SS.'},
+    {id:'F', label:'F-statistic', value:0.382828,
+     alt:[{value:-0.382828, msg:'You subtracted in the wrong order: the numerator is SSR_R − SSR_U, always positive.'},
+          {value:0.765655, msg:'You forgot to divide the numerator by K* = 2, the number of constraints.'},
+          {value:0.000271897, msg:'You forgot to divide SSR_U by its degrees of freedom, N − K − 1 = 1408.'},
+          {value:1113.7409, msg:'That is the F of the ANOVA table of Model 2: it tests that all ten slopes are zero. Compute the F of β₅ = β₈ = 0 yourself.'},
+          {value:1393.3001, msg:'That is the F of the ANOVA table of the restricted model. Compute the F of β₅ = β₈ = 0 yourself.'},
+          {value:0.252937, msg:'That F compares Model 1 with Model 1 minus two variables. The test is on Model 2.'}],
+     msg:'F = [(SSR_R − SSR_U) / 2] / [SSR_U / (1419 − 10 − 1)].'},
+    {id:'fc', label:'Critical value at the 5% significance level', value:3.002115,
+     alt:[{value:3.698561, msg:'The F-test is one-sided: at the 5% significance level, use the 95% quantile, =F.INV.RT(0.05, 2, 1408), not the 97.5% one.'},
+          {value:0.0512952, msg:'That is the 5% quantile. At the 5% significance level, the critical value is the 95% quantile: =F.INV.RT(0.05, 2, 1408).'},
+          {value:4.620265, msg:'That is the critical value at the 1% significance level. The significance level here is 5%.'},
+          {value:19.495016, msg:'You swapped the degrees of freedom: first K* = 2, then N − K − 1 = 1408.'},
+          {value:3.848072, msg:'There are two constraints, so the first degree of freedom is K* = 2, not 1.'},
+          {value:1.9616, msg:'That is a critical value of the t distribution. The F-test needs the Fisher distribution: =F.INV.RT(0.05, 2, 1408).'}],
+     msg:'Use =F.INV.RT(0.05, K*, N − K − 1).'},
+    {id:'d', kind:'select', label:'Decision at the 5% significance level', correct:'fail',
+     options:[['fail','Do not reject H₀: MetColor and Doors can be dropped together'],
+              ['reject','Reject H₀: at least one of the two matters'],
+              ['accept','Accept H₀: it is proven that β₅ = β₈ = 0']],
+     msg:'Reject H₀ only when F is larger than the critical value. And a test never proves H₀.'}],
+  hint:`The SSR of each model is in its ANOVA table : row <b>Residual</b>, column <b>SS</b>. You can also
+  compute it with SUMSQ on the column of residuals. Then apply the formula with K* = 2 and N − K − 1. The
+  F-test is one-sided : at the 5% significance level, the critical value is the 95% quantile of the
+  Fisher distribution, <b>F.INV.RT(0.05, K*, N − K − 1)</b>.`,
+  code:`Restricted model: right-click the tab Model 2 → Move or Copy → [x] Create a copy
+   delete columns F (MetColor) and I (Doors), then Regression with X = B1:I1420
+=SUMSQ(???)                                       ← SSR from a column of residuals
+=((??? - ???) / ???) / (??? / (1419 - 10 - 1))    ← F-statistic
+=F.INV.RT(0.05, ???, ???)                         ← critical value, 5% significance`,
+  say:'SSR_U ≈ 2.1042E+09 and SSR_R ≈ 2.1053E+09, so F ≈ 0.38, below the critical value 3.00 : we do not reject H₀.',
+  right:`F ≈ <strong>0.38</strong>, far below the critical value <strong>3.00</strong>. We do not reject ${H0} :
+  dropping the colour and the doors raises the sum of squared residuals by 0.05% only. The p-value,
+  =F.DIST.RT(F, 2, 1408), is about 0.68.
+  <span class="fx">The Master nods slowly.</span>
+  Not rejecting is not proving. It says that the data give no reason to keep these two variables.`,
+  widgetAfter:'ftest', note:'F = 0.38 < F(0.95; 2, 1408) = 3.00: do not reject b5 = b8 = 0' },
+
+{ id:'f2', type:'choice', bg:'court', who:'master', mood:'raised', qn:'M2 3',
+  title:'TRIAL XI · ONE TEST FOR TWO',
+  text:`In Model 2, the t-tests of MetColor (t ≈ 0.20) and Doors (t ≈ 0.84) were not significant either.
+  <strong>So what did the F-test add ?</strong>`,
+  q:'Choose the correct answer.',
+  options:[
+    {id:'a', label:'Nothing: two insignificant t-tests always give an insignificant F-test, so the F-test was a waste of time.'},
+    {id:'b', label:'It tested the two constraints jointly. Each t-test judges one variable while the other stays in the model; neither can say whether both can be dropped at once. Here they can: the restricted model even has a slightly higher adjusted R² (88.71% against 88.70%).'},
+    {id:'c', label:'It proved that the colour and the doors have no effect at all on the price of a Corolla.'},
+    {id:'d', label:'It showed that Model 2 is wrong, and that Model 1 must be used instead.'}
+  ], correct:'b',
+  hint:`Each t-test tests one coefficient while the other variable stays in the model. Ask : what happens
+  when both leave at the same time ? Then compare the adjusted R² of your restricted model with the one of
+  Model 2.`,
+  right:`Exactly. A t-test judges one variable, the others staying in. When two variables are correlated,
+  each can look useless while the other is present, and still matter together : only a joint test can
+  tell. Here the verdict is simple : both go. The restricted model keeps Age, Age², KM, Diesel, HP,
+  Automatic, CC and Weight, with an adjusted R² of 88.71%, the best of the three.
+  <span class="fx">Drop insignificant variables one at a time, or test them together with an F-test. Never
+  drop several at once on the strength of separate t-tests.</span>`,
+  wrong:{a:`Not always. When two variables are correlated, each t-test can look insignificant while the joint
+  F-test rejects. Only the F-test answers the joint question.`,
+  c:`Not rejecting is not proving. The data simply give no reason to keep them, once the other
+  characteristics are known.`,
+  d:`The F-test compares Model 2 with Model 2 minus two variables. It says nothing in favour of Model 1,
+  which lacks the Age² term.`},
+  widgetAfter:'cards3', note:'joint test: drop MetColor and Doors together; restricted model adj R2 = 88.71%' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`A Corolla does not lose 200 euros a month. Other things equal, it loses about 257 € in its first
+  month, and less than 100 € a month after five years.
+  <span class="fx">The Master crosses out his rule of thumb.</span>
+  Four rules leave with you.
+  <strong>One.</strong> In a multiple regression, a coefficient is <em>ceteris paribus</em> : other things
+  equal. Add a variable, and the others change meaning, as the age went from −171 to −122.
+  <strong>Two.</strong> A category enters as a dummy. Its coefficient is a gap with the reference category,
+  other things equal, not a raw difference of averages.
+  <strong>Three.</strong> Read the residuals : a funnel is heteroskedasticity, a bend is a missing term,
+  like Age². In a large sample, fat tails worry less than a funnel.
+  <strong>Four.</strong> Compare models with the adjusted R², never the R². Test several constraints at
+  once with the F-test : restricted against unrestricted.`,
+  banner:'CETERIS PARIBUS', cont:'Finish', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {b1:'—', a1:'—', a2:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the first rows of the file, the price against the
+   age with the fitted line, the t and Fisher distributions of the two
+   tests, the residuals of Model 1 and Model 2 against their fitted
+   values (with the spread of each tenth of the cars), the QQ plot of
+   Model 1, the t Stats of Model 1, the monthly loss of value implied
+   by Model 2, and the R² of the models. Points are never connected;
+   hovering a point shows its car.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const eur = v => Math.round(v).toLocaleString('en-US') + ' €';
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series, straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="${l.dash===true?'7 6':l.dash}"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||4}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.8}" stroke="${s.stroke||PLOT.paper}" stroke-width="${s.sw===undefined?1:s.sw}">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{ labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:p.sz||16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* a short legend line, drawn inside a panel (pixel coordinates) */
+function legendRow(x, y, color, dash, text){
+  return `<line x1="${x}" y1="${y-5}" x2="${x+28}" y2="${y-5}" stroke="${color}" stroke-width="2.5" ${dash?`stroke-dasharray="${dash}"`:''}/>`
+    + TXT(x+36, y, text, {sz:16, col:color, anchor:'start'});
+}
+function withLegend(svg, rows){ return svg.replace('</svg>', rows + '</svg>'); }
+
+/* quantile of N(0, 1), Acklam's rational approximation */
+function qnorm(p){
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00],
+        b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,6.680131188771972e+01,-1.328068155288572e+01],
+        c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,-2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00],
+        d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,3.754408661907416e+00];
+  const tail=q=>(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  if(p<0.02425) return tail(Math.sqrt(-2*Math.log(p)));
+  if(p>1-0.02425) return -tail(Math.sqrt(-2*Math.log(1-p)));
+  const q=p-0.5, r=q*q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+function lgamma(z){
+  const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+    -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(z<0.5) return Math.log(Math.PI/Math.abs(Math.sin(Math.PI*z)))-lgamma(1-z);
+  z-=1; let x=c[0];
+  for(let i=1;i<9;i++) x+=c[i]/(z+i);
+  const t=z+7.5;
+  return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x);
+}
+function tpdf(x,n){ return Math.exp(lgamma((n+1)/2)-lgamma(n/2)-0.5*Math.log(n*Math.PI)-(n+1)/2*Math.log(1+x*x/n)); }
+function fpdf(x,d1,d2){
+  if(x<=0) return d1===2 ? 1 : 0;
+  return Math.exp(lgamma((d1+d2)/2)-lgamma(d1/2)-lgamma(d2/2)+(d1/2)*Math.log(d1/d2)
+                  +(d1/2-1)*Math.log(x)-((d1+d2)/2)*Math.log(1+d1*x/d2));
+}
+
+/* ---- the cold open: the first rows of the file ---- */
+function playTable(host){
+  const names=['Price','Age','KM','FuelType','HP','MetColor','Automatic','CC','Doors','Weight'];
+  const cx=i=>48+i*67;
+  let head='', rows='';
+  names.forEach((n,i)=>{ head += TXT(cx(i),62,'ABCDEFGHIJ'[i],{sz:15,col:PLOT.axis}) + TXT(cx(i),84,n,{sz:17,col:PLOT.ink}); });
+  for(let r=0;r<5;r++){
+    const y=118+r*24;
+    DATA.FIRST[r].forEach((v,i)=>{ rows += TXT(cx(i),y,v,{sz:18}); });
+  }
+  const svg=`<svg viewBox="0 0 700 270" style="width:100%;height:auto;display:block">
+    <rect width="700" height="270" fill="${PLOT.paper}"/>
+    ${TXT(16,30,'TOYOTACOROLLA_WITH_DATA_MODELS.XLSX · SHEET TOYOTACOROLLA · THE FIRST FIVE OF 1,419 CARS',{sz:17,anchor:'start'})}
+    <line x1="14" y1="94" x2="686" y2="94" stroke="${PLOT.axis}"/>
+    ${head}${rows}
+    ${TXT(350,240,'Price in €, Age in months, KM on the odometer, HP horsepower, CC engine volume (cm³), Weight in kg',{sz:15})}
+    ${TXT(350,258,'MetColor and Automatic: 1 = yes, 0 = no',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE FILE', svg,
+    'The sheets Model SLR, Model 1 and Model 2 hold the same 1,419 cars, with the columns arranged for each regression.');
+  return 600;
+}
+
+/* ---- the price against the age, with or without the fitted line ---- */
+function playScatter(host, withFit){
+  const o = {
+    series:[{x:DATA.AGE, y:DATA.PRICE.map(v=>v/1000), r:2.6, alpha:0.32, sw:0,
+             tip:i=>`row ${i+2}: ${DATA.AGE[i]} months, ${eur(DATA.PRICE[i])}`}],
+    lines:[], labels:[],
+    xmin:0, xmax:82, ymin:0, ymax:35,
+    xticks:[0,10,20,30,40,50,60,70,80], yticks:[0,5,10,15,20,25,30,35],
+    title: withFit ? 'Price = 20,316.56 − 171.07 × Age' : 'Price against age, 1,419 second-hand Corollas',
+    xlab:'Age (months)', ylab:'Price (thousands of €)'
+  };
+  let svg;
+  if(withFit){
+    o.lines.push({x1:0, y1:FIT.b0/1000, x2:80, y2:(FIT.b0+80*FIT.b1)/1000});
+    o.lines.push({x1:0, y1:FIT.b0/1000, x2:80, y2:(FIT.b0-80*200)/1000, color:PLOT.second, dash:true});
+    svg = withLegend(panelSVG(o),
+      legendRow(388, 64, PLOT.fit, '', 'fitted line: −171 € per month') +
+      legendRow(388, 86, PLOT.second, '7 6', 'the Master’s rule: −200 € per month'));
+  } else svg = panelSVG(o);
+  host.innerHTML = plotFrame(withFit ? 'EVIDENCE · THE FITTED LINE' : 'EVIDENCE · THE CLOUD', svg,
+    withFit ? 'Both lines start from the same intercept. After 80 months, they are 2,300 € apart.'
+            : 'One point is one car. Most cars are between 40 and 80 months old.');
+  return 900;
+}
+
+/* ---- the t distribution of the test of β1 = −200; t itself is far off the chart ---- */
+function playT(host){
+  const W=700,H=250,L=30,R=670,T=44,B=196,xmin=-4.5,xmax=4.5,ymax=0.42;
+  const px=v=>L+(v-xmin)/(xmax-xmin)*(R-L), py=v=>B-v/ymax*(B-T);
+  let curve='';
+  for(let x=xmin;x<=xmax+1e-9;x+=0.05) curve+=(curve?'L':'M')+px(x).toFixed(1)+' '+py(tpdf(x,FIT.df)).toFixed(1)+' ';
+  const tail=(a,b)=>{
+    let p=`M${px(a).toFixed(1)} ${B} `;
+    for(let x=a;x<=b+1e-9;x+=0.05) p+=`L${px(x).toFixed(1)} ${py(tpdf(x,FIT.df)).toFixed(1)} `;
+    return `<path d="${p}L${px(b).toFixed(1)} ${B} Z" fill="${PLOT.fit}" fill-opacity=".28"/>`;
+  };
+  let ticks='';
+  [-4,-3,-2,-1,0,1,2,3,4].forEach(v=>{ ticks+=`<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>`+TXT(px(v),B+21,v,{sz:15}); });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,'If H0: β1 = −200 is true, t follows a Student t with 1,417 degrees of freedom',{sz:17,anchor:'start'})}
+    ${tail(xmin,-FIT.crit)}${tail(FIT.crit,xmax)}
+    <path d="${curve}" fill="none" stroke="${PLOT.ink}" stroke-width="2"/>
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT(px(0),py(0.2),'95%',{sz:20,col:PLOT.ink})}
+    ${TXT(px(-FIT.crit),B+40,'−1.96',{sz:16,col:PLOT.fit})}${TXT(px(FIT.crit),B+40,'1.96',{sz:16,col:PLOT.fit})}
+    <line x1="${px(2.9)}" y1="${T+40}" x2="${R-6}" y2="${T+40}" stroke="${PLOT.second}" stroke-width="3"/>
+    <path d="M${R-6} ${T+33} L${R+4} ${T+40} L${R-6} ${T+47} Z" fill="${PLOT.second}"/>
+    ${TXT(R-8,T+28,'t = 11.66: far beyond the right edge',{sz:18,col:PLOT.second,anchor:'end'})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · WHERE YOUR t FALLS', svg,
+    'Rejection region at the 5% significance level: |t| > 1.96, 2.5% in each shaded tail, 95% confidence in the middle. Your t is about six times the critical value.');
+  return 900;
+}
+
+/* ---- residuals against fitted values, with the spread of each tenth of the cars ---- */
+function tenths(fit, res){
+  const order = fit.map((v,i)=>i).sort((a,b)=>fit[a]-fit[b]);
+  const n = order.length, g = [];
+  for(let k=0;k<10;k++){
+    const ids = order.slice(Math.round(k*n/10), Math.round((k+1)*n/10));
+    const e = ids.map(i=>res[i]), m = e.reduce((a,b)=>a+b,0)/e.length;
+    const s = Math.sqrt(e.reduce((a,b)=>a+(b-m)*(b-m),0)/(e.length-1));
+    g.push({lo:fit[ids[0]], hi:fit[ids[ids.length-1]], m, s, n:ids.length});
+  }
+  return g;
+}
+function playResid(host, which){
+  const fit = which===2 ? DATA.FIT2 : DATA.FIT1, res = which===2 ? DATA.RES2 : DATA.RES1;
+  const g = tenths(fit, res);
+  const o = {
+    series:[{x:fit.map(v=>v/1000), y:res.map(v=>v/1000), r:2.4, alpha:0.3, sw:0,
+             tip:i=>`row ${i+2}: fitted ${eur(fit[i])}, residual ${eur(res[i])}`}],
+    lines:[{x1:4, y1:0, x2:29, y2:0, color:PLOT.axis, w:1.2}],
+    xmin:4, xmax:29, ymin:-11.5, ymax:8.5,
+    xticks:[5,10,15,20,25], yticks:[-10,-8,-6,-4,-2,0,2,4,6,8],
+    title:`Residuals against fitted values, Model ${which}`,
+    xlab:'Fitted price (thousands of €)', ylab:'Residual (thousands of €)'
+  };
+  g.forEach(t=>{
+    const a=t.lo/1000, b=t.hi/1000, up=(t.m+1.96*t.s)/1000, dn=(t.m-1.96*t.s)/1000;
+    o.lines.push({x1:a, y1:up, x2:b, y2:up, color:PLOT.fit, w:2.2, dash:'5 4'});
+    o.lines.push({x1:a, y1:dn, x2:b, y2:dn, color:PLOT.fit, w:2.2, dash:'5 4'});
+    o.lines.push({x1:a, y1:t.m/1000, x2:b, y2:t.m/1000, color:PLOT.second, w:3.5});
+  });
+  const svg = withLegend(panelSVG(o),
+    legendRow(330, 230, PLOT.second, '', 'average residual of each tenth of the cars') +
+    legendRow(330, 252, PLOT.fit, '5 4', 'average ± 1.96 × sd of each tenth'));
+  const f = g[0], l = g[9];
+  host.innerHTML = plotFrame(`EVIDENCE · THE DIAGNOSTIC PLOT OF MODEL ${which}`, svg,
+    `Each tenth holds about 142 cars. Standard deviation of the residuals: ${eur(f.s)} for the cheapest tenth, ${eur(l.s)} for the most expensive. ` +
+    (which===1 ? 'The averages bend: positive at both ends, negative in between.' : 'The averages are much flatter than in Model 1; the funnel remains.'));
+  return 900;
+}
+
+/* ---- normal QQ plot of the standardized residuals of Model 1 ---- */
+function playQQ(host){
+  const e = DATA.RES1, n = e.length;
+  const m = e.reduce((a,b)=>a+b,0)/n, s = Math.sqrt(e.reduce((a,b)=>a+(b-m)*(b-m),0)/(n-1));
+  const z = e.map(v=>(v-m)/s);
+  const idx = z.map((v,i)=>i).sort((a,b)=>z[a]-z[b]);
+  const zs = idx.map(i=>z[i]), q = zs.map((v,k)=>qnorm((k+1-0.5)/n));
+  const o = {
+    series:[{x:q, y:zs, r:2.8, alpha:0.55, sw:0, tip:k=>`row ${idx[k]+2}: standardized residual ${zs[k].toFixed(2)}`}],
+    lines:[{x1:-3.6, y1:-3.6, x2:3.6, y2:3.6, color:PLOT.fit}],
+    labels:[{x:q[0]+0.16, y:zs[0]-0.12, text:`row ${idx[0]+2}: a 1,615 kg Corolla`, col:PLOT.second},
+            {x:-3.4, y:4.6, text:'45° line: where normal errors would sit', col:PLOT.fit}],
+    xmin:-3.7, xmax:3.7, ymin:-8.8, ymax:5.6,
+    xticks:[-3,-2,-1,0,1,2,3], yticks:[-8,-6,-4,-2,0,2,4],
+    title:'Sorted standardized residuals of Model 1 against N(0, 1) quantiles',
+    xlab:'Theoretical quantiles of N(0, 1)', ylab:'Standardized residuals'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE QQ PLOT', panelSVG(o),
+    'The middle hugs the line; both tails leave it, the lower one by far. Heavy tails: the errors are not normal.');
+  return 900;
+}
+
+/* ---- the t Stats of Model 1, against the critical value 1.96 ---- */
+function playSig(host){
+  const L=150, R=640, top=72, step=22, xmax=20;
+  const px=v=>L+Math.min(v,xmax)/xmax*(R-L);
+  let bars='', ticks='';
+  FIT.M1T.forEach(([name,t],k)=>{
+    const y=top+k*step, a=Math.abs(t), sig=a>FIT.crit, col=sig?PLOT.ink:PLOT.second;
+    bars += TXT(L-10, y+13, name, {sz:17, col, anchor:'end'})
+          + `<rect x="${L}" y="${y}" width="${(px(a)-L).toFixed(1)}" height="15" fill="${col}" fill-opacity="${sig?0.8:0.9}"/>`
+          + TXT((a>xmax ? px(a)-6 : px(a)+6).toFixed(1), y+13, (a>xmax?'|t| = ':'')+a.toFixed(2)+(a>xmax?' ▸':''),
+                {sz:16, col:a>xmax?PLOT.paper:col, anchor:a>xmax?'end':'start'});
+  });
+  const B=top+FIT.M1T.length*step+4;
+  [0,5,10,15,20].forEach(v=>{ ticks += `<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>` + TXT(px(v),B+21,v,{sz:15}); });
+  const svg=`<svg viewBox="0 0 700 ${B+56}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${B+56}" fill="${PLOT.paper}"/>
+    ${TXT(30,28,'Model 1: |t Stat| of each coefficient, H0: βj = 0',{sz:17,anchor:'start'})}
+    ${bars}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${px(FIT.crit)}" y1="${top-8}" x2="${px(FIT.crit)}" y2="${B}" stroke="${PLOT.fit}" stroke-width="2" stroke-dasharray="6 5"/>
+    ${TXT(px(FIT.crit)+6, top-12, 'critical value 1.96', {sz:16, col:PLOT.fit, anchor:'start'})}
+    ${ticks}
+    ${TXT((L+R)/2, B+44, '|t Stat|  (the axis stops at 20)', {sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · WHO MATTERS IN MODEL 1', svg,
+    'Dark bars cross the critical value: significant at the 5% significance level. Orange bars do not: MetColor and Doors.');
+  return 900;
+}
+
+/* ---- the loss of value per month implied by Model 2, against the Master's rule ---- */
+function playDepr(host){
+  const loss = a => -(FIT.m2a + 2*FIT.m2b*a);
+  const a200 = (-200 - FIT.m2a)/(2*FIT.m2b);
+  const o = {
+    lines:[{x1:1, y1:loss(1), x2:80, y2:loss(80), color:PLOT.fit, w:3},
+           {x1:0, y1:200, x2:82, y2:200, color:PLOT.second, dash:true},
+           {x1:0, y1:-FIT.b1, x2:82, y2:-FIT.b1, color:PLOT.ink, dash:'3 4', w:1.8},
+           {x1:a200, y1:0, x2:a200, y2:200, color:PLOT.axis, dash:'3 4', w:1.2}],
+    series:[{x:[a200], y:[200], r:6, alpha:1, color:PLOT.paper, stroke:PLOT.fit, sw:2.5}],
+    labels:[{x:a200+1.5, y:14, text:'about 22 months', col:PLOT.label},
+            {x:48, y:212, text:'the Master’s rule: 200 € a month', col:PLOT.second},
+            {x:48, y:150, text:'simple regression: 171 € a month', col:PLOT.ink},
+            {x:28, y:268, text:'Model 2: 259 − 2.69 × Age', col:PLOT.fit}],
+    xmin:0, xmax:82, ymin:0, ymax:300,
+    xticks:[0,10,20,30,40,50,60,70,80], yticks:[0,50,100,150,200,250,300],
+    title:'Loss of value in one more month, other things equal (€)',
+    xlab:'Age of the car (months)', ylab:'Loss per month (€)'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · A PRICE THAT FALLS SLOWER', panelSVG(o),
+    'The slope of the price curve of Model 2 at each age. It crosses the Master’s 200 € at about 22 months, and falls below 100 € after five years.');
+  return 900;
+}
+
+/* ---- the Fisher distribution F(2, 1408), its rejection region, and F ---- */
+function playF(host, withStat){
+  const W=700,H=250,L=40,R=670,T=44,B=196,xmax=5,ymax=1.05;
+  const px=v=>L+v/xmax*(R-L), py=v=>B-v/ymax*(B-T);
+  let curve='';
+  for(let x=0;x<=xmax+1e-9;x+=0.025) curve+=(curve?'L':'M')+px(x).toFixed(1)+' '+py(fpdf(x,2,FIT.fdf2)).toFixed(1)+' ';
+  let p=`M${px(FIT.fcrit).toFixed(1)} ${B} `;
+  for(let x=FIT.fcrit;x<=xmax+1e-9;x+=0.025) p+=`L${px(x).toFixed(1)} ${py(fpdf(x,2,FIT.fdf2)).toFixed(1)} `;
+  const shade=`<path d="${p}L${px(xmax).toFixed(1)} ${B} Z" fill="${PLOT.fit}" fill-opacity=".35"/>`;
+  let ticks='';
+  [0,1,2,3,4,5].forEach(v=>{ ticks+=`<line x1="${px(v)}" y1="${B}" x2="${px(v)}" y2="${B+5}" stroke="${PLOT.axis}"/>`+TXT(px(v),B+21,v,{sz:15}); });
+  const fx=px(FIT.F);
+  const stat = withStat ? `<line x1="${fx.toFixed(1)}" y1="${B}" x2="${fx.toFixed(1)}" y2="${T+6}" stroke="${PLOT.second}" stroke-width="3"/>`
+    + TXT((fx+8).toFixed(1), T+16, 'F = 0.38', {sz:18, col:PLOT.second, anchor:'start'}) : '';
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,'If H0 is true, F follows a Fisher distribution with 2 and 1,408 degrees of freedom',{sz:17,anchor:'start'})}
+    ${shade}
+    <path d="${curve}" fill="none" stroke="${PLOT.ink}" stroke-width="2"/>
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT(px(FIT.fcrit),B+40,'critical value 3.00',{sz:16,col:PLOT.fit})}
+    ${TXT(px(3.9),py(0.16),'5% significance: reject H0',{sz:18,col:PLOT.fit})}
+    ${TXT(px(1.55),py(0.55),'95% confidence: do not reject',{sz:18,col:PLOT.ink,anchor:'start'})}
+    ${stat}
+  </svg>`;
+  host.innerHTML = plotFrame(withStat ? 'EVIDENCE · WHERE YOUR F FALLS' : 'THE RULE · AN F-TEST AT 5% SIGNIFICANCE', svg,
+    withStat ? 'F lies deep in the non-rejection region: dropping MetColor and Doors costs almost nothing.'
+             : 'One-sided: F is never negative, and only a large F speaks against H0. The whole 5% significance level sits in the right tail.');
+  return 900;
+}
+
+/* ---- the fit of the models: R² and adjusted R² ---- */
+function playCards(host, three){
+  const ms = three ? FIT.MODELS : FIT.MODELS.slice(0,2);
+  const w = three ? 200 : 290, gap = three ? 20 : 40, x0 = three ? 30 : 40;
+  const best = ms.reduce((b,m)=>m.adj>b.adj?m:b, ms[0]);
+  let cards='';
+  ms.forEach((m,k)=>{
+    const x = x0 + k*(w+gap), win = (m===best);
+    cards += `<rect x="${x}" y="48" width="${w}" height="150" fill="#fbfaf4" stroke="${win?PLOT.fit:PLOT.ink}" stroke-width="${win?3:2}"/>
+      ${TXT(x+w/2,76,m.name,{sz:19,col:PLOT.ink})}
+      ${TXT(x+w/2,100,m.k+' explanatory variables',{sz:16})}
+      ${TXT(x+w/2,130,'R² = '+m.r2.toFixed(2)+'%',{sz:18})}
+      ${TXT(x+w/2,158,'adjusted R² = '+m.adj.toFixed(2)+'%',{sz:18,col:win?PLOT.fit:PLOT.label})}
+      ${win?TXT(x+w/2,186,'BEST FIT',{sz:18,col:PLOT.fit}):''}`;
+  });
+  const svg=`<svg viewBox="0 0 700 220" style="width:100%;height:auto;display:block">
+    <rect width="700" height="220" fill="${PLOT.paper}"/>
+    ${TXT(30,28,'Which model fits best? The adjusted R² decides.',{sz:18,anchor:'start'})}
+    ${cards}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE FIT OF THE MODELS', svg,
+    three ? 'The restricted model drops two parameters and loses almost no R²: its adjusted R² is the highest of the three.'
+          : 'The R² always rises with an extra variable. The adjusted R² rises only if the variable earns its place: Age² does.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='scatter') return playScatter(host, false);
+  if(name==='fit')     return playScatter(host, true);
+  if(name==='ttest')   return playT(host);
+  if(name==='resid1')  return playResid(host, 1);
+  if(name==='resid2')  return playResid(host, 2);
+  if(name==='qq1')     return playQQ(host);
+  if(name==='sig')     return playSig(host);
+  if(name==='depr')    return playDepr(host);
+  if(name==='fdist')   return playF(host, false);
+  if(name==='ftest')   return playF(host, true);
+  if(name==='cards2')  return playCards(host, false);
+  if(name==='cards3')  return playCards(host, true);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your workbook step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+/* the course margin rule: exact integers; ±0.01 when 0.1 ≤ |value| < 1e6;
+   ±1% of the value otherwise. The tiny extra absorbs floating-point error. */
+function marginOf(value, exact){
+  if(exact) return 0;
+  const a = Math.abs(value);
+  return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
+}
+function tolerance(f){ return marginOf(f.value, f.exact); }
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02 or 2.1E+09, without thousands separators.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){
+    const at = (a.tol !== undefined) ? a.tol : marginOf(a.value, f.exact);
+    if(Math.abs(v-a.value) <= at) return a.msg;
+  }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE7',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise VII</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+/* the data file: the button names its file in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — no password: this exercise is not graded
+   ================================================================ */
+function finish(){
+  $('#endblurb').innerHTML =
+    `You fitted a line to 1,419 used cars and tested a rule of thumb against it, turned the fuel into a
+     dummy variable, and read nine coefficients other things equal. You found a real funnel and a bend
+     in the residuals and heavy tails in the QQ plot, added the square of the age, chose a model with
+     the adjusted R², and tested two constraints at once with an F-test.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: A COROLLA LOSES 200 € A MONTH';
+  show('scr-end');
+}
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v7.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE VII ....... TOYOTA COROLLA",
+  "DATA ........................ 1,419 USED CARS",
+  "MODELS ...................... SLR, M1, M2",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
