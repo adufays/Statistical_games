@@ -1,1 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 10: Can You See Ten Dimensions?</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 10
+  "Can You See Ten Dimensions?"  (Excel_lab_PCA.tex: principal component analysis)
+  EDHEC · Multivariate Data Analysis · Empirical Session 10
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  Same engine as Empirical Exercise 7: no checkpoints, no passwords,
+  no SHOW THE ANSWER button. Every question has a HINT button.
+  Numbers follow the course margin rule: counts exact; ±0.01 when
+  0.1 <= |value| < 1e6; ±1% otherwise.
+
+  QUESTIONS (Excel_lab_PCA.tex)
+  ---------
+  1  Diesel dummy: number of cars, of diesel cars, share (%)      -> numbers
+  2  correlation matrix: Price-Age, Diesel-CC, Diesel-HP           -> numbers
+  3  why the correlation matrix (standardized data)?               -> MCQ
+     eigenvalues l1, l2 and loading of Age on PC1 (EigCov)         -> numbers
+     PC1 and PC2 of the car in row 3                               -> numbers
+     the PC1-PC2 plot: what do you see?                            -> MCQ
+     cars with PC2 > 1, and diesel cars among them                 -> numbers
+     who are the cars with PC1 < -7?                               -> MCQ
+  4  correlation between PC1 and PC2                               -> MCQ (true value 0)
+     variances of PC1 and PC2 (= eigenvalues)                      -> numbers
+  5  share kept by PC1+PC2, k for 80%, share kept by k             -> numbers
+     what the 54% plot shows and hides                             -> MCQ
+
+  Sign convention imposed on the eigenvectors (they are defined up to
+  their sign): the loading of Age on PC1 and the loading of Diesel on
+  PC2 are positive. It matches the output of EigCov on the matrix in
+  the order of the file (Solution_EigCov_Excel_lab.xlsm).
+
+  DATA
+  ----
+  ToyotaCorolla_data.xlsx, sheet ToyotaCorolla: 1,419 second-hand
+  Corollas. A Price (EUR), B Age (months), C KM, D FuelType (Petrol
+  1,264 / Diesel 155: no gas car), E HP, F MetColor, G Automatic,
+  H CC, I Doors, J Weight. The function EigCov exists only inside
+  EigCov.xlsm (Blackboard).
+
+  TARGET VALUES (pandas / numpy on the Excel file)
+  -------------
+  N = 1419; diesel = 155; share 10.9232%  (petrol 1264, 89.0768%)
+  corr Price-Age -0.877774; Diesel-CC 0.763099; Diesel-HP -0.532502
+    (traps: COVARIANCE.S -59549.50, Covariance tool (/N) -59507.53;
+     petrol dummy: -0.763099, +0.532502)
+  eigenvalues 2.931625 2.481799 1.062388 1.007723 0.958980 0.863353
+              0.341273 0.235245 0.083737 0.033878   (sum 10)
+  cumulative % 29.3162 54.1342 64.7581 74.8353 84.4251 93.0587 ...
+  v1 = (-0.514452, 0.478544, 0.225807, -0.218987, -0.147041,
+        -0.097258, -0.000986, -0.311901, -0.201141, -0.488436)
+  v2 = (-0.219930, 0.187997, 0.480899, 0.557788, -0.355651,
+        -0.054492, -0.072888, 0.434424, 0.010902, 0.224241)
+  covariance matrix instead: l1 = 1.375482E+09 (99.35%), l2 = 8.90265E+06;
+    KM holds 99.04% of the raw total variance
+  row 3 (18,950 EUR, 8 months): PC1 -3.285253, PC2 -1.802992
+    traps PC1/PC2: opposite sign; raw data -9225.22/106.16; centred
+    only -18037.18/-31099.16; eigenvector read along a row -0.242570/
+    1.546669; eigenvalue included in the vector 6.699045/6.966331;
+    covariance eigenvectors -1.770648/2.185509.
+    STDEV.P instead of STDEV.S: -3.286411/-1.803627 (absorbed by ±0.01)
+  PC2 > 1: 166 cars = all 155 diesel cars + 11 petrol cars
+  PC1 < -7: 7 diesel cars, 4-11 months, 23,000-32,500 EUR, 1,280-1,480 kg
+  corr(PC1, PC2) = 1.8E-15 (0); without standardization: 0.9911
+  Var(PC1) = 2.931625, Var(PC2) = 2.481799 (sd 1.712199, 1.575373;
+    VAR.P 2.929559, 2.480050 absorbed)
+  k for 80% = 5 (84.4251%); 4 -> 74.8353%; 6 -> 93.0587%
+
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example Excel formula ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Excel helper: function names in English and French ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#0b5b2e,#1f8f4e);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:22%}
+.xlguide td:nth-child(2){width:24%}
+.xlguide td:nth-child(3){width:30%}
+.xlguide td:nth-child(4){width:24%}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'ENGLISH EXCEL'}
+  .xlguide td:nth-child(2)::before{content:'FRENCH EXCEL'}
+  .xlguide td:nth-child(3)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(4)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE X</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="toyota">DATA (XLSX)</button>
+      <button class="toolbtn" data-excel-helper>EXCEL HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>CAN YOU SEE<br>TEN DIMENSIONS ?</h1>
+      <h2>Empirical Exercise X &nbsp;·&nbsp; Multivariate Data Analysis</h2>
+      <p>Master Scepticus claims that nobody can see a cloud of points in ten dimensions. 1,419
+      second-hand Toyota Corollas, each described by ten variables, will judge him. You will turn the fuel
+      into a dummy variable, compute the correlation matrix, extract its eigenvalues and eigenvectors, draw
+      the first two principal components, check that they are uncorrelated, and decide how many components
+      keep 80% of the variance.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · EXCEL</b>Download <code>ToyotaCorolla_data.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top. The eigenvalues and eigenvectors need the function
+        <strong>EigCov</strong>, which only exists inside the file <code>EigCov.xlsm</code>, available on
+        <strong>Blackboard</strong>. Open EigCov.xlsm, enable its macros, copy the data into it, and do all
+        your work in that workbook (save it as .xlsm): each question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your plots, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example Excel formula, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers with a dot or a comma as the decimal separator, e.g., <code>36.18</code>
+      or <code>36,18</code>. Give two decimals: your answer is accepted within 0.01 of the
+      exact value. Very small or very large numbers can be typed as Excel displays them, e.g.,
+      <code>-8.54E-05</code>, and are accepted within 1%. Counts must be exact. Shares are asked in
+      percent, e.g., <code>12.34</code> for 12.34%.</p>
+      <div class="xlguide">
+        <h3>EXCEL QUICK REFERENCE</h3>
+        <p class="guideintro">In the sheet <code>ToyotaCorolla</code>, column <code>A</code> holds the
+        price in euros, <code>B</code> the age in months, <code>C</code> the kilometres, <code>D</code> the
+        fuel type (Petrol or Diesel), then HP, MetColor, Automatic, CC, Doors and Weight up to column
+        <code>J</code>. Row 1 holds the names; rows 2 to 1420 hold the 1,419 cars. The function
+        <code>EigCov</code> works only inside <code>EigCov.xlsm</code>, on Blackboard. English Excel
+        separates the arguments of a function with a comma; French Excel uses a semicolon, e.g.,
+        <code>=SI(D2="Diesel";1;0)</code>.</p>
+        <table aria-label="Excel functions used in this exercise">
+          <thead><tr><th>ENGLISH EXCEL</th><th>FRENCH EXCEL</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>=COUNT(range)</code>, <code>=SUM(range)</code>, <code>=AVERAGE(range)</code></td><td><code>=NB(plage)</code>, <code>=SOMME(plage)</code>, <code>=MOYENNE(plage)</code></td><td>Number of values; sum; sample average.</td><td><code>=COUNT(A2:A1420)</code></td></tr>
+            <tr><td><code>=IF(test, a, b)</code></td><td><code>=SI(test; a; b)</code></td><td>Returns a if the test is true, b otherwise: builds a dummy variable.</td><td><code>=IF(D2="Diesel",1,0)</code></td></tr>
+            <tr><td><code>=COUNTIF(range, test)</code>, <code>=COUNTIFS(range1, test1, range2, test2)</code></td><td><code>=NB.SI(plage; critère)</code>, <code>=NB.SI.ENS(plage1; critère1; plage2; critère2)</code></td><td>Counts the cells that pass a test; the rows that pass two tests at once.</td><td><code>=COUNTIF(D2:D1420,"Diesel")</code></td></tr>
+            <tr><td>Data → Data Analysis → Correlation</td><td>Données → Utilitaire d’analyse → Analyse de corrélation</td><td>Correlation matrix of adjacent columns. Excel fills the <b>lower triangle only</b>: copy each value to its mirror cell. If the menu is missing: File → Options → Add-ins → Analysis ToolPak.</td><td>Input Range: A1:J1420, tick Labels in First Row</td></tr>
+            <tr><td><code>=CORREL(x, y)</code></td><td><code>=COEFFICIENT.CORRELATION(x; y)</code></td><td>Correlation between two columns.</td><td><code>=CORREL(A2:A1420,B2:B1420)</code></td></tr>
+            <tr><td><code>=VAR.S(range)</code>, <code>=STDEV.S(range)</code></td><td><code>=VAR.S(plage)</code>, <code>=ECARTYPE.STANDARD(plage)</code></td><td>Empirical variance and standard deviation, dividing by N − 1.</td><td><code>=STDEV.S(A2:A1420)</code></td></tr>
+            <tr><td><code>=STANDARDIZE(x, mean, sd)</code></td><td><code>=CENTREE.REDUITE(x; moyenne; écart_type)</code></td><td>Standardized value (x − mean) / sd. Anchor the mean and the sd with $.</td><td><code>=STANDARDIZE(A2,A$1422,A$1423)</code></td></tr>
+            <tr><td><code>=EigCov(matrix)</code></td><td><code>=EigCov(matrice)</code></td><td>Only inside <b>EigCov.xlsm</b> (Blackboard). Select an empty block of K + 1 rows and K columns, type the formula, press Ctrl + Shift + Enter. Row 1: the eigenvalues, from the largest. Below: one eigenvector per <b>column</b>.</td><td><code>=EigCov(M8:V17)</code> in a block of 11 × 10 cells</td></tr>
+            <tr><td><code>=MMULT(row, column)</code></td><td><code>=PRODUITMAT(ligne; colonne)</code></td><td>Matrix product. A row of 10 standardized values times a column of 10 loadings gives one score.</td><td><code>=MMULT(L2:U2,$M$22:$M$31)</code></td></tr>
+            <tr><td>Insert → Charts → Scatter</td><td>Insertion → Graphiques → Nuage de points</td><td>Scatter plot. Right-click → Select Data to choose which column goes on which axis.</td><td>X: PC1, Y: PC2</td></tr>
+            <tr><td>Data → Sort</td><td>Données → Trier</td><td>Sorts a table by one of its columns.</td><td>Sort by PC1, smallest to largest</td></tr>
+            <tr><td><code>1.8E-15</code></td><td><code>1,8E-15</code></td><td>Scientific notation: 1.8 × 10⁻¹⁵ = 0.0000000000000018.</td><td><code>-8.54E-05</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>λ₁</span><b id="hud-l1">—</b></div>
+            <div class="hudrow"><span>PC1 + PC2 keep</span><b id="hud-sh">—</b></div>
+            <div class="hudrow"><span>k for 80%</span><b id="hud-k">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise X &nbsp;·&nbsp; Can You See Ten Dimensions ?</h2>
+      <p id="endblurb"></p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button */
+  DATA_FILES: {
+    toyota: "https://www.dropbox.com/scl/fi/zaz5vvxo4wuhoick24bo5/ToyotaCorolla_data.xlsx?rlkey=xca7k4ruqzzd29hyruhw3p5pl&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   DATA — the 1,419 cars of ToyotaCorolla_data.xlsx, embedded for the
+   pictures only: the first rows of the file, the price, the age, the
+   Diesel dummy, and the scores on the first two principal components
+   (rounded to two decimals). The correlation matrix, the eigenvalues
+   and the first two eigenvectors (sign convention: Age > 0 on PC1,
+   Diesel > 0 on PC2). The student computes everything in Excel.
+   ================================================================ */
+const DATA = {
+  FIRST:[[10500,42,92204,"Petrol",110,1,0,1600,5,1075],[18950,8,7000,"Petrol",110,0,0,1600,5,1115],[7950,78,91399,"Petrol",110,1,0,1600,5,1070],[8500,77,71825,"Petrol",110,0,0,1600,5,1075],[10750,57,45000,"Petrol",110,1,0,1600,5,1050]],
+  PRICE:[10500,18950,7950,8500,10750,20500,9950,11500,12450,9950,8950,19950,11950,7950,10500,8900,7600,8250,7950,9950,7350,7750,10750,11495,11950,8950,6900,8950,8250,5950,8250,13250,8500,18750,10450,12500,7450,16650,21950,16500,12500,7950,9250,9250,9450,12995,7950,8950,9950,6550,9950,9000,9500,7950,12950,8250,8750,6750,10500,9950,7750,7750,8250,8950,11950,4400,11950,7250,8500,8500,9900,9500,8950,9950,31275,11500,13950,10950,11950,6950,7500,11950,8950,12950,8750,6950,7450,8750,9900,7950,10500,10250,8695,12500,13450,8450,16500,13450,12950,10950,11895,16950,7750,5950,8500,9950,10950,8250,13950,9450,9000,8750,9950,6999,9950,10950,8500,22250,10750,12950,7250,8400,8900,11750,12495,17650,9250,6750,32500,8950,9950,20500,7950,18450,13500,10950,8950,12200,9950,11500,6750,7500,9950,15950,6950,8950,10950,11500,21125,14750,14950,11950,10450,15950,8100,16450,4750,10750,9500,10500,9950,7500,8750,9500,15500,12500,7990,8950,7450,8250,9900,11900,8950,18950,7750,5740,6950,7750,17950,9750,9950,11950,7950,10950,9950,14950,9500,5950,11750,12950,13750,8050,7900,9450,8750,9950,15950,7300,5950,10750,7950,6950,12950,9950,20750,9940,17450,5950,10950,6950,11450,18950,8450,12950,15950,9450,9750,21950,9950,13750,6950,8950,9245,19950,8250,9450,11450,7950,10295,8250,7950,10950,7450,16450,8950,11250,10950,14900,8450,6950,11950,8950,10500,8950,8500,9450,9950,11750,8450,8950,7950,6750,8750,14950,6950,10900,11950,7450,6950,10845,8750,9250,15950,12950,10250,10000,9750,15750,6900,6250,24500,7250,19500,12900,10950,8500,7500,22500,12500,18245,10995,7950,10950,9950,8250,7995,9500,20950,8450,10750,13500,12950,9250,22250,10950,9500,8750,10950,10950,8250,9950,10450,17795,13450,9500,10450,9900,8750,14950,7500,14950,17950,10950,12450,17950,17450,13950,12750,21950,8950,9750,7950,8250,12000,7400,14950,12200,18950,8500,15950,9950,9799,6950,6950,8950,8990,9950,9950,10250,13950,18990,12950,6000,9450,5150,9895,11900,17950,7450,8950,6650,7900,10950,11750,10750,6500,19750,8950,12900,8950,8700,7499,10750,13950,10950,11690,18500,15950,6750,8500,8250,11950,8950,16950,7950,10950,16250,9750,10950,21950,8950,9750,8250,6750,8950,11480,9950,9900,7995,8500,7000,7750,8500,16950,8950,9250,16950,7950,9950,6750,10950,11500,16868,9980,11650,9990,9250,8750,8750,10950,11950,10750,13950,10900,9650,19500,8950,7750,8950,10450,11495,10500,12295,7500,7999,9400,8450,11250,12750,7950,11450,7950,13500,5950,10500,7950,8150,7750,10950,7950,10750,7750,10500,8950,11250,8950,9450,12900,12250,9250,8950,7750,8750,11450,8800,11750,8900,8250,7600,8950,9900,8500,8500,13950,10450,8250,8450,9950,7450,9800,6400,9475,7200,11690,7500,10900,9450,6750,10950,8950,22000,6900,9950,8900,23950,8200,10900,18950,6950,13000,9500,8500,7995,10950,9950,10950,11950,9250,8950,9950,7400,11250,13950,8000,7950,7350,13250,7950,10600,15950,9500,13500,15950,7950,9750,5751,6900,18950,10500,7500,19950,7250,8950,12750,8450,7500,13750,9250,10500,7500,11950,8750,9950,19950,8750,7900,8950,6950,19600,16750,9950,10250,9500,8250,8950,15950,11900,7500,12950,9895,13750,11450,9950,13250,7950,9500,18950,10950,7950,10950,11700,10995,12750,8500,9950,7950,13950,9500,7950,9900,12950,9450,12695,10500,10900,13500,8950,8950,8450,7950,9500,15950,11250,10895,7450,18750,9950,8500,8500,11895,7750,12950,8750,19250,7450,7800,9550,8495,15850,9000,8950,8950,8500,9250,7950,7150,16895,9750,10500,8250,10500,8750,9950,9500,14350,11500,6900,12950,8250,8950,10500,6150,11500,8950,10950,6950,11500,7900,6950,10950,15250,9250,18700,7250,9500,8950,8950,10950,10950,7750,10250,10500,15750,12450,11250,8250,6900,11950,9950,19750,18500,8400,7950,6500,9950,8950,7500,19950,7750,8750,9950,10250,8950,7750,9950,13750,14990,8950,9750,7750,8500,24950,9250,9900,9250,10495,12950,18500,11450,10950,12950,11750,10500,7950,19450,8250,8450,7250,8950,8950,9450,7750,7750,9950,8950,11650,8600,13995,8250,10950,8950,10450,9950,7900,7500,9850,7950,10500,7950,8500,10500,7750,6900,9250,18500,10850,8750,7950,8950,9500,13950,10450,6640,8900,16900,12900,7500,15950,20950,16250,9950,11790,11750,12450,11700,9450,8950,18950,10900,11250,10450,9950,13950,7995,10990,8000,9450,8900,21750,8950,13450,7450,6900,10500,21950,9950,9900,7350,11900,11950,9700,7250,10000,12450,11750,10495,8750,8800,7950,6990,14750,9750,7950,9000,11950,8950,10750,9950,10500,13950,11900,24990,8950,19950,6500,7750,8950,9950,7750,7950,8900,10950,7500,7500,8950,11500,11950,10495,10950,21950,7250,8950,9950,9500,19500,8250,21500,16500,7000,12850,9950,9450,10450,12950,9750,8950,7200,8250,10900,10450,7950,7450,8950,7950,13500,9750,10250,7950,10950,9750,7750,6500,9450,6900,19950,10950,7995,7750,7950,7600,19450,9900,8750,7250,19950,10950,8950,9450,8950,16950,11950,10250,13450,8950,11500,12950,20500,11750,9500,8250,9900,8895,9950,11950,10950,6750,7750,9950,7950,8750,10950,8250,18900,13250,18245,8900,10995,8950,19500,6950,7145,11695,11950,5950,11950,7500,11950,5750,9250,8500,13500,8600,16950,12950,9930,7950,17950,12950,8750,17900,22250,8250,8750,17950,9795,9950,7500,11950,9900,7750,12900,6950,8750,6495,7950,7950,10900,9995,8950,9250,8950,10750,11925,9950,8750,9950,15750,15750,10850,12850,10950,8900,8250,12450,11950,9750,19950,11950,12750,12450,8850,5950,11450,11950,7250,18600,13750,8950,9250,8950,8250,7450,8750,12950,7795,5950,7750,6500,8950,21500,4450,12495,9750,9750,8450,7500,12950,7950,10500,12500,31000,9950,10995,9250,7750,7750,10950,23000,10500,21750,9995,10950,6950,17200,15250,11950,7250,8500,9250,9950,12000,9250,8500,10250,5600,18950,7490,24950,8950,7800,11750,8950,8750,11450,11950,9500,8950,12450,8950,17950,12950,17950,8950,7900,16250,18450,8900,7750,10950,8450,15450,12000,13500,9950,9450,9950,5800,8750,8500,11250,6750,11290,8950,10500,8450,9750,9950,13500,9200,10950,12750,10495,16950,12500,11450,7250,10500,9130,14950,11750,6500,10750,6425,9950,6900,14990,9750,9950,8950,10950,6950,17450,6495,10250,18800,7400,7250,7950,17795,8950,8000,10950,8950,8950,9900,10950,11500,9500,8750,10950,11950,11950,10500,12950,23750,6950,18750,6450,11500,10500,13950,7450,8750,9950,16950,9450,8950,11950,8950,8750,12500,7500,10750,19950,7750,7900,22750,14900,8950,10250,6500,5950,9950,9940,7950,9000,8950,10950,8950,12900,12950,9900,9750,6950,9950,11450,12400,10950,9500,9390,8900,14750,8950,12950,5950,7750,11950,8750,7950,9500,8995,21500,10950,8250,8750,11895,9900,8750,9750,10950,10500,15999,11750,11950,8950,8750,10950,6500,17250,9450,12950,9500,8950,15800,9950,11750,7950,7250,9995,16500,7750,9650,7750,10400,6800,13250,10500,8250,10500,9950,11950,7250,8900,6900,8950,14750,6250,7900,8950,19000,6490,8500,8600,8900,10950,16450,10950,7950,8500,7250,8950,6750,10450,7750,12950,6900,13950,10995,7950,9500,15750,8750,13500,9750,5250,10450,8950,11950,10450,10750,9500,14950,6500,15750,9900,9950,11950,22500,8450,9695,11950,8950,18950,8450,13995,9950,11450,8450,12450,10000,16250,19600,8745,9950,11500,13750,9850,9950,13500,8250,7450,9950,9950,8490,10950,18950,8950,8450,15950,8900,7450,19900,12950,4350,8500,9950,8750,8500,8250,6950,10950,17495,7250,6750,9995,18900,8950,8950,9400,7495,9750,12250,11930,17950,7950,11710,5750,7900,6650,11950,9450,17950,10450,8950,11990,8950,9750,9950,19950,9250,9950,16250,11950,8250,10500,8450,7950,8950,9750,10995,10500,8250,7800,9750,16750,16950,9750,13875,6450,7850,18450,9950,11950,9900,7750,11450,5900,7750,10900,9800,9250,12500,11450,9450,8900,7950,17950,8950,5845,14950,8950,9250,8150,9950,11000,16350,9900,10800,8250,6900,15500,9750,8950,11500,8750,11950,9950,10950,6950,7950,7950,10350,7250,10500,7950,8750,12500,8750,5950,13995,10950,8950,11895,8950,10750,8950,6950,9950,10450,10750,6750,10500,9950,10500,9950,13500,9900,8250,9950,9750,11900,12750,9800,10750,7950,12950,11950,9500,15950,8250,11500,10950,7900,8495,9500,11950,11950,13500,22950,13500,16950,8950,11000,20950,8250,9950,8950,7950,8700],
+  AGE:[42,8,78,77,57,26,47,48,42,52,78,28,55,71,50,49,77,65,73,65,65,48,46,44,38,65,76,61,76,71,79,41,70,11,48,36,77,25,8,20,48,67,62,68,77,32,80,66,49,73,61,80,63,67,39,76,74,77,35,62,74,78,59,55,55,74,54,65,73,60,53,61,73,65,4,65,43,44,49,77,69,56,63,49,68,75,76,79,56,69,59,54,50,49,34,80,19,40,50,62,52,28,76,72,71,62,65,66,41,64,48,65,79,71,59,57,70,17,54,35,70,77,64,47,44,11,80,80,4,72,67,20,77,19,33,38,70,41,48,55,80,62,45,30,72,62,62,55,2,40,43,60,48,20,68,16,44,50,59,50,55,76,65,66,25,38,77,65,77,67,67,44,61,13,80,74,72,71,27,69,67,51,74,53,68,41,57,68,33,33,38,74,50,80,73,54,19,80,69,36,68,76,45,64,17,39,28,78,47,65,56,16,72,39,27,61,56,27,48,54,68,62,66,19,80,79,51,75,67,64,75,67,78,20,71,54,50,30,65,79,42,58,65,76,78,70,63,54,70,74,69,76,66,42,58,62,54,75,78,72,68,74,19,38,39,56,67,32,80,67,13,78,16,41,52,71,80,32,62,1,50,61,65,42,80,62,68,25,75,54,39,40,64,20,56,62,67,57,65,80,63,62,1,39,38,60,67,59,26,73,23,17,59,38,20,18,35,43,8,65,62,75,65,39,75,26,50,49,78,28,63,51,80,58,78,65,68,43,52,44,20,44,78,62,56,68,46,22,72,75,75,68,60,40,48,78,16,73,42,80,75,80,63,52,56,34,7,28,74,74,70,58,59,27,75,62,19,68,58,8,62,64,63,69,55,41,50,42,65,58,73,75,80,19,74,53,17,66,42,75,67,54,15,49,39,55,73,61,62,60,53,55,22,54,67,8,65,68,66,35,39,62,33,79,65,69,67,61,43,79,49,80,33,59,68,77,76,73,38,75,49,77,52,76,52,69,61,38,51,63,69,79,79,37,79,48,78,64,78,62,68,73,67,44,64,71,65,63,70,77,51,48,79,33,71,57,57,80,41,80,28,76,69,78,19,60,57,25,68,49,66,77,79,48,58,44,41,67,48,62,80,50,51,78,78,72,33,71,51,25,60,42,25,74,68,67,69,15,65,59,7,69,77,37,68,78,23,61,66,73,47,79,54,8,75,75,68,77,9,24,67,54,59,67,47,20,51,59,50,67,54,41,68,32,74,79,20,39,65,54,40,49,33,78,51,71,22,58,69,62,39,54,39,77,50,38,65,67,70,76,55,13,40,53,75,31,61,69,77,44,79,33,61,20,78,73,54,68,13,80,52,68,72,66,60,70,29,66,56,80,65,79,61,66,41,46,80,23,78,68,54,80,39,60,50,43,35,68,80,51,28,65,7,78,54,69,68,58,54,76,61,63,23,42,44,77,69,56,46,17,13,60,72,72,62,68,71,17,73,47,37,55,54,55,75,39,33,64,68,60,71,8,80,80,71,62,43,16,49,55,32,38,57,78,19,69,78,80,61,65,66,78,74,44,79,38,69,35,77,57,68,58,63,76,78,53,76,60,68,80,50,64,60,80,11,54,71,74,66,68,42,49,74,67,27,33,80,19,14,29,61,34,51,34,52,67,80,23,49,47,61,65,37,76,53,64,66,66,13,68,40,70,74,55,19,80,63,58,41,44,51,78,57,54,42,68,74,68,73,79,27,65,78,68,44,62,56,63,61,35,47,8,65,22,80,74,77,63,65,71,45,64,80,50,65,55,56,48,33,31,80,68,79,62,14,72,31,27,53,39,61,63,62,38,62,65,75,52,46,46,60,75,70,64,41,57,57,61,47,63,72,70,63,69,16,61,59,59,74,78,11,73,65,71,19,54,71,52,68,26,54,60,33,54,68,43,12,40,80,59,57,61,61,44,68,77,63,55,57,69,59,80,11,41,9,61,55,79,12,80,80,43,40,71,41,74,41,76,67,62,43,68,29,43,53,68,24,40,49,7,22,72,75,20,68,68,65,51,68,78,39,80,68,74,80,62,50,61,60,61,79,54,44,68,80,67,26,22,43,40,49,59,57,35,38,58,14,43,40,44,65,77,37,54,78,30,39,54,76,80,65,80,58,29,75,74,77,53,68,27,56,39,68,58,71,78,35,76,61,40,4,63,59,78,73,77,58,11,41,16,68,76,79,20,26,41,80,78,65,58,52,58,79,62,75,28,73,8,56,64,43,59,66,46,50,77,65,47,75,30,67,30,57,62,20,10,73,70,62,77,25,56,43,64,59,63,78,78,68,56,74,49,79,78,78,65,59,50,69,63,36,60,28,56,50,80,49,67,42,44,78,50,79,58,59,38,64,78,75,35,70,17,71,62,14,75,80,79,9,53,58,54,65,71,51,49,65,79,78,47,41,60,56,50,8,76,31,72,48,56,40,74,80,75,23,68,71,40,63,76,41,75,68,13,73,75,30,30,60,53,78,75,57,53,70,79,63,57,68,52,33,65,64,73,66,48,34,52,62,66,61,39,76,40,73,76,54,57,73,63,67,2,54,80,61,41,64,67,70,57,62,30,42,40,70,62,59,70,29,63,53,68,63,22,55,52,64,74,57,20,77,53,71,68,80,44,55,66,52,64,43,77,68,68,72,40,80,70,67,23,80,77,76,63,67,20,50,76,73,78,53,76,62,54,50,62,24,63,78,61,29,69,23,52,72,65,71,42,50,56,58,22,71,30,68,65,47,6,63,57,42,68,28,75,35,50,55,64,38,75,13,25,65,55,52,30,65,59,35,63,78,58,80,62,59,8,58,69,25,59,65,20,51,44,76,68,60,60,66,77,42,27,77,73,61,20,73,70,54,79,67,60,49,27,72,48,73,77,78,50,66,31,65,65,40,62,56,63,14,68,64,19,37,63,67,68,73,71,68,59,54,73,65,65,27,22,48,39,75,72,27,59,49,68,78,40,73,68,60,68,60,35,54,65,59,68,22,61,70,22,61,67,65,53,41,14,59,50,65,65,22,61,59,39,76,40,65,43,77,73,74,60,74,58,80,64,54,77,79,44,38,57,39,62,60,61,68,61,61,60,77,50,66,60,53,33,66,80,65,67,41,43,67,52,64,38,40,64,20,64,44,65,75,77,65,41,35,43,7,33,30,74,47,14,65,58,72,68,75],
+  D:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,1,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,1,0,1,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0],
+  PC1:[-0.54,-3.29,0.79,0.73,-0.24,-3.56,0.61,0.05,-1.14,0.98,1.01,-2.92,-0.61,1.66,-0.21,-0.24,1.87,0.84,1.36,0.31,-0.15,-0.82,0.15,-0.6,-1.0,1.73,1.03,0.48,1.6,2.06,0.94,-2.16,0.31,-2.9,0.5,-0.52,1.84,-2.18,-4.04,-2.16,0.33,1.08,0.25,0.26,0.48,-0.93,2.57,1.4,-0.04,3.14,0.63,0.75,0.21,2.0,-1.25,0.65,0.02,2.89,-0.15,-0.2,1.24,0.84,1.4,1.74,-0.56,0.7,-0.06,2.58,0.6,0.09,0.57,-0.2,0.42,0.79,-10.17,-0.33,-0.5,-0.53,1.12,2.56,1.76,-0.47,0.12,-1.29,0.77,2.36,-0.44,1.75,0.59,1.34,0.36,0.16,-0.86,0.11,-0.8,2.22,-2.02,-0.65,-0.96,0.04,-0.54,-2.17,1.11,2.88,1.95,0.37,0.45,0.73,-1.38,1.76,-0.05,0.79,0.26,0.58,-0.14,-0.23,-1.12,-6.27,0.96,-0.74,1.89,1.12,1.85,-0.7,-1.07,-2.73,0.88,3.3,-10.14,1.96,0.6,-3.58,1.26,-2.53,-2.9,0.31,0.28,-0.27,0.98,0.27,1.54,-0.64,0.33,-1.62,1.08,-0.89,0.05,0.16,-3.49,-3.82,-0.85,-0.48,0.2,-1.58,1.94,-2.14,-0.39,-0.34,0.64,-0.35,0.82,1.28,1.73,0.68,-2.57,-0.73,0.69,1.75,1.32,1.07,0.27,-1.56,0.72,-2.85,2.46,2.23,0.42,1.35,-4.89,0.27,0.87,-0.31,-0.8,0.09,0.58,-1.51,0.92,3.24,-0.96,-1.3,-1.49,2.04,0.66,0.43,0.94,-0.08,-1.49,1.99,1.22,-1.07,1.38,0.12,-0.68,0.86,-3.2,-0.77,-2.9,2.68,0.17,-1.56,1.13,-2.96,2.04,-1.31,-1.42,0.24,1.15,-5.04,0.3,0.21,2.73,0.43,0.49,-5.55,1.52,1.23,0.11,2.49,0.61,0.99,1.82,-0.05,0.42,-2.23,-0.68,-0.63,-0.22,-1.76,2.27,0.2,-1.12,-1.2,0.11,0.44,1.76,0.9,0.91,-0.4,1.27,0.57,0.17,0.86,2.18,-0.73,1.34,0.12,0.06,2.64,0.57,1.65,-0.36,0.39,-1.63,-1.25,-0.19,1.2,0.58,-1.29,0.58,-0.67,-4.21,1.4,-3.03,-0.39,-0.69,0.78,0.79,-4.57,-0.15,-3.25,0.09,1.23,-0.47,-0.26,0.97,0.16,1.04,-4.34,0.93,-0.46,-1.26,-1.44,0.74,-5.55,0.96,0.44,2.22,0.67,0.08,0.6,-0.09,0.15,-2.75,-0.71,-1.49,0.45,0.05,-0.06,-1.29,1.31,-1.5,-2.68,0.79,-0.51,-4.63,-1.9,-2.1,-0.46,-6.5,1.01,1.66,1.79,0.88,-0.49,0.68,-3.22,0.12,-1.67,0.63,-1.88,0.98,0.93,0.97,0.05,2.15,0.75,0.56,0.74,0.15,-0.7,-2.72,-1.21,0.24,-0.06,-0.83,0.35,-1.04,-5.06,1.42,0.34,1.09,1.78,0.18,-0.38,-0.21,2.77,-3.77,-0.94,-0.9,1.26,0.79,1.34,0.32,-0.97,0.79,-0.48,-2.91,-1.92,2.64,1.07,0.7,-0.48,1.82,-4.35,0.5,0.09,-2.19,0.57,0.8,-4.07,0.89,1.08,0.85,1.14,-0.7,-0.97,0.77,0.56,1.92,1.59,2.44,1.29,0.99,-1.87,1.34,-1.49,-2.73,1.25,0.97,2.73,0.93,-0.59,-2.03,0.92,-0.51,0.56,1.4,1.85,2.07,-0.32,-0.1,0.31,-0.96,0.72,0.6,-3.05,2.08,0.67,1.81,-1.41,-0.08,0.76,-1.32,1.68,1.08,-0.78,1.86,-0.48,0.02,-0.37,0.38,2.37,-1.74,2.33,0.55,0.85,0.74,2.24,-0.06,1.18,0.83,2.34,0.9,1.19,0.11,-0.17,-0.06,-1.4,-0.9,1.37,1.91,1.33,0.95,-0.81,0.54,-0.06,0.69,2.2,0.69,0.3,0.11,1.15,-0.62,-1.3,0.28,-0.24,0.85,1.72,1.21,1.01,0.36,0.89,1.99,-1.15,2.07,0.45,0.46,2.52,0.62,0.65,-4.49,1.91,0.59,0.61,-5.61,2.0,0.22,-3.58,2.21,-0.89,0.81,0.46,0.51,-0.1,-0.24,0.69,0.33,2.22,-1.53,0.45,0.97,-0.16,-1.08,1.51,2.37,2.51,-1.25,1.66,0.57,-1.3,-0.02,-0.54,-2.13,1.46,-0.05,0.48,0.06,-3.37,0.48,-0.78,-3.66,0.94,1.05,-1.3,1.46,1.54,-3.18,0.5,0.72,0.55,-1.07,0.82,0.93,-3.76,0.52,-0.09,0.42,1.76,-3.55,-1.57,1.97,-0.37,1.06,1.79,0.83,-2.21,-0.79,-0.01,-0.42,0.65,-1.0,-0.58,0.38,-1.46,1.49,2.25,-3.13,0.01,2.04,0.16,-1.05,-0.98,-1.48,2.01,-0.94,1.37,-0.94,-0.1,2.38,-0.15,-0.63,-0.57,-0.99,-0.69,0.05,-1.3,1.83,1.0,1.32,0.89,1.15,-2.5,0.68,-0.18,1.39,-2.9,0.3,-0.26,1.01,-0.38,2.35,-1.5,-0.08,-5.35,2.68,1.08,0.43,0.4,-2.39,1.06,1.12,1.23,0.32,1.93,1.81,1.05,-2.57,1.04,1.13,2.43,0.06,1.68,1.65,1.96,-1.1,-0.93,1.39,-1.94,1.16,0.39,0.25,0.9,-1.24,0.88,0.84,0.42,0.28,0.45,1.1,-1.49,-1.52,1.59,-3.02,2.58,1.28,1.52,1.97,-1.7,0.13,0.92,0.66,-0.35,-2.02,-1.03,-0.19,0.54,2.5,-0.58,1.05,-3.48,-1.98,0.56,1.8,2.62,0.07,1.1,0.62,-5.34,2.48,-1.7,0.67,0.7,1.16,-1.09,1.13,-1.53,-1.21,-0.49,0.73,1.41,1.27,-7.62,0.88,0.48,0.33,0.28,-0.51,-2.7,0.69,0.18,-2.75,-0.68,-0.38,0.67,-3.14,0.39,1.54,1.35,0.64,0.32,0.38,0.7,1.5,0.61,0.16,-0.99,1.83,-1.66,0.69,0.46,1.97,-0.49,0.38,1.37,0.65,1.06,1.13,1.5,2.32,0.89,-0.18,2.03,-0.01,0.98,-2.78,0.27,2.46,2.54,1.96,0.58,-1.37,0.3,1.17,0.96,-4.13,-1.48,1.32,-1.65,-3.75,-2.08,0.73,-1.29,0.28,-0.53,-0.09,0.21,1.48,-3.51,0.32,-0.58,-0.11,-0.05,-1.5,0.54,0.5,1.74,0.34,0.26,-3.86,0.9,-1.42,0.39,1.71,0.38,-5.7,0.44,1.11,1.4,-0.74,-0.61,-0.24,1.55,1.44,-0.18,-0.73,0.96,-0.42,2.12,1.23,1.05,-1.06,1.0,1.44,0.43,-0.61,1.9,1.11,0.97,-1.2,-1.61,-0.59,-7.05,1.71,-4.2,1.74,0.85,2.41,-0.03,1.94,0.32,-0.72,0.1,1.21,-2.93,0.93,0.03,-0.55,-0.04,-0.92,-4.85,1.44,0.55,0.47,-0.88,-3.07,0.73,-4.52,-2.41,0.31,-0.86,0.58,0.44,0.59,-1.13,0.95,-1.03,1.41,-1.1,-0.13,-0.2,1.71,2.23,1.68,-0.71,-0.4,0.32,-0.48,2.2,-0.54,1.81,1.36,0.54,0.67,1.12,-5.34,-0.33,1.6,-0.32,1.37,1.11,-3.39,0.8,2.0,-0.06,-3.22,-0.26,0.16,1.29,0.56,-2.22,-0.03,0.25,-1.43,-1.21,-0.2,-2.27,-3.76,-1.93,-0.87,0.44,-0.39,-0.03,0.06,0.62,-0.09,2.59,1.36,0.07,2.0,0.81,-2.11,0.2,-3.38,-2.42,-3.04,0.51,-0.03,0.48,-3.43,2.68,0.85,-1.04,-2.63,-0.23,0.16,2.21,-1.12,0.83,0.35,1.6,-1.2,0.86,-2.33,-1.15,0.23,1.24,-2.34,-1.26,0.37,-2.9,-6.3,0.56,0.96,-2.53,0.62,0.04,2.19,0.24,-0.52,1.15,-0.55,0.86,0.44,2.59,2.14,-0.67,0.88,0.32,0.59,0.29,2.09,0.46,0.69,0.74,1.73,-0.12,-1.13,-1.49,0.05,-1.28,0.68,0.59,-0.51,-1.12,-1.1,0.36,-3.42,-0.22,-1.16,-5.86,0.21,2.12,0.43,-0.22,0.89,-4.41,-0.78,-1.56,0.53,1.3,0.92,1.19,0.74,-1.07,1.4,1.44,2.23,0.58,0.61,-4.44,0.16,-1.15,0.64,1.33,1.19,1.17,-1.42,1.22,0.31,-0.91,-10.12,0.52,0.65,0.42,2.21,0.61,-0.51,-7.2,0.12,-3.65,1.83,0.08,2.03,-2.37,-1.58,-1.05,1.77,1.96,0.27,-0.17,0.21,1.73,1.31,-0.22,3.25,-2.98,2.3,-7.62,1.22,0.9,-0.92,1.82,1.25,-0.09,-0.86,1.06,0.74,-2.11,1.28,-2.39,0.07,-2.76,0.69,0.86,-2.14,-2.82,0.42,-0.75,0.08,1.29,-2.0,0.07,-0.84,-0.1,0.57,0.21,3.19,1.32,1.25,-0.54,2.78,-0.08,1.29,1.17,2.06,0.17,0.34,-1.12,0.23,-0.29,-0.59,-0.32,-1.89,-0.79,-0.56,2.35,0.25,1.93,-1.68,0.44,0.89,0.13,2.34,-0.23,-0.82,-0.95,0.64,0.67,0.26,0.34,1.48,-2.01,1.36,-0.31,-2.22,1.29,1.62,0.65,-2.22,1.5,0.75,-0.31,0.06,0.1,0.07,0.48,0.6,0.86,0.16,0.05,-0.55,0.92,0.17,-0.73,-4.29,-0.03,-2.83,1.65,-2.1,0.93,-1.64,0.89,0.39,0.3,-2.7,1.54,1.47,-0.45,0.88,1.96,-0.47,2.33,0.3,-3.56,1.16,0.43,-4.66,-1.76,1.46,-1.1,2.68,2.56,-1.56,-0.43,1.09,0.84,0.12,1.29,0.17,-0.39,-1.47,2.09,1.73,-0.2,-0.48,-0.08,-0.78,0.31,1.23,-2.4,0.75,-3.48,-0.82,-1.31,1.42,1.54,-0.58,0.73,1.32,1.43,1.17,-4.19,-0.63,1.38,1.19,-0.28,0.06,1.92,0.94,-0.17,-0.02,-2.45,0.51,-0.91,0.77,0.22,-0.62,2.45,-2.63,1.33,-0.27,0.45,0.79,-1.77,1.32,-0.15,-0.78,-0.4,0.71,-1.99,2.52,-0.18,1.34,1.62,1.65,-1.35,0.53,0.24,0.07,0.24,-0.82,1.09,0.66,2.42,0.41,-3.63,2.75,1.11,-1.01,-5.04,1.71,0.31,-0.08,1.26,-0.12,-1.56,-0.15,0.65,0.64,1.08,1.45,1.31,0.44,-0.35,-0.64,2.33,-3.37,-0.31,1.99,0.75,-1.92,1.94,-3.3,0.01,1.77,0.56,1.8,0.37,0.06,-0.44,0.01,-1.88,1.57,-1.67,0.08,0.22,-0.89,-4.0,0.53,-0.13,-0.1,0.55,-2.97,0.56,-1.52,0.4,-1.42,0.76,-1.32,0.77,-2.78,-4.15,0.88,1.13,-0.56,-3.05,0.82,-0.06,-2.06,1.97,1.61,0.4,0.63,1.11,-0.59,-2.97,1.78,0.25,-1.99,0.75,2.13,-3.36,-0.17,0.04,2.23,1.19,0.95,1.73,1.19,2.51,0.39,-2.26,1.05,2.28,0.43,-2.44,1.01,2.0,1.01,0.82,-0.05,-1.1,0.58,-2.2,0.51,-0.09,1.86,1.17,1.0,0.01,1.07,-3.31,0.23,1.79,-1.07,0.14,1.11,-0.59,-3.63,0.84,-1.42,-1.73,-0.71,0.61,0.53,1.27,2.3,0.37,0.88,0.62,-1.49,1.45,1.98,0.72,-1.45,-4.54,-0.36,-1.39,0.99,0.59,-2.63,0.42,-0.25,0.24,1.62,-0.81,0.09,2.2,-1.6,-0.03,0.59,-0.41,-0.38,0.92,0.44,2.09,-5.12,0.63,2.15,-1.92,1.56,1.91,2.07,-1.14,-1.0,-2.77,1.33,0.54,2.22,0.13,-1.42,-0.2,0.02,0.27,1.31,-1.03,0.77,0.19,2.69,1.79,1.41,-0.32,1.63,-0.54,2.08,2.16,-0.35,1.13,2.85,-1.35,-0.91,0.69,-0.61,-1.51,0.03,1.78,0.05,1.04,1.37,0.93,0.54,0.08,0.68,-0.15,0.96,-2.11,0.9,2.46,1.47,1.16,-1.2,-1.29,-0.92,0.72,2.01,-1.09,-1.04,0.58,-2.12,1.22,0.06,0.44,1.74,1.26,0.06,0.35,-0.33,-1.25,-6.92,-2.98,-1.78,1.14,-0.64,-3.67,1.74,0.35,2.11,1.24,1.12],
+  PC2:[-0.13,-1.8,0.36,0.2,-0.71,-1.24,-1.29,-0.39,-0.94,-0.73,-1.04,-1.33,-0.63,1.12,-0.2,-0.19,0.45,-0.29,0.4,0.07,4.67,4.33,-0.48,-0.11,-0.91,-0.74,0.71,0.36,-0.27,0.04,0.38,3.83,-0.05,-1.65,-1.46,-1.12,0.79,-1.67,-2.0,-1.46,-1.19,0.99,-0.1,0.11,-0.23,-1.42,0.14,-1.07,0.48,1.0,-0.48,0.23,0.29,-0.3,-0.92,0.23,-0.49,0.33,-0.85,-0.44,-0.17,0.42,0.17,-0.28,-0.29,5.85,-0.71,0.34,-0.59,-0.2,-0.49,-0.2,0.39,-0.31,1.34,-0.47,-1.0,-0.43,-0.68,0.01,-0.97,-0.23,-0.15,-0.74,-0.34,-0.34,5.1,0.02,-0.35,0.29,-0.49,-0.77,3.33,-0.45,-1.16,-0.81,-1.45,-1.33,-0.8,-0.13,-0.57,-1.27,-0.21,0.34,-0.98,0.45,-0.42,-0.57,-1.06,-0.51,0.4,-0.28,0.02,-0.01,-0.29,-0.37,4.06,2.01,-0.99,-1.16,-1.03,-0.2,-0.46,-0.4,-0.76,-2.0,0.78,1.08,1.36,-0.48,-0.13,-1.71,-0.0,-1.47,2.98,-1.3,-0.0,-1.07,-0.88,-0.5,0.29,5.32,-0.3,-0.79,-0.39,3.73,0.0,-0.84,-2.37,2.77,-1.41,-0.22,-0.6,-1.52,-0.52,-1.58,4.11,-0.34,-0.12,-0.42,-1.19,-0.02,-0.8,-0.16,-0.98,-1.37,0.2,-0.69,0.0,-0.21,-0.01,3.57,-0.08,-1.1,-0.38,1.35,0.65,0.08,3.05,-0.23,0.19,0.09,4.38,-1.0,-0.2,-1.05,-0.34,1.4,-0.66,-0.76,-1.2,-0.19,0.03,-0.01,-0.31,0.17,-1.28,0.15,-0.21,-0.93,-0.46,-0.49,-1.34,-0.12,-1.83,-0.63,-1.54,-0.02,-0.61,4.67,-0.55,-1.84,-0.85,-1.06,-1.49,-0.54,-0.93,-2.49,-0.88,-1.01,0.77,-0.29,-0.84,2.48,0.17,-0.12,-0.64,-0.25,-0.38,0.09,-0.73,-0.09,0.18,-1.62,3.66,-0.33,-1.2,-1.67,-0.04,6.14,-1.02,4.53,-0.1,0.06,0.04,-0.0,-0.72,-0.4,0.26,-0.01,4.99,0.31,-0.21,-1.2,-0.35,-1.05,-0.47,0.07,5.2,-1.08,4.42,0.36,-1.58,-0.89,-1.19,-0.75,-0.21,-1.49,-0.02,4.56,-1.97,0.18,-1.85,-0.84,-0.79,0.8,0.17,-2.74,-1.02,-2.21,-0.84,0.33,0.17,-1.16,0.4,-0.13,0.3,-2.64,-0.49,-0.44,-0.81,-1.26,-0.2,2.17,-1.03,-0.61,-0.17,0.39,-0.19,-0.07,-0.38,0.09,-2.26,-1.14,4.69,-0.6,-0.24,-0.41,-1.4,0.17,-1.73,-1.49,-0.52,-0.83,2.75,-1.75,2.74,-1.22,1.79,-0.09,-0.88,-0.22,-0.1,-1.02,0.13,2.53,-0.44,-1.02,0.19,-0.9,-0.61,-0.82,0.2,5.42,-0.42,-0.2,-0.6,-1.05,-0.7,-1.22,-1.59,-0.95,6.0,-0.25,4.48,0.48,-0.92,2.91,0.23,0.31,0.82,-0.92,-0.82,-1.17,-1.01,1.39,-1.75,4.41,-0.66,-0.09,0.7,-0.07,-0.34,-0.55,-0.79,-0.85,-2.02,-1.42,0.15,-0.15,-0.39,-0.69,-0.62,3.63,-0.12,-0.67,-1.53,-0.28,-0.61,-2.06,-0.99,-0.0,-0.17,-0.18,4.0,-0.78,0.43,-1.2,-0.56,-0.83,-0.49,0.11,-0.15,-1.84,-0.58,3.76,-1.15,-0.64,-0.31,0.08,-1.54,-0.54,-1.94,-1.04,-1.15,-0.46,-0.34,-0.57,-0.26,-0.69,-0.76,-0.67,-1.08,-1.14,-0.19,-2.09,-0.31,0.17,-0.61,3.37,-0.87,-0.78,-0.97,-0.42,0.16,3.64,-0.67,-0.32,-1.1,4.91,-0.23,-0.93,3.05,0.08,-0.71,0.41,-0.58,-0.62,-0.91,0.04,-0.6,-0.28,-1.09,0.14,-0.66,4.82,-0.33,-1.21,-0.89,0.2,-0.44,0.01,-0.46,-1.35,0.11,-0.47,0.38,-0.18,0.19,0.05,-0.05,0.08,3.96,-0.8,0.64,4.42,-0.11,-0.75,-0.13,-0.29,5.22,-0.86,0.16,-0.75,-0.62,-1.0,-0.45,-0.26,-0.77,0.21,-2.84,0.85,-0.59,-0.0,-3.1,-0.46,-0.83,-1.62,-0.34,-0.8,-0.42,-0.04,0.33,-1.11,-0.34,-0.75,-1.14,0.09,3.83,-0.47,0.2,-0.98,-0.73,0.18,-0.12,0.22,-1.48,-0.0,-1.41,-1.46,-0.51,-1.17,-1.29,0.23,-0.55,5.3,4.82,-1.61,-0.41,4.57,-2.0,-0.39,-0.2,-1.0,-0.17,0.13,2.78,-0.47,0.3,0.08,-0.78,0.59,-0.92,-1.9,-0.1,4.95,-0.58,0.82,-1.94,-1.5,0.05,-0.36,-0.24,-0.69,-1.07,-1.41,-0.61,5.26,-1.34,-0.16,-0.75,-0.16,0.4,-1.0,0.63,-0.45,-1.32,-0.8,-0.33,-0.48,-0.84,3.35,-1.2,-0.73,3.92,0.18,-1.05,-0.15,-0.11,-0.35,-1.36,4.18,-1.56,5.14,-0.64,-0.86,-0.52,0.14,0.57,0.79,-0.62,-1.45,-0.53,-0.09,0.24,-1.37,-0.63,5.61,-0.39,-1.03,-0.34,-1.19,-0.56,2.69,0.01,-0.24,-0.64,0.45,-1.51,-0.21,-1.01,0.25,-0.12,-0.61,-0.6,-0.23,-1.38,-0.59,-0.78,-0.08,0.12,-0.0,-0.81,-0.48,-1.44,-0.9,0.01,2.93,-0.07,-0.02,-0.51,5.74,-1.26,-0.14,-0.57,5.75,-1.42,5.62,0.48,3.92,-1.08,-0.96,-2.17,0.08,-0.61,0.04,-0.37,3.62,-0.89,0.34,-0.01,-0.33,-1.47,-0.58,-1.05,-0.06,-0.1,-0.69,-0.64,-1.75,-1.1,-0.52,-0.06,0.25,-0.18,-0.02,0.21,2.18,0.2,3.45,-1.04,-0.23,-0.67,4.61,0.3,-1.21,-1.48,4.5,-0.19,0.7,0.09,1.24,0.45,0.29,0.01,-0.44,-1.28,-1.75,-0.73,-0.59,2.9,-1.45,-0.47,0.11,-1.51,-0.22,-0.09,0.01,-0.15,0.31,-0.49,0.12,0.59,-1.16,-0.06,-0.65,-0.56,-1.37,0.37,-0.41,-0.37,-0.76,-0.4,-0.06,0.67,-0.63,-0.19,-0.4,-0.18,0.64,-0.04,-0.67,4.76,-0.42,-1.81,-0.6,0.16,0.35,-0.18,0.53,-0.96,-0.77,0.7,-0.28,3.25,-1.16,-0.01,-1.62,-2.18,-1.3,-0.26,-0.65,-0.88,-1.06,-0.82,0.33,0.25,-1.39,-0.16,-1.61,-0.08,-0.37,-1.43,0.05,-0.39,0.42,0.66,-0.01,-1.89,-0.03,-1.22,-0.26,0.52,-1.03,1.89,0.35,-0.31,-0.45,-0.51,-0.81,-0.3,0.19,-1.07,-0.83,-0.57,-0.74,4.02,-0.33,0.12,0.66,-1.33,0.45,0.13,-0.03,-1.37,-0.45,-0.99,-0.64,4.44,-1.16,-0.01,1.59,-0.79,-2.45,0.54,0.28,-0.15,0.12,-0.57,4.76,4.59,-0.08,-0.34,2.88,-0.25,-0.76,-0.43,-0.82,-0.44,-2.25,0.09,0.89,-0.08,4.83,-1.97,0.36,-2.84,-1.01,4.95,-1.02,0.1,-0.65,-0.15,-0.63,-0.56,4.59,0.22,4.39,-0.83,-1.1,-0.21,-0.39,-0.66,4.75,-0.94,-0.67,-0.23,-0.12,-0.58,-0.49,0.39,5.39,-0.15,-0.2,2.22,-0.52,0.46,4.8,0.37,-0.45,-1.99,-0.34,-0.21,4.57,-1.56,-0.17,-0.32,-0.19,0.56,-1.46,-0.65,-0.49,-0.92,4.69,-0.33,3.43,-1.93,3.99,4.34,0.42,-0.75,-0.4,0.16,-0.99,-0.22,0.02,0.46,0.24,-0.37,-0.4,3.31,0.14,-1.81,3.28,-2.13,-0.54,-0.93,0.01,-1.83,0.54,0.21,-0.96,4.64,4.97,-1.5,-0.47,-0.98,5.56,0.22,0.2,-0.87,0.21,-1.1,-0.9,-0.54,0.46,-1.57,-0.88,-0.46,-2.02,1.71,0.32,-0.24,-1.8,-0.4,-0.19,-0.43,-0.93,4.03,0.88,-0.98,0.18,0.36,0.09,0.3,4.45,-0.95,-0.43,-0.42,0.36,0.82,0.1,-0.84,-0.09,-0.07,-0.49,-1.2,-1.46,-0.71,-0.93,-0.98,-0.39,4.16,-0.59,-0.81,-0.04,-1.75,-0.8,-0.82,1.83,-0.29,1.13,-1.2,0.16,0.28,2.93,-1.14,3.75,0.57,-0.01,-0.12,-0.3,-0.4,-1.55,0.34,0.03,-0.5,5.52,0.46,-2.8,4.34,-0.82,-0.36,0.1,0.24,0.73,-1.11,-0.04,-0.34,-0.36,1.39,-0.47,-0.65,0.01,-0.68,0.33,-0.6,1.54,-1.33,-1.57,-0.74,-0.34,0.2,-1.73,-1.11,-0.84,0.47,-0.85,0.26,-0.18,-0.36,-0.44,-0.07,-0.42,0.92,-1.38,-0.25,1.24,-0.96,-0.23,-0.69,-0.16,-0.47,-0.55,-0.7,-0.06,-0.32,3.67,-0.38,-1.59,-0.53,-1.23,-0.41,0.02,-1.48,-1.96,0.39,5.01,-0.76,-0.53,-1.58,-0.61,-1.59,-0.32,-0.31,-0.42,1.02,0.05,0.2,-0.45,0.25,-0.62,0.22,-0.62,-0.59,-0.17,-0.32,-0.89,0.22,-0.43,-0.92,-0.6,-1.0,-0.7,-0.51,0.69,-0.18,-0.36,-1.09,-1.09,0.63,-0.49,0.41,-0.33,4.8,-1.14,-0.63,-0.73,-0.27,-1.41,0.22,-1.94,-0.09,-0.6,-2.11,0.03,0.59,0.14,-2.33,-0.22,-0.23,0.04,-0.26,-0.14,0.73,0.02,0.01,0.51,5.19,-0.81,-1.26,-0.45,-0.66,-0.31,-2.09,5.76,-1.23,0.69,3.22,-1.21,-1.15,0.62,-0.02,-0.08,-1.37,-1.06,-1.16,-1.31,-0.27,-0.4,-1.09,-0.25,-0.86,-1.68,0.99,-0.29,-2.78,-1.43,-0.99,4.5,0.7,-0.15,4.05,-0.28,0.06,-0.32,-0.05,-0.92,-0.28,-1.1,-1.13,-0.08,-0.26,4.1,4.33,-0.83,-1.32,-0.07,-0.47,1.33,-0.14,3.54,4.54,-0.97,1.55,-0.52,-0.29,-0.05,0.31,-1.17,-0.25,-2.16,-0.04,-0.14,0.8,-1.01,-0.44,-0.36,-0.26,0.0,0.08,-1.04,-1.18,-0.49,-0.5,0.05,-0.72,-0.01,-1.44,-0.31,-0.86,0.13,0.23,-0.88,-1.02,-0.88,4.92,4.79,-0.67,-1.42,0.12,-0.4,0.4,-0.67,0.53,-1.18,0.15,-0.21,-0.83,0.42,-0.44,0.88,-0.64,0.1,0.19,3.18,0.12,0.11,4.53,3.19,0.47,5.18,4.64,-0.6,-0.25,-1.35,-0.69,-0.17,0.2,0.22,-0.02,-0.14,-0.12,4.93,-1.35,-0.03,2.37,-0.22,1.19,-0.0,-1.07,-0.43,2.45,0.09,0.76,-0.68,-0.45,-0.99,-1.1,-0.61,0.08,-1.32,0.57,-1.03,0.25,-0.56,-0.5,-2.03,0.26,-0.45,-0.7,-0.65,-1.34,0.49,-1.08,-0.1,3.39,-0.25,-1.14,-0.24,-1.51,-2.55,-0.41,-0.86,-0.7,2.54,-0.26,-0.46,2.6,-0.21,0.37,-0.51,0.09,0.15,-0.89,-2.06,-0.09,0.08,-1.45,-0.06,-0.25,-1.58,-0.88,4.61,-0.27,0.53,0.06,-0.62,0.09,-0.09,-1.31,-1.28,0.78,0.95,-0.21,-1.36,-0.01,-0.61,-0.88,0.27,-0.15,3.82,-1.18,-1.51,0.14,-0.87,0.71,0.71,0.49,-0.64,-1.0,-1.55,-0.69,-0.62,-0.78,-0.08,-0.68,-0.38,-1.88,-0.07,4.39,-1.73,0.07,-0.58,-0.51,0.23,-0.13,0.12,-0.19,-0.53,4.01,0.66,-0.48,-0.17,-1.35,3.45,-0.2,-1.0,0.55,0.29,-1.37,-0.14,-1.04,-0.1,0.44,-0.39,6.43,-0.5,3.73,-0.08,-0.35,-1.16,-0.31,0.22,-0.71,-0.34,2.78,-0.38,-0.07,-1.41,-0.83,-0.61,-0.21,3.95,-1.26,-1.27,-0.87,-1.36,-0.33,5.17,-1.37,-0.44,-0.07,-1.3,0.35,4.21,-0.73,-0.34,-0.04,0.19,0.55,-0.42,0.75,-0.84,-0.8,-0.06,-0.11,-0.09,-0.04,-1.0,-0.63,-0.3,-1.31,3.6,-0.82,-0.46,4.54,-0.4,-0.77,-1.38,5.56,-0.65,-0.59,-0.12,-0.82,2.59,0.23,-0.34,-1.05,-0.45,-1.18,-1.11,4.59,-1.09,-0.33,-0.55,-0.65,-0.49,-1.5,0.92,-0.35,-0.13,0.78,-0.08,-0.12,-1.42,-0.8,-0.73,1.09,2.69,-0.9,0.11,-0.65,-2.02,-0.89,0.47,-0.12,0.48,0.1]
+};
+/* the PCA itself, for the pictures */
+const PCA = {
+  NAMES:["Price","Age","KM","Diesel","HP","MetColor","Automatic","CC","Doors","Weight"],
+  R:[[1.0,-0.8778,-0.5702,0.0528,0.3192,0.1091,0.0347,0.1664,0.1858,0.5866],[-0.8778,1.0,0.5118,-0.098,-0.1575,-0.1084,0.0317,-0.1336,-0.1478,-0.4723],[-0.5702,0.5118,1.0,0.4166,-0.3496,-0.0825,-0.0779,0.3051,-0.0358,-0.036],[0.0528,-0.098,0.4166,1.0,-0.5325,-0.0117,-0.085,0.7631,0.026,0.5718],[0.3192,-0.1575,-0.3496,-0.5325,1.0,0.0578,0.0132,0.0498,0.0925,0.0867],[0.1091,-0.1084,-0.0825,-0.0117,0.0578,1.0,-0.0211,0.0347,0.082,0.0573],[0.0347,0.0317,-0.0779,-0.085,0.0132,-0.0211,1.0,-0.0698,-0.0276,0.0567],[0.1664,-0.1336,0.3051,0.7631,0.0498,0.0347,-0.0698,1.0,0.1273,0.652],[0.1858,-0.1478,-0.0358,0.026,0.0925,0.082,-0.0276,0.1273,1.0,0.3013],[0.5866,-0.4723,-0.036,0.5718,0.0867,0.0573,0.0567,0.652,0.3013,1.0]],
+  LAM:[2.931625,2.481799,1.062388,1.007723,0.95898,0.863353,0.341273,0.235245,0.083737,0.033878],
+  V1:[-0.5145,0.4785,0.2258,-0.219,-0.147,-0.0973,-0.001,-0.3119,-0.2011,-0.4884],
+  V2:[-0.2199,0.188,0.4809,0.5578,-0.3557,-0.0545,-0.0729,0.4344,0.0109,0.2242],
+  RAWSHARE:[0.955,0.0,99.0422,0.0,0.0,0.0,0.0,0.0026,0.0,0.0002]
+};
+
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Excel, or
+              drop-down choices ({kind:'select'})
+
+   Every number field follows the course margin rule, applied by the
+   engine (marginOf): 'exact:true' integers (counts) must be exact;
+   values with 0.1 <= |value| < 1e6 are accepted within ±0.01; smaller
+   or larger values within ±1% of the target. Fields carry no tolerance
+   of their own. 'alt' lists common wrong values, each with its own
+   feedback, checked with the same rule around the wrong value.
+
+   The correlation between PC1 and PC2 is 0: the margin rule cannot
+   accept the rounding noise Excel prints (1.8E-15), so question 4 is
+   asked as a choice.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const L1 = 'λ<sub>1</sub>', L2 = 'λ<sub>2</sub>';
+const SIGNMSG = 'Opposite sign: apply the sign convention. The loading of Age must be positive in the first eigenvector, the loading of Diesel positive in the second; if not, multiply that whole eigenvector by −1.';
+
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE X',
+  text:`You have met these cars before : 1,419 second-hand Toyota Corollas, their price and nine
+  characteristics. Ten columns.
+  <span class="fx">The Master pins ten sheets of paper on the wall, one per column.</span>
+  A scatter plot shows two columns at a time. Ten columns make 45 pairs : 45 scatter plots, and not one
+  of them shows the whole cloud. Hence my claim : <strong>nobody can see a cloud in ten
+  dimensions</strong>. Whatever groups or strange cars hide in this file, they stay hidden.
+  Today there is no Y to explain. You will squeeze the ten columns into two principal components, draw
+  them, and we shall see what can be seen.`,
+  widget:'table', banner:'CLAIM: NOBODY CAN SEE TEN DIMENSIONS', cont:'Open the file' },
+
+{ id:'t1', type:'numeric', bg:'lab', who:'master', qn:'1',
+  title:'TRIAL I · A DUMMY FOR THE FUEL',
+  text:`Download <span class="kbd">ToyotaCorolla_data.xlsx</span> with the DATA (XLSX) button. Then take
+  <span class="kbd">EigCov.xlsm</span> from <strong>Blackboard</strong>, open it, enable its macros, and
+  copy the data into it. Work in that file from now on : it holds the function EigCov, which you will
+  need for the eigenvectors, and which exists nowhere else.
+  Column D, FuelType, holds words, and a PCA only eats numbers. Replace it with a <strong>dummy
+  variable</strong>, Diesel : 1 when the car runs on diesel, 0 otherwise, whether petrol or gas. In
+  fact, this file holds no gas car : only Petrol and Diesel.
+  <strong>How many cars, how many diesel cars, and what share of the file runs on diesel ?</strong>`,
+  q:'Report what your workbook says. The share in percent.',
+  fields:[
+    {id:'n', label:'Number of cars', value:1419, exact:true,
+     alt:[{value:1420, msg:'Row 1 holds the names, not a car. Count the numbers only, i.e., =COUNT(A2:A1420).'}],
+     msg:'Use =COUNT(A2:A1420) on the Price column.'},
+    {id:'nd', label:'Number of diesel cars', value:155, exact:true,
+     alt:[{value:1264, msg:'That is the number of petrol cars. The dummy is 1 for the diesel cars.'},
+          {value:1419, msg:'That is the number of cars. Sum the dummy, or use COUNTIF: COUNT counts the zeros too.'}],
+     msg:'Sum your dummy column, or count the cells equal to "Diesel" in column D.'},
+    {id:'sh', label:'Share of diesel cars (%)', value:10.923185,
+     alt:[{value:89.076815, msg:'That is the share of petrol cars. The dummy is 1 for the diesel cars.'},
+          {value:0.10923185, msg:'That is a proportion. Give the share in percent: multiply by 100.'}],
+     msg:'The average of the dummy is the share of diesel cars; multiply it by 100.'}],
+  hint:`Build the dummy in a new column with <b>IF</b>, and copy it down to row 1420. Its sum counts the
+  diesel cars; its average is their share. Then put the dummy in place of FuelType (paste it as values
+  in column D), so that the ten variables sit in ten adjacent columns.`,
+  code:`=IF(D2="Diesel",1,0)        ← French: =SI(D2="Diesel";1;0)
+=COUNT(A2:A1420)
+=SUM(???)                    ← the dummy column
+=100*AVERAGE(???)`,
+  say:'1,419 cars, 155 of them diesel : 10.92% of the file.',
+  right:`<strong>155</strong> diesel cars out of <strong>1,419</strong> : about one car in nine. Your ten
+  columns are now all numbers : the price, the age, the kilometres, the Diesel dummy, the horsepower, the
+  metallic colour, the gearbox, the engine volume, the doors and the weight.
+  <span class="fx">The Master unpins the FuelType sheet and pins a new one : Diesel, 0 or 1.</span>
+  Before any component, look at how these ten columns move together.`,
+  note:'1,419 cars; Diesel dummy = 1 for 155 cars (10.92%); no gas car in the file' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'2',
+  title:'TRIAL II · THE CORRELATION MATRIX',
+  text:`Compute the <strong>correlation matrix</strong> of the ten variables, the price included : Data →
+  Data Analysis → Correlation, on the ten adjacent columns, with Labels ticked. A 10 by 10 table, with 1
+  on the diagonal.
+  Careful : Excel fills only the lower triangle. The matrix is symmetric, so copy each value to its
+  mirror cell, above the diagonal. You will need the full matrix soon.
+  <strong>Report three of its entries.</strong>`,
+  q:'Read your correlation matrix.',
+  fields:[
+    {id:'pa', label:'Correlation between Price and Age', value:-0.877774,
+     alt:[{value:-59549.4956, msg:'That is the covariance of Price and Age (COVARIANCE.S). The question asks for the correlation: Data Analysis → Correlation, or CORREL.'},
+          {value:-59507.5298, msg:'That is the covariance computed by the Covariance tool, which divides by N. The question asks for the correlation: Data Analysis → Correlation.'}],
+     msg:'Read the cell at the crossing of the Price and Age rows and columns, or check with =CORREL(A2:A1420,B2:B1420).'},
+    {id:'dc', label:'Correlation between Diesel and CC', value:0.763099,
+     alt:[{value:-0.763099, msg:'Your dummy equals 1 for the petrol cars. It must be 1 for the diesel cars.'}],
+     msg:'Read the crossing of the Diesel and CC rows and columns. The Diesel dummy must replace FuelType in column D.'},
+    {id:'dh', label:'Correlation between Diesel and HP', value:-0.532502,
+     alt:[{value:0.532502, msg:'Your dummy equals 1 for the petrol cars. It must be 1 for the diesel cars.'}],
+     msg:'Read the crossing of the Diesel and HP rows and columns.'}],
+  hint:`Data → Data Analysis → Correlation. Input Range : the ten columns, from the names in row 1 down to
+  row 1420, with the Diesel dummy in column D, in place of FuelType. Tick <b>Labels in First Row</b>. You
+  can check any entry with <b>CORREL</b>.`,
+  code:`Data → Data Analysis → Correlation
+   Input Range:  A1:J1420     ← ten adjacent columns, Diesel in D
+   [x] Labels in First Row
+=CORREL(A2:A1420, B2:B1420)   ← check: Price and Age`,
+  say:'Price and Age : −0.88. Diesel and CC : 0.76. Diesel and HP : −0.53.',
+  right:`The strongest link of the table is between the price and the age, −0.88 : old cars are cheap.
+  Then the dummy and the engine volume, 0.76 : the diesel Corollas carry the big 2-litre engine. Diesel
+  and horsepower, −0.53 : big engines, but not powerful ones. The weight goes with the price (0.59) and
+  with the engine volume (0.65).
+  <span class="fx">The Master circles the large numbers with a red pen.</span>
+  Strong correlations mean redundancy : several columns tell the same story. That is what a PCA feeds
+  on.`,
+  widgetAfter:'corr', note:'corr(Price,Age) = -0.88; corr(Diesel,CC) = 0.76; corr(Diesel,HP) = -0.53' },
+
+{ id:'t3', type:'choice', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL III · WHY STANDARDIZE ?',
+  text:`One decision before the eigenvalues. The course offers two routes : the eigenvectors of the
+  <strong>covariance</strong> matrix, applied to the raw data, or the eigenvectors of the
+  <strong>correlation</strong> matrix, applied to the standardized data.
+  <strong>Which one here, and why ?</strong>`,
+  q:'Choose the right matrix and the right reason.',
+  options:[
+    {id:'a', label:'The covariance matrix: it keeps the true variability of each column, and a PCA is all about variance.'},
+    {id:'b', label:'The correlation matrix: the columns are in different units (euros, months, kilometres, kilograms…), and the kilometres, whose variance is by far the largest, would swallow the first component.'},
+    {id:'c', label:'Either one: the two matrices have the same eigenvectors; only the eigenvalues differ.'},
+    {id:'d', label:'The correlation matrix, because its eigenvalues are all equal to 1.'}
+  ], correct:'b',
+  hint:`Compare the variance of the KM column with the variance of the Price column, then with that of
+  Doors. Then remember what the course says when the variables are not measured in the same unit.`,
+  code:`=VAR.S(C2:C1420)     ← KM
+=VAR.S(A2:A1420)     ← Price
+=VAR.S(???)          ← Doors`,
+  right:`The correlation matrix. The variance of the kilometres is about 1.37 billion : a hundred times
+  that of the price, and more than a billion times that of the doors. In raw units, the kilometres hold
+  99.04% of the total variance. A PCA on the covariance matrix finds one component, the odometer, and
+  says it "explains" 99.35% of the variance.
+  <span class="fx">The Master tears the KM sheet off the wall, then pins it back, smaller.</span>
+  Standardizing puts every column in the same unit : its own standard deviation. Each column then
+  carries a variance of 1, and the ten together a total variance of 10.`,
+  wrong:{a:`True variability, in which unit ? A kilometre is a small unit, so the KM column has huge
+  numbers and a huge variance : 99% of the raw total. On the covariance matrix, the first component is
+  the mileage and almost nothing else.`,
+  c:`They are not the same. Rescaling a column changes the covariance matrix, hence its eigenvectors. On
+  the raw data, the first eigenvector is almost (0, 0, 1, 0, …, 0) : the kilometres alone.`,
+  d:`The diagonal holds 1s, but the eigenvalues also depend on the correlations off the diagonal. They
+  would all equal 1 only if the ten variables were uncorrelated, and your matrix says otherwise.`},
+  widgetAfter:'covtrap', note:'Use the correlation matrix: in raw units KM holds 99.04% of the total variance' },
+
+{ id:'t4', type:'numeric', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL IV · EIGENVALUES AND EIGENVECTORS',
+  text:`Now the eigenvalues and eigenvectors of the correlation matrix. Excel has no built-in function for
+  them : use <span class="kbd">EigCov</span>, from the file <strong>EigCov.xlsm</strong> on
+  <strong>Blackboard</strong>. Work inside that file, macros enabled : anywhere else, Excel answers
+  #NAME?.
+  Select an empty block of <strong>11 rows and 10 columns</strong>, type <span class="kbd">=EigCov(</span>
+  followed by your full 10 by 10 matrix, and press Ctrl + Shift + Enter. Row 1 holds the eigenvalues,
+  from the largest to the smallest. Below, <strong>each column</strong> is the eigenvector of the
+  eigenvalue above it.
+  An eigenvector is defined up to its sign, so we need a convention to speak of the same components :
+  <strong>if the loading of Age in the first eigenvector is negative, multiply that whole eigenvector by
+  −1 ; if the loading of Diesel in the second eigenvector is negative, do the same with it.</strong>
+  <strong>Report ${L1}, ${L2} and the loading of Age in the first eigenvector.</strong>`,
+  q:'Read the output of EigCov.',
+  fields:[
+    {id:'l1', label:`First eigenvalue ${L1}`, value:2.931625,
+     alt:[{value:1.375482e9, msg:'That is an eigenvalue of the covariance matrix. Feed EigCov with the correlation matrix.'},
+          {value:29.316247, msg:'That is the share of the variance kept by PC1, in percent. Report the eigenvalue itself, row 1 of the EigCov output.'}],
+     msg:'The eigenvalues are in row 1 of the EigCov output, the largest first. EigCov needs the full correlation matrix: numbers only, no labels, no empty cell.'},
+    {id:'l2', label:`Second eigenvalue ${L2}`, value:2.481799,
+     alt:[{value:8.90265e6, msg:'That is an eigenvalue of the covariance matrix. Feed EigCov with the correlation matrix.'}],
+     msg:'Row 1 of the EigCov output, second cell.'},
+    {id:'a1', label:'Loading of Age in the first eigenvector', value:0.478544,
+     alt:[{value:-0.478544, msg:SIGNMSG},
+          {value:-0.219930, msg:'You read the first eigenvector along a row. Each eigenvector is a column of the EigCov output, below its eigenvalue.'},
+          {value:0.187997, msg:'That is the loading of Age in the second eigenvector. Read the column below the first eigenvalue.'},
+          {value:-0.514452, msg:'That is the loading of Price, the first variable. Age is the second variable: the second cell of the first eigenvector.'}],
+     msg:'Read the column below the first eigenvalue: its second cell is the loading of Age (the variables keep the order of your matrix).'}],
+  hint:`EigCov returns a block : select the 11 × 10 cells first, type the formula, then press <b>Ctrl +
+  Shift + Enter</b> (in recent Excel, Enter is enough). Its input must be the <b>full</b> symmetric
+  matrix : numbers only, no labels, no empty cell above the diagonal. Row 1 of the output : the
+  eigenvalues. Rows 2 to 11 : the eigenvectors, one per <b>column</b>, their cells in the order of your
+  variables (Price, Age, KM, Diesel, …).`,
+  code:`select an empty block of 11 rows × 10 columns, then type
+=EigCov(???)          ← your full 10 × 10 correlation matrix, numbers only
+Ctrl + Shift + Enter
+row 1: λ1 … λ10   ·   column 1 below λ1: the first eigenvector`,
+  say:'λ₁ ≈ 2.93, λ₂ ≈ 2.48, and Age loads 0.48 on the first eigenvector.',
+  right:`${L1} ≈ <strong>2.93</strong> and ${L2} ≈ <strong>2.48</strong>. Add up the ten eigenvalues :
+  10, the total variance of ten standardized columns.
+  Now read the loadings. The first eigenvector puts large negative weights on the price (−0.51) and the
+  weight (−0.49), and a large positive one on the age (0.48) : PC1 is high for old, cheap, light cars.
+  The second puts its weight on the Diesel dummy (0.56), the kilometres (0.48) and the engine volume
+  (0.43), against the horsepower (−0.36) : PC2 is high for big, tired, diesel engines.
+  <span class="fx">The Master writes two words on the board : AGE, DIESEL.</span>`,
+  widgetAfter:'loadings', hud:{l1:'2.93'},
+  note:'lambda1 = 2.93, lambda2 = 2.48 (the 10 add up to 10); PC1: old & cheap; PC2: diesel & km' },
+
+{ id:'t5', type:'numeric', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL V · TEN NUMBERS BECOME TWO',
+  text:`Standardize the ten columns : from each value, subtract the average of its column and divide by
+  the standard deviation of its column. Then give each car its two scores :
+  <br><span class="kbd">PC1 = Σ (standardized value of variable j) × (loading of j in the first eigenvector)</span><br>
+  a sum over the ten variables, and the same with the second eigenvector for PC2. Compute them for all
+  1,419 cars.
+  <strong>Report PC1 and PC2 of the second car of the file, row 3 : 18,950 €, 8 months old.</strong>`,
+  q:'Report the two scores of the car in row 3.',
+  fields:[
+    {id:'p1', label:'PC1 of the car in row 3', value:-3.285253,
+     alt:[{value:3.285253, msg:SIGNMSG},
+          {value:-9225.2174, msg:'You multiplied the raw data by the eigenvector. Standardize first: (value − average) / standard deviation, column by column.'},
+          {value:-18037.1786, msg:'You subtracted the averages but did not divide by the standard deviations. Standardize completely.'},
+          {value:-0.242570, msg:'You read the eigenvector along a row. In the EigCov output, each eigenvector is a column, below its eigenvalue.'},
+          {value:6.699045, msg:'Your eigenvector starts with the eigenvalue. The eigenvalues are row 1 of the EigCov output; the eigenvector is the 10 cells below it.'},
+          {value:-1.770648, msg:'Those are the eigenvectors of the covariance matrix. Use those of the correlation matrix.'}],
+     msg:'Standardized row 3 (10 cells) times the first eigenvector (10 cells), summed: =MMULT(row, column).'},
+    {id:'p2', label:'PC2 of the car in row 3', value:-1.802992,
+     alt:[{value:1.802992, msg:SIGNMSG},
+          {value:106.1607, msg:'You multiplied the raw data by the eigenvector. Standardize first: (value − average) / standard deviation, column by column.'},
+          {value:-31099.1564, msg:'You subtracted the averages but did not divide by the standard deviations. Standardize completely.'},
+          {value:1.546669, msg:'You read the eigenvector along a row. In the EigCov output, each eigenvector is a column, below its eigenvalue.'},
+          {value:6.966331, msg:'Your eigenvector starts with the eigenvalue. The eigenvalues are row 1 of the EigCov output; the eigenvector is the 10 cells below it.'},
+          {value:2.185509, msg:'Those are the eigenvectors of the covariance matrix. Use those of the correlation matrix.'}],
+     msg:'Standardized row 3 times the second eigenvector, summed: =MMULT(row, column).'}],
+  hint:`Compute the average and the standard deviation (<b>STDEV.S</b>) of each column once, in two rows
+  below the data, then standardize with $ anchors on the row. With a standardized car in a row of 10
+  cells and an eigenvector in a column of 10 cells, <b>MMULT</b> multiplies them pairwise and adds
+  the products. Anchor the eigenvector with $ before copying down.`,
+  code:`=AVERAGE(A2:A1420)   and   =STDEV.S(A2:A1420)     ← in rows 1422 and 1423
+=(A2-A$1422)/A$1423                              ← same as =STANDARDIZE(A2,A$1422,A$1423)
+=MMULT(???, $???$??:$???$??)                     ← standardized row × first eigenvector`,
+  say:'Row 3 : PC1 ≈ −3.29 and PC2 ≈ −1.80.',
+  right:`PC1 ≈ <strong>−3.29</strong> : a young, expensive car, far to the left. PC2 ≈ <strong>−1.80</strong> :
+  a petrol car with few kilometres, low on the second axis. Ten numbers per car have become two.
+  <span class="fx">The Master hands you a sheet of graph paper.</span>
+  Now draw them.`,
+  note:'Row 3 (18,950 EUR, 8 months): PC1 = -3.29, PC2 = -1.80' },
+
+{ id:'t6', type:'choice', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL VI · THE PICTURE',
+  text:`Draw the scatter plot of the 1,419 cars : PC1 on the horizontal axis, PC2 on the vertical axis.
+  One point is one car, its ten numbers squeezed into two.
+  <strong>Do you observe interesting patterns ?</strong>`,
+  q:'Choose the description of your plot.',
+  options:[
+    {id:'a', label:'One round, featureless cloud: the PCA found no structure in these cars.'},
+    {id:'b', label:'All the points lie along one single straight line: PC1 and PC2 tell the same story.'},
+    {id:'c', label:'Two separate, elongated clouds: a large one below and a smaller one above it, beyond PC2 ≈ 1, with a clear gap in between; plus a few cars standing far to the left, with PC1 below −7.'},
+    {id:'d', label:'Two groups side by side along the horizontal axis: one on the left, one on the right.'}
+  ], correct:'c',
+  hint:`Insert → Charts → Scatter, then Select Data → Add : X values = your PC1 column, Y values = your
+  PC2 column. Check your axes : PC1 runs from about −10 to 3, PC2 from about −3 to 6.5. Look at the top
+  of the cloud, and at its far left.`,
+  code:`Insert → Charts → Scatter
+Select Data → Add
+   Series X values:  your PC1 column (1,419 cells)
+   Series Y values:  your PC2 column`,
+  right:`Two groups. A large cloud and, above it, beyond PC2 ≈ 1, a smaller one, clearly apart. And on the
+  far left, a handful of isolated cars.
+  <span class="fx">The Master leans over the plot, glasses down his nose.</span>
+  None of the 45 scatter plots of the raw columns shows this in one picture. Who are the cars of the
+  upper group ? You have built the column that answers it.`,
+  wrong:{a:`Look again, and look up. Something sits above the main cloud, with a gap in between.`,
+  b:`Not one line : look for a gap. And over the 1,419 cars together, PC1 and PC2 cannot tell the same
+  story : principal components are uncorrelated, as question 4 will show.`,
+  d:`The gap is not between left and right : each cloud stretches across most of the horizontal axis.
+  Look along the vertical axis.`},
+  widgetAfter:'pcplain', note:'PC1-PC2 plot: main cloud + a separate group above PC2 = 1 + isolated cars at PC1 < -7' },
+
+{ id:'t7', type:'numeric', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL VII · WHO IS UP THERE ?',
+  text:`Count them. <strong>How many cars have a PC2 above 1, and how many of them are diesel
+  cars ?</strong>`,
+  q:'Count in your workbook.',
+  fields:[
+    {id:'up', label:'Number of cars with PC2 > 1', value:166, exact:true,
+     alt:[{value:1253, msg:'That is the number of cars below 1. Count those above.'},
+          {value:155, msg:'That is the number of diesel cars in the whole file. Count first all the cars with PC2 above 1, diesel or not.'}],
+     msg:'Count the cells of your PC2 column above 1: =COUNTIF(range, ">1").'},
+    {id:'ud', label:'… of which diesel cars', value:155, exact:true,
+     alt:[{value:11, msg:'That is the number of petrol cars above 1. Count the diesel ones.'},
+          {value:166, msg:'That counts every car above 1. Add the second test: Diesel = 1.'}],
+     msg:'Count the rows with PC2 above 1 and Diesel = 1: =COUNTIFS(PC2 range, ">1", Diesel range, 1).'}],
+  hint:`<b>COUNTIF</b> counts the cells that pass a test ; <b>COUNTIFS</b> counts the rows that pass two
+  tests at once, on two columns of the same length.`,
+  code:`=COUNTIF(???, ">1")                 ← your PC2 column
+=COUNTIFS(???, ">1", ???, 1)        ← your PC2 column, then the Diesel column
+French: =NB.SI(…;">1")   and   =NB.SI.ENS(…;">1";…;1)`,
+  say:'166 cars above 1 : all 155 diesel cars, and only 11 petrol cars.',
+  right:`<strong>All 155</strong> diesel cars sit above PC2 = 1, with only 11 petrol cars among them,
+  most of them old petrol cars with more than 145,000 km. The upper group is the diesel Corollas.
+  The PCA never saw a label. It found the diesels by itself, because the dummy, the 2-litre engine, the
+  low horsepower and the high mileage travel together : four columns, one story, one direction.
+  <span class="fx">The Master colours the upper group in red.</span>`,
+  widgetAfter:'pcfuel', note:'PC2 > 1: 166 cars = all 155 diesel cars + 11 petrol cars' },
+
+{ id:'t8', type:'choice', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL VIII · FAR TO THE LEFT',
+  text:`Seven cars stand alone on the far left, with PC1 below −7. Use the loadings of the first
+  eigenvector.
+  <strong>What kind of cars are they ?</strong>`,
+  q:'Choose the right reading of PC1.',
+  widget:'loadings',
+  options:[
+    {id:'a', label:'Old, cheap, light cars.'},
+    {id:'b', label:'Very young, expensive, heavy cars: the price and the weight load negatively on PC1 and the age positively, so a very negative PC1 means a high price, a high weight and a low age.'},
+    {id:'c', label:'Automatic cars: the gearbox sets them apart.'},
+    {id:'d', label:'Data errors: a PCA flags the points far from the others as mistakes, to be deleted.'}
+  ], correct:'b',
+  hint:`A car gets a very negative PC1 when its standardized values are large where the loadings are
+  negative, and small where the loadings are positive. You can also sort your sheet by PC1 and look at
+  the first seven rows.`,
+  code:`Data → Sort → by your PC1 column, smallest to largest
+then read the Price, Age and Weight of the first seven rows`,
+  right:`Brand-new diesel Corollas : 4 to 11 months old, sold between 23,000 and 32,500 €, all with the
+  2-litre engine and between 1,280 and 1,480 kg. Three of them, 4 months old and 31,000 € or more, sit
+  together at PC1 ≈ −10.
+  <span class="fx">The Master underlines them twice.</span>
+  Rare cars, not errors, and the plot showed them at once. The bottom of the cloud holds another small
+  family worth a look : the 192-horsepower, 1.8-litre petrol cars.`,
+  wrong:{a:`Read the signs. The price loads negatively on PC1 : a very negative PC1 goes with a high price,
+  not a low one. Old, cheap, light cars sit on the right.`,
+  c:`The loading of Automatic in the first eigenvector is −0.001 : the gearbox plays no role in PC1.`,
+  d:`An isolated point is a question, not a verdict. Look at these rows : real cars, just unusual ones.
+  Check before you delete anything.`},
+  note:'PC1 < -7: 7 diesel cars, 4-11 months old, 23,000-32,500 EUR' },
+
+{ id:'t9', type:'choice', bg:'court', who:'master', qn:'4',
+  title:'TRIAL IX · ARE THEY CORRELATED ?',
+  text:`Question 4. <strong>Compute the correlation between your PC1 column and your PC2
+  column. What does Excel return ?</strong>`,
+  q:'Choose what your workbook shows.',
+  options:[
+    {id:'a', label:'About −0.88, like the price and the age: the components inherit the strongest correlation of the data.'},
+    {id:'b', label:'Zero, or a tiny number such as 1.8E-15, which is zero up to the rounding errors of the computer.'},
+    {id:'c', label:'About 0.99: the two components move together.'},
+    {id:'d', label:'Exactly 1.'}
+  ], correct:'b',
+  hint:`<b>CORREL</b> on your two columns of 1,419 scores. Excel may display the result in scientific
+  notation : <b>1.8E-15</b> means 0.0000000000000018.`,
+  code:`=CORREL(???, ???)     ← your PC1 column, your PC2 column`,
+  right:`Zero. Not approximately : exactly, up to the last digits the computer can hold. Principal
+  components are uncorrelated by construction : each one carries information that the others do not.
+  <span class="fx">The Master nods slowly.</span>
+  Yet look at your plot : inside each cloud, the points rise from left to right. Over the whole file,
+  the slope vanishes, because the diesel cloud sits up and to the left of the petrol one, and the two
+  effects cancel exactly. Zero correlation is a statement about all 1,419 cars together, not about each
+  group.`,
+  wrong:{a:`Components are built to be uncorrelated. If you see −0.88, check that you correlated your two
+  PC columns, not Price and Age.`,
+  c:`Then your components were not built from standardized data : without standardization, PC1 and PC2
+  are correlated at 0.99 in this file. Go back to the scores.`,
+  d:`You correlated a column with itself. Use CORREL(your PC1 column, your PC2 column).`},
+  note:'corr(PC1, PC2) = 0, up to rounding errors' },
+
+{ id:'t10', type:'numeric', bg:'court', who:'master', qn:'4',
+  title:'TRIAL X · AND THEIR VARIANCES ?',
+  text:`One more property while you are there. <strong>Compute the variance of your PC1 column and of
+  your PC2 column.</strong>`,
+  q:'Report the two empirical variances.',
+  fields:[
+    {id:'v1', label:'Variance of PC1', value:2.931625,
+     alt:[{value:1.712199, msg:'That is the standard deviation of PC1. The variance is its square: use VAR.S.'}],
+     msg:'Use =VAR.S on your PC1 column.'},
+    {id:'v2', label:'Variance of PC2', value:2.481799,
+     alt:[{value:1.575373, msg:'That is the standard deviation of PC2. The variance is its square: use VAR.S.'}],
+     msg:'Use =VAR.S on your PC2 column.'}],
+  hint:`<b>VAR.S</b> on each column of 1,419 scores. Then compare with something you have already
+  reported.`,
+  code:`=VAR.S(???)     ← your PC1 column
+=VAR.S(???)     ← your PC2 column`,
+  say:'Var(PC1) ≈ 2.93 and Var(PC2) ≈ 2.48 : the first two eigenvalues.',
+  right:`The first two eigenvalues. The variance of the j-th component is the j-th eigenvalue : out of a
+  total variance of 10, PC1 carries 2.93 and PC2 carries 2.48, more than any single standardized column,
+  which carries 1.
+  <span class="fx">The Master taps the total on the board : 10.</span>
+  So how much of the cloud does your plot keep ?`,
+  note:'Var(PC1) = 2.93 = lambda1; Var(PC2) = 2.48 = lambda2' },
+
+{ id:'t11', type:'numeric', bg:'court', who:'master', qn:'5',
+  title:'TRIAL XI · HOW MANY COMPONENTS ?',
+  text:`Question 5. The share of the total variance kept by the first k components is
+  <br><span class="kbd">(${L1} + … + λ<sub>k</sub>) / (${L1} + … + λ<sub>10</sub>)</span><br>
+  The rule of thumb of the course keeps the smallest k that reaches <strong>80%</strong>.
+  <strong>What share do PC1 and PC2 keep together, how many components do you need for 80%, and what
+  share do they keep ?</strong>`,
+  q:'Shares in percent, e.g., 12.34 for 12.34%.',
+  fields:[
+    {id:'s2', label:'Share kept by PC1 and PC2 (%)', value:54.134239,
+     alt:[{value:0.54134239, msg:'That is a proportion. Give the share in percent: multiply by 100.'},
+          {value:29.316247, msg:'That is the share of PC1 alone. Add λ₂ to the numerator.'},
+          {value:24.817992, msg:'That is the share of PC2 alone. Add λ₁ to the numerator.'}],
+     msg:'(λ₁ + λ₂) divided by the sum of the ten eigenvalues, times 100.'},
+    {id:'k', label:'Smallest number of components keeping at least 80%', value:5, exact:true,
+     alt:[{value:4, msg:'Four components keep 74.84% of the variance: not yet 80%.'},
+          {value:6, msg:'Six components keep more than 80%, but fewer are enough: take the smallest k.'},
+          {value:1, msg:'One component would do only on the covariance matrix, where the kilometres swallow 99% of the variance. Use the eigenvalues of the correlation matrix.'},
+          {value:2, msg:'Two components keep 54% of the variance: far from 80%.'},
+          {value:10, msg:'Ten components keep 100%, but then nothing is reduced. Take the smallest k that reaches 80%.'}],
+     msg:'Compute the cumulative share for k = 1, 2, 3, …, and stop at the first one that reaches 80%.'},
+    {id:'s5', label:'Share kept by these k components (%)', value:84.425137,
+     alt:[{value:74.835340, msg:'That is the share of four components, below 80%.'},
+          {value:93.058669, msg:'That is the share of six components. Take the smallest k that reaches 80%.'},
+          {value:0.84425137, msg:'That is a proportion. Give the share in percent: multiply by 100.'}],
+     msg:'The cumulative share of the first k components, in percent.'}],
+  hint:`Next to the row of the ten eigenvalues, compute their running sum divided by the total, times 100.
+  The first cumulative share that reaches 80% gives k.`,
+  code:`=SUM($M$21:M21)/SUM($M$21:$V$21)*100     ← row of eigenvalues in M21:V21; copy to the right
+=COUNTIF(???, "<80") + 1                  ← the cumulative shares: the smallest k reaching 80%`,
+  say:'PC1 and PC2 keep 54.13% ; 80% needs 5 components, which keep 84.43%.',
+  right:`Two components keep <strong>54.13%</strong> of the total variance. The 80% rule asks for
+  <strong>five</strong>, which keep <strong>84.43%</strong> ; four stop at 74.84%.
+  <span class="fx">The Master draws the ten eigenvalues as ten bars, tall, then short.</span>
+  After the first two bars, the next four are all close to 1 : the variance of a single standardized
+  column. Components 4, 5 and 6 are mostly one variable each : the gearbox, the metallic colour, the
+  doors. Little is left to compress there.`,
+  widgetAfter:'scree', hud:{sh:'54.13%', k:'5'},
+  note:'PC1 + PC2 keep 54.13%; 5 components for 80% (84.43%)' },
+
+{ id:'t12', type:'choice', bg:'court', who:'master', qn:'5',
+  title:'TRIAL XII · WHAT THE PICTURE HIDES',
+  text:`So your plot keeps 54% of the variance of the ten columns, well below the 80% of the rule.
+  <strong>What follows ?</strong>`,
+  q:'Choose the right conclusion.',
+  options:[
+    {id:'a', label:'The plot is worthless: below 80%, what it shows is noise.'},
+    {id:'b', label:'The groups and isolated cars of the plot are real, since PC1 and PC2 are exact combinations of the data; but the 46% left out may hide other differences between the cars, which this plot cannot show.'},
+    {id:'c', label:'The plot shows 54% of the cars; the other 46% are missing from it.'},
+    {id:'d', label:'We should have used the covariance matrix: its first two components keep almost 100% of the variance.'}
+  ], correct:'b',
+  hint:`Separate two things : which <b>cars</b> are on the plot, and how much of the <b>variance</b> of the
+  ten columns its two axes carry. And recall what you counted above PC2 = 1.`,
+  right:`A shadow of a ten-dimensional cloud on a sheet of paper. A shadow keeps some shapes and loses
+  others : what it shows is there ; what it does not show may be there too. For a picture, two components
+  are all a sheet of paper can take. To reduce the data, the rule asks for five.
+  <span class="fx">The Master takes down the ten sheets from the wall, and pins up one : your plot.</span>`,
+  wrong:{a:`80% is a rule of thumb to reduce a data set, not a licence to throw a picture away. The diesel
+  group you found is in the data : 155 diesel cars out of 155.`,
+  c:`All 1,419 cars are on the plot. What is partly missing is not cars but variance : the directions of
+  PC3 to PC10.`,
+  d:`Almost 100% of a variance made of kilometres in raw units. That plot would show the odometer, and
+  little else.`},
+  note:'The PC1-PC2 plot is a shadow: real patterns, 46% of the variance unseen' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · CASE CLOSED',
+  text:`I claimed that nobody can see ten dimensions. You have just seen them, or their best shadow on a
+  sheet of paper : the diesel Corollas in a cloud of their own, and seven brand-new cars standing alone.
+  <span class="fx">The Master strikes out his claim.</span>
+  Four rules to take home.
+  <strong>One.</strong> When the columns are in different units, standardize, and take the eigenvectors of
+  the correlation matrix. Otherwise the column with the largest numbers wins.
+  <strong>Two.</strong> An eigenvector is defined up to its sign. Fix a convention before you read the
+  scores.
+  <strong>Three.</strong> Principal components are uncorrelated, and the variance of the j-th one is the
+  j-th eigenvalue. The eigenvalues add up to the total variance : the number of variables, once
+  standardized.
+  <strong>Four.</strong> A plot of the first two components reveals groups and isolated points that no pair
+  of columns shows. But it keeps only part of the variance : always say how much.`,
+  banner:'TWO COMPONENTS SHOW WHAT TEN COLUMNS HIDE', cont:'Close the case file', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {l1:'—', sh:'—', k:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the first rows of the file, the correlation matrix,
+   the share of each raw column in the total variance, the loadings of
+   the first two eigenvectors, the cloud of the 1,419 cars on PC1 and
+   PC2 (plain, then by fuel), and the share of the variance kept by
+   each component. Points are never connected; hovering a point shows
+   its car.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const eur = v => Math.round(v).toLocaleString('en-US') + ' €';
+const sgn = (v,d) => (v<0?'−':'') + Math.abs(v).toFixed(d);
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series, straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="${l.dash===true?'7 6':l.dash}"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.r||4}"
+        fill="${s.color||PLOT.ink}" fill-opacity="${s.alpha||0.8}" stroke="${s.stroke||PLOT.paper}" stroke-width="${s.sw===undefined?1:s.sw}">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{ labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:p.sz||16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* legend rows, drawn inside a panel (pixel coordinates): a line or a point */
+function legendRow(x, y, color, dash, text){
+  return `<line x1="${x}" y1="${y-5}" x2="${x+28}" y2="${y-5}" stroke="${color}" stroke-width="2.5" ${dash?`stroke-dasharray="${dash}"`:''}/>`
+    + TXT(x+36, y, text, {sz:16, col:color, anchor:'start'});
+}
+function legendDot(x, y, color, alpha, text){
+  return `<circle cx="${x+14}" cy="${y-5}" r="4.5" fill="${color}" fill-opacity="${alpha}"/>`
+    + TXT(x+36, y, text, {sz:16, col:color, anchor:'start'});
+}
+function withLegend(svg, rows){ return svg.replace('</svg>', rows + '</svg>'); }
+
+/* ---- the cold open: the first rows of the file ---- */
+function playTable(host){
+  const names=['Price','Age','KM','FuelType','HP','MetColor','Automatic','CC','Doors','Weight'];
+  const cx=i=>48+i*67;
+  let head='', rows='';
+  names.forEach((n,i)=>{ head += TXT(cx(i),62,'ABCDEFGHIJ'[i],{sz:15,col:PLOT.axis}) + TXT(cx(i),84,n,{sz:17,col:PLOT.ink}); });
+  for(let r=0;r<5;r++){
+    const y=118+r*24;
+    DATA.FIRST[r].forEach((v,i)=>{ rows += TXT(cx(i),y,v,{sz:18}); });
+  }
+  const svg=`<svg viewBox="0 0 700 270" style="width:100%;height:auto;display:block">
+    <rect width="700" height="270" fill="${PLOT.paper}"/>
+    ${TXT(16,30,'TOYOTACOROLLA_DATA.XLSX · SHEET TOYOTACOROLLA · THE FIRST FIVE OF 1,419 CARS',{sz:17,anchor:'start'})}
+    <line x1="14" y1="94" x2="686" y2="94" stroke="${PLOT.axis}"/>
+    ${head}${rows}
+    ${TXT(350,240,'Price in €, Age in months, KM on the odometer, HP horsepower, CC engine volume (cm³), Weight in kg',{sz:15})}
+    ${TXT(350,258,'MetColor and Automatic: 1 = yes, 0 = no',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE FILE', svg,
+    'Ten columns, 1,419 cars. A scatter plot shows two columns at a time: 45 pairs.');
+  return 600;
+}
+
+/* ---- the correlation matrix, both triangles, shaded by strength ---- */
+function playCorr(host){
+  const head=['Price','Age','KM','Diesel','HP','MetCol','Auto','CC','Doors','Weight'];
+  const x0=106, cw=58.5, y0=74, ch=26;
+  let cells='', labs='';
+  head.forEach((n,j)=>{ labs += TXT((x0+j*cw+cw/2).toFixed(1), y0-10, n, {sz:15, col:PLOT.ink}); });
+  PCA.NAMES.forEach((n,i)=>{
+    labs += TXT(x0-8, y0+i*ch+18, n, {sz:16, col:PLOT.ink, anchor:'end'});
+    PCA.R[i].forEach((r,j)=>{
+      const a=Math.abs(r), col = r>=0 ? PLOT.ink : PLOT.fit;
+      cells += `<rect x="${(x0+j*cw).toFixed(1)}" y="${y0+i*ch}" width="${(cw-2).toFixed(1)}" height="${ch-2}"
+        fill="${col}" fill-opacity="${(0.06+0.86*a).toFixed(2)}"><title>${PCA.NAMES[i]} and ${PCA.NAMES[j]}: ${sgn(r,4)}</title></rect>`
+        + TXT((x0+j*cw+cw/2-1).toFixed(1), y0+i*ch+18, sgn(r,2), {sz:16, col:a>0.5?PLOT.paper:PLOT.ink});
+    });
+  });
+  const H=y0+10*ch+16;
+  const svg=`<svg viewBox="0 0 700 ${H}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(16,26,'Correlation matrix of the ten variables, both triangles filled',{sz:17,anchor:'start'})}
+    ${labs}${cells}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE CORRELATION MATRIX', svg,
+    'Blue: positive correlation; red: negative; the darker, the stronger. The upper triangle mirrors the lower one: EigCov needs both.');
+  return 900;
+}
+
+/* ---- why standardize: each column's share of the total variance ---- */
+function playCovTrap(host){
+  const y0=78, rh=22, xa=110, xb=430, wbar=250;
+  let rows='';
+  PCA.NAMES.forEach((n,i)=>{
+    const y=y0+i*rh, s=PCA.RAWSHARE[i], wa=s/100*wbar, wb=0.10*wbar;
+    const lab = s>=0.01 ? s.toFixed(2)+'%' : '< 0.01%';
+    rows += TXT(xa-10, y+14, n, {sz:16, col:PLOT.ink, anchor:'end'})
+      + `<rect x="${xa}" y="${y+2}" width="${Math.max(wa,0.8).toFixed(1)}" height="15" fill="${PLOT.fit}" fill-opacity=".85"/>`
+      + (wa>60 ? TXT((xa+wa-6).toFixed(1), y+15, lab, {sz:15, col:PLOT.paper, anchor:'end'})
+               : TXT((xa+wa+6).toFixed(1), y+15, lab, {sz:15, col:PLOT.label, anchor:'start'}))
+      + `<rect x="${xb}" y="${y+2}" width="${wb.toFixed(1)}" height="15" fill="${PLOT.ink}" fill-opacity=".85"/>`
+      + TXT((xb+wb+6).toFixed(1), y+15, '10%', {sz:15, anchor:'start'});
+  });
+  const B=y0+10*rh+6, H=B+30;
+  const svg=`<svg viewBox="0 0 700 ${H}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(16,26,'Share of each column in the total variance',{sz:17,anchor:'start'})}
+    ${TXT(xa,62,'raw columns (covariance matrix)',{sz:16,col:PLOT.fit,anchor:'start'})}
+    ${TXT(xb,62,'standardized columns (correlation)',{sz:16,col:PLOT.ink,anchor:'start'})}
+    ${rows}
+    <line x1="${xa}" y1="${B}" x2="${xa+wbar}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${xb}" y1="${B}" x2="${xb+wbar}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${TXT(xa,B+18,'0%',{sz:14})}${TXT(xa+wbar,B+18,'100%',{sz:14})}
+    ${TXT(xb,B+18,'0%',{sz:14})}${TXT(xb+wbar,B+18,'100%',{sz:14})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · WHO OWNS THE VARIANCE', svg,
+    'In raw units the kilometres hold 99.04% of the total variance: the first component of the covariance matrix is the odometer. Standardized, every column weighs 1 out of 10.');
+  return 900;
+}
+
+/* ---- the loadings of the first two eigenvectors ---- */
+function playLoadings(host){
+  const y0=72, rh=24, sc=230, c1=255, c2=560;
+  let rows='';
+  const bar=(c,v,y)=>{
+    const w=v*sc, x=w>=0?c:c+w, col=w>=0?PLOT.ink:PLOT.second, big=Math.abs(v)>=0.3;
+    const lx = big ? (w>=0 ? c+w-4 : c+w+4) : (w>=0 ? c+w+5 : c+w-5);
+    const anchor = big ? (w>=0?'end':'start') : (w>=0?'start':'end');
+    return `<rect x="${x.toFixed(1)}" y="${y+3}" width="${Math.max(Math.abs(w),0.8).toFixed(1)}" height="15" fill="${col}" fill-opacity=".85"/>`
+      + TXT(lx.toFixed(1), y+15, sgn(v, Math.abs(v)<0.005?3:2), {sz:14, col:big?PLOT.paper:col, anchor});
+  };
+  PCA.NAMES.forEach((n,i)=>{
+    const y=y0+i*rh;
+    rows += TXT(110, y+15, n, {sz:16, col:PLOT.ink, anchor:'end'}) + bar(c1, PCA.V1[i], y) + bar(c2, PCA.V2[i], y);
+  });
+  const B=y0+10*rh+4, H=B+12;
+  const svg=`<svg viewBox="0 0 700 ${H}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(16,26,'Loadings: the first two eigenvectors of the correlation matrix',{sz:17,anchor:'start'})}
+    ${TXT(c1,58,'PC1 · λ1 = '+PCA.LAM[0].toFixed(2),{sz:17,col:PLOT.ink})}
+    ${TXT(c2,58,'PC2 · λ2 = '+PCA.LAM[1].toFixed(2),{sz:17,col:PLOT.ink})}
+    <line x1="${c1}" y1="${y0-2}" x2="${c1}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${c2}" y1="${y0-2}" x2="${c2}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${rows}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE LOADINGS', svg,
+    'PC1 is high for old, cheap, light cars. PC2 is high for diesel cars with a big engine, many kilometres and little horsepower. Signs: Age > 0 on PC1, Diesel > 0 on PC2.');
+  return 900;
+}
+
+/* ---- the 1,419 cars on the first two principal components ---- */
+function playPC(host, byFuel){
+  const tip = i=>`row ${i+2}: PC1 ${sgn(DATA.PC1[i],2)}, PC2 ${sgn(DATA.PC2[i],2)} · ${DATA.D[i]?'diesel':'petrol'}, ${eur(DATA.PRICE[i])}, ${DATA.AGE[i]} months`;
+  const all = DATA.PC1.map((v,i)=>i);
+  const pick = (ids, key)=>ids.map(i=>DATA[key][i]);
+  const o = {
+    H:380, B:320, series:[], labels:[],
+    lines:[{x1:-10.8, y1:0, x2:3.8, y2:0, color:PLOT.axis, w:1}, {x1:0, y1:-3.6, x2:0, y2:7, color:PLOT.axis, w:1}],
+    xmin:-10.8, xmax:3.8, ymin:-3.6, ymax:7,
+    xticks:[-10,-8,-6,-4,-2,0,2], yticks:[-2,0,2,4,6], xfmt:v=>sgn(v,0), yfmt:v=>sgn(v,0),
+    title: byFuel ? 'PC2 against PC1, by fuel' : 'PC2 against PC1, 1,419 second-hand Corollas',
+    xlab:'PC1  (high: old, cheap, light)', ylab:'PC2  (high: diesel, many km)'
+  };
+  let svg;
+  if(byFuel){
+    const pet = all.filter(i=>!DATA.D[i]), die = all.filter(i=>DATA.D[i]);
+    o.series.push({x:pick(pet,'PC1'), y:pick(pet,'PC2'), r:2.6, alpha:0.35, sw:0, color:PLOT.ink, tip:k=>tip(pet[k])});
+    o.series.push({x:pick(die,'PC1'), y:pick(die,'PC2'), r:2.8, alpha:0.75, sw:0, color:PLOT.fit, tip:k=>tip(die[k])});
+    o.lines.push({x1:-10.8, y1:1, x2:3.8, y2:1, color:PLOT.second, w:1.6, dash:'6 5'});
+    o.labels.push({x:-10.6, y:0.55, text:'PC2 = 1', col:PLOT.second});
+    o.labels.push({x:-10.6, y:2.35, text:'7 brand-new diesel cars', col:PLOT.fit});
+    o.labels.push({x:-10.6, y:-2.95, text:'192 HP petrol cars ▸', col:PLOT.ink});
+    svg = withLegend(panelSVG(o),
+      legendDot(78, 64, PLOT.fit, 0.85, 'diesel (155 cars)') +
+      legendDot(78, 86, PLOT.ink, 0.6, 'petrol (1,264 cars)'));
+  } else {
+    o.series.push({x:DATA.PC1, y:DATA.PC2, r:2.6, alpha:0.4, sw:0, color:PLOT.ink, tip});
+    svg = panelSVG(o);
+  }
+  host.innerHTML = plotFrame(byFuel ? 'EVIDENCE · THE TWO CLOUDS' : 'EVIDENCE · TEN DIMENSIONS ON ONE SHEET', svg,
+    byFuel ? 'All 155 diesel cars lie above the dashed line PC2 = 1, with only 11 petrol cars. Hover a point to see its car.'
+           : 'One point is one car: its ten standardized columns squeezed into two scores. Hover a point to see its car.');
+  return 900;
+}
+
+/* ---- the share of the variance kept by each component, and the running total ---- */
+function playScree(host){
+  const W=700, H=340, L=64, R=684, T=46, B=272;
+  const bw=(R-L)/10, py=v=>B-v/100*(B-T), tot=PCA.LAM.reduce((a,b)=>a+b,0);
+  let bars='', dots='', ticks='', cum=0;
+  PCA.LAM.forEach((l,k)=>{
+    const s=100*l/tot; cum+=s;
+    const cx=L+bw*k+bw/2, win=(k===4);
+    bars += `<rect x="${(cx-15).toFixed(1)}" y="${py(s).toFixed(1)}" width="30" height="${(B-py(s)).toFixed(1)}" fill="${PLOT.ink}" fill-opacity=".8">
+      <title>PC${k+1}: λ = ${l.toFixed(2)}, ${s.toFixed(2)}% of the variance</title></rect>`;
+    dots += `<circle cx="${cx.toFixed(1)}" cy="${py(cum).toFixed(1)}" r="${win?7:5}" fill="${win?PLOT.fit:PLOT.second}" stroke="${PLOT.paper}" stroke-width="1.5">
+      <title>PC1 to PC${k+1}: ${cum.toFixed(2)}%</title></circle>`
+      + TXT(cx.toFixed(1), (cum>66 && cum<80 ? py(cum)+22 : py(cum)-11).toFixed(1), cum.toFixed(1), {sz:15, col:win?PLOT.fit:PLOT.second});
+    ticks += TXT(cx.toFixed(1), B+19, 'PC'+(k+1), {sz:15, col:PLOT.ink}) + TXT(cx.toFixed(1), B+37, 'λ '+l.toFixed(2), {sz:14});
+  });
+  let yt='';
+  [0,20,40,60,80,100].forEach(v=>{ yt += `<line x1="${L-5}" y1="${py(v)}" x2="${L}" y2="${py(v)}" stroke="${PLOT.axis}"/>` + TXT(L-9, py(v)+5, v, {sz:15, anchor:'end'}); });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L,26,'Share of the total variance (%), component by component',{sz:17,anchor:'start'})}
+    <line x1="${L}" y1="${py(80)}" x2="${R}" y2="${py(80)}" stroke="${PLOT.fit}" stroke-width="1.6" stroke-dasharray="6 5"/>
+    ${TXT(L+6, py(80)-6, '80%', {sz:16, col:PLOT.fit, anchor:'start'})}
+    ${bars}${dots}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}${yt}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">percent of the total variance</text>
+    ${legendDot(330, 184, PLOT.second, 1, 'cumulative share, PC1 to PCk')}
+    <rect x="337" y="198" width="14" height="11" fill="${PLOT.ink}" fill-opacity=".8"/>${TXT(366, 208, 'share of each component: λj / 10', {sz:16, col:PLOT.ink, anchor:'start'})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · HOW MANY COMPONENTS', svg,
+    'PC1 and PC2 keep 54.1% of the variance. Five components are the first to pass 80%: 84.4%.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')    return playTable(host);
+  if(name==='corr')     return playCorr(host);
+  if(name==='covtrap')  return playCovTrap(host);
+  if(name==='loadings') return playLoadings(host);
+  if(name==='pcplain')  return playPC(host, false);
+  if(name==='pcfuel')   return playPC(host, true);
+  if(name==='scree')    return playScree(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your workbook step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example Excel formula ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE EXCEL · TYPE IT IN AN EMPTY CELL OF YOUR WORKBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Excel, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim().replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+/* the course margin rule: exact integers; ±0.01 when 0.1 ≤ |value| < 1e6;
+   ±1% of the value otherwise. The tiny extra absorbs floating-point error. */
+function marginOf(value, exact){
+  if(exact) return 0;
+  const a = Math.abs(value);
+  return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
+}
+function tolerance(f){ return marginOf(f.value, f.exact); }
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02 or 2.1E+09, without thousands separators.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){
+    const at = (a.tol !== undefined) ? a.tol : marginOf(a.value, f.exact);
+    if(Math.abs(v-a.value) <= at) return a.msg;
+  }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Excel.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   EXCEL HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openExcelHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyExcelHelperE10',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Excel Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excel Helper · Empirical Exercise X</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>EXCEL HELPER</h1>
+<p>Reference syntax only. Compute in Excel; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-excel-helper]').forEach(b=>b.onclick=openExcelHelper);
+/* the data file: the button names its file in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — no password: this exercise is not graded
+   ================================================================ */
+function finish(){
+  $('#endblurb').innerHTML =
+    `You turned the fuel into a dummy, read a 10 × 10 correlation matrix, saw why the kilometres must be
+     standardized, extracted eigenvalues and eigenvectors with EigCov, and squeezed 1,419 cars into two
+     principal components. The plot found the diesel Corollas and seven brand-new cars by itself; the
+     components came out uncorrelated, with the eigenvalues as their variances; and five of them keep 80%
+     of the variance.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: NOBODY CAN SEE TEN DIMENSIONS';
+  show('scr-end');
+}
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v10.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE X ......... TOYOTA COROLLA",
+  "DATA ........................ 1,419 CARS, 10 COLUMNS",
+  "DIMENSIONS .................. 10 -> 2",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "",
+  "> KEEP EXCEL AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
