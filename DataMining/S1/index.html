@@ -1,0 +1,2099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 1: Five Cheats in the Ledger</title>
+
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 1
+  "Five Cheats in the Ledger"  (Topic 1: outlier detection, exercise 1,
+  and Benford's law, part 1)
+  EDHEC · Data Mining · Exo 1 in class
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  No checkpoints, no passwords, no SHOW THE ANSWER button. Every
+  question has a HINT button. Students compute everything in Python.
+
+  QUESTIONS
+  ---------
+  setup  N, min, median, mean                                   -> numbers
+  1.a    plot of the observations: positive, highly skewed      -> MCQ
+  1.b    z-score rule (mean +- 1.96 s) on the raw data          -> numbers
+  1.c    MAD rule (median +- 1.96 * 1.48 MAD) on the raw data   -> numbers
+         diagnosis: symmetric rules on skewed data              -> MCQ
+  1.d    y = ln(x): mean, s, median, sigma_MAD                  -> numbers
+         plot of y: five cheats stand apart                     -> MCQ
+  1.e    z-score rule and MAD rule on y                         -> numbers
+         honest suspects: 5% of a 95% interval                  -> MCQ
+  2.a    Benford proportions of the digits 1 and 3              -> numbers
+  2.b    first non-zero digits: count and share of 1s           -> numbers
+         bar chart against Benford                              -> MCQ
+  2.c    z-score of the share of 1s, decision at 5%             -> numbers
+  2.d    z-scores of the nine digits: one false alarm           -> numbers
+  2.e    limits of the one-digit z-test: multiple testing       -> MCQ
+
+  DATA
+  ----
+  Data_Outliers_Benford.xlsx (Generate_Data_Outliers_Benford.py, seed 61):
+  one column, Observations. 500 honest values, ln(x) ~ N(2, 9), and
+  5 cheats, ln(x) ~ N(20, 9), at rows 0, 126, 252, 378, 504.
+
+  FINAL PASSWORD (one, at the end; no checkpoints)
+  --------------
+  DM1-hhmmss-cccccc, hhmmss = time of completion on the student's clock.
+  m = h*3600 + min*60 + sec
+  a = (m*m + 373*m + 52817) mod 999953
+  b = (a*(m + 191) + 7*m*m + 7) mod 999953
+  code = (39119*b + 22283*a + 77711*m + 161803) mod 1e6
+  Checked by check_passwords_DM1.py.
+
+  TARGET VALUES (computed with Python on the Excel file)
+  -------------
+  n          505
+  xmin       0.0005495959754877171
+  xmed       6.374127671609622
+  xmean      44599960.08904929
+  rs         705890790.8188152
+  rzlo       -1338945989.9158285
+  rzhi       1428145910.0939271
+  rzn        3
+  rzin       502
+  rmad       6.293344565740224
+  rsm        9.31414995729553
+  rsm_mean   66007931.79493544
+  rmlo       -11.881606244689618
+  rmhi       24.62986158790886
+  rmlo2      -12.25417224298144
+  rmhi2      25.00242758620068
+  rmn        176
+  rmin       329
+  lmean      1.9919270217388116
+  lstd       3.50920276662426
+  lmed       1.8522472458556725
+  lmad       2.144470988442327
+  lsm        3.1738170628946443
+  lsm_mean   3.1291630573816906
+  l10mean    0.8650829138951446
+  l10std     1.5240273974245409
+  l10med     0.8044207579956144
+  l10sm      1.3783712369855299
+  lzlo       -4.886110400844737
+  lzhi       8.869964444322362
+  lzn        15
+  lzlo2      -5.026478511509708
+  lzhi2      9.01033255498733
+  lzn2       13
+  lzin       490
+  l10zlo     -2.1220107850569554
+  l10zhi     3.8521766128472446
+  lmlo       -4.36843419741783
+  lmhi       8.072928689129174
+  lmn        20
+  lmlo2      -4.495386879933616
+  lmhi2      8.199881371644961
+  lmin       485
+  l10mlo     -1.897186866496024
+  l10mhi     3.506028382487253
+  pb1        30.10299956639812
+  pb3        12.493873660829994
+  pb1prop    0.3010299956639812
+  pb3prop    0.12493873660829993
+  pb1ln      69.31471805599453
+  pb3ln      28.768207245178086
+  n1         142
+  p1pct      28.118811881188122
+  p1prop     0.2811881188118812
+  n1naive    111
+  p1naive    21.980198019801982
+  z1         -0.9720627104426306
+  z1hat      -0.9917959541660863
+  z1nosqrt   -47.62180110663616
+  z1mixed    -97.20627104426306
+  nrej       1
+  nrejhat    0
+  zdig       5
+  zmax       2.1446143482713205
+  zmaxhat    1.8894337861461945
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example of Python code ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Python helper ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#1e3f66,#306998);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:38%}
+.xlguide td:nth-child(2){width:34%}
+.xlguide td:nth-child(3){width:28%}
+.xlguide pre{margin:8px 0; padding:8px 10px; background:#06110a; color:var(--green);
+  font:17px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+/* the setup block must scroll inside the card, not widen the page on a phone */
+#wrap{min-width:0}
+.pwline{flex-wrap:wrap; gap:4px 12px}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'PYTHON'}
+  .xlguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE I</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="ledger">DATA (XLSX)</button>
+      <button class="toolbtn" data-python-helper>PYTHON HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>FIVE CHEATS<br>IN THE LEDGER</h1>
+      <h2>Empirical Exercise I &nbsp;·&nbsp; Data Mining</h2>
+      <p>Master Scepticus believes that one z-score catches every cheat. 505 simulated positive numbers,
+      five of them rogue, will test him. You will detect outliers with the standard deviation and with the
+      MAD, on the raw data and on their logarithm. Then you will check their first digits against
+      Benford’s law with the z-score of a proportion.</p>
+      <p><strong style="color:var(--amber)">A password waits for you at the end.</strong> When you complete
+      the exercise, the game gives you a personal password. <strong>Copy it and submit it on
+      Blackboard</strong>: it is the proof that you finished. Copy it before you close this page, because
+      it is not kept.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · PYTHON</b>Download <code>Data_Outliers_Benford.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and save it in the folder of your notebook. Load it
+        with pandas, compute every number and draw every plot in Python, and keep your notebook: each
+        question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your plots, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example of Python code, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers as Python prints them, e.g., <code>36.18</code> or <code>-8.544e-05</code>
+      (a comma is also accepted as the decimal separator). Give two decimals: your answer is accepted
+      within 0.01 of the exact value. Very small or very large numbers are accepted within 1%, so three
+      significant digits are enough. Counts must be exact. Use <code>print(...)</code> to see a full
+      number.</p>
+      <div class="xlguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <div class="guideintro">The file has one column, <code>Observations</code>: 505 positive numbers
+        (500 honest ones and 5 cheats). Start your notebook with:
+<pre>import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+df = pd.read_excel('Data_Outliers_Benford.xlsx')
+x = df['Observations'].to_numpy()</pre>
+        If Python cannot find the file, put it in the same folder as your notebook, or give its full
+        path.</div>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>PYTHON</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>len(x)</code>, <code>np.min(x)</code>, <code>np.median(x)</code>, <code>np.mean(x)</code></td><td>Number of observations, smallest value, median, average.</td><td><code>np.median(x)</code></td></tr>
+            <tr><td><code>plt.plot(x, 'o')</code>, <code>plt.hist(x, bins=50)</code>, <code>plt.show()</code></td><td>Plot of the observations in the order of the file; histogram.</td><td><code>plt.plot(np.log(x), 'o')</code></td></tr>
+            <tr><td><code>np.std(x, ddof=1)</code></td><td>Empirical standard deviation (N − 1). Without <code>ddof=1</code>, NumPy divides by N.</td><td><code>np.std(x, ddof=1)</code></td></tr>
+            <tr><td><code>np.median(np.abs(x - np.median(x)))</code></td><td>MAD: median of the absolute deviations from the median. Robust standard deviation: 1.48 × MAD.</td><td><code>1.48*MAD_x</code></td></tr>
+            <tr><td><code>(x &lt; lo) | (x &gt; hi)</code>, <code>np.sum(...)</code>, <code>np.where(...)</code></td><td>True for the observations outside [lo ; hi]; their number; their positions.</td><td><code>np.sum((x &lt; lo) | (x &gt; hi))</code></td></tr>
+            <tr><td><code>plt.axhline(lo, color='r', linestyle='-.')</code></td><td>Adds a horizontal bound to the current plot.</td><td><code>plt.axhline(hi, color='r')</code></td></tr>
+            <tr><td><code>np.log(x)</code>, <code>np.log10(x)</code></td><td>Natural logarithm (ln); logarithm in base 10.</td><td><code>y = np.log(x)</code></td></tr>
+            <tr><td><code>np.floor(x / 10**np.floor(np.log10(x)))</code></td><td>First non-zero digit of each positive number (add <code>.astype(int)</code>).</td><td>0.0055 → 5; 274000 → 2</td></tr>
+            <tr><td><code>s.astype(str).str.lstrip('0.').str[0]</code></td><td>The same with strings, on a pandas column <code>s</code>: strip the leading zeros and the dot, keep the first character.</td><td><code>df['Observations'].astype(str)</code></td></tr>
+            <tr><td><code>np.bincount(d, minlength=10)[1:]</code>, <code>np.mean(d == 1)</code></td><td>Counts of the digits 1 to 9; share of the digit 1.</td><td><code>np.sum(d == 1)</code></td></tr>
+            <tr><td><code>np.log10(1 + 1/np.arange(1, 10))</code></td><td>The nine Benford proportions.</td><td><code>plt.bar(np.arange(1, 10), p_obs)</code></td></tr>
+            <tr><td><code>(p_hat - p) / np.sqrt(p*(1 - p)/N)</code></td><td>z-score of an observed proportion p̂ against a proportion p, under H₀.</td><td>reject when <code>abs(z) &gt; 1.96</code></td></tr>
+            <tr><td><code>np.random.seed(2026)</code>, <code>np.random.uniform(1, 10, 505)</code></td><td>Fixes the random generator, so that everybody draws the same numbers; 505 uniform numbers between 1 and 10.</td><td>call the seed right before drawing</td></tr>
+            <tr><td><code>4.46e+07</code></td><td>Scientific notation: 4.46 × 10⁷ = 44,600,000. Type it as Python prints it.</td><td><code>-1.34e+09</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>flagged, raw</span><b id="hud-raw">—</b></div>
+            <div class="hudrow"><span>flagged, log</span><b id="hud-log">—</b></div>
+            <div class="hudrow"><span>Benford z, digit 1</span><b id="hud-z1">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise I &nbsp;·&nbsp; Five Cheats in the Ledger</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">COMPLETED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, dashes included. It is not kept: copy it before you close this page.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button: paste its Dropbox link (…&raw=1) here */
+  DATA_FILES: {
+    ledger: "https://www.dropbox.com/scl/fi/hcisyvy1mk28g41u5ueci/Data_Outliers_Benford.xlsx?rlkey=9fs5n50ufeptchh49blosd97j&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   FINAL PASSWORD — one per student, created the first time the
+   exercise is completed, never regenerated (REPLAY keeps it). It
+   contains the time of completion, on the student's clock:
+       DM1-hhmmss-cccccc
+     m    = h*3600 + min*60 + sec
+     a    = (m*m + 373*m + 52817) mod 999953
+     b    = (a*(m + 191) + 7*m*m + 7) mod 999953
+     code = (39119*b + 22283*a + 77711*m + 161803) mod 1e6
+   The code depends on the time, so the time cannot be edited.
+   Every intermediate value stays below 2^53, so the arithmetic is exact.
+   Checked by check_passwords_DM1.py.
+   ================================================================ */
+function makeFinalPassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const a = (m*m + 373*m + 52817) % 999953;
+  const b = (a*(m + 191) + 7*m*m + 7) % 999953;
+  const code = (39119*b + 22283*a + 77711*m + 161803) % 1000000;
+  return { time:`${hh}:${mm}:${ss}`,
+           code:`DM1-${hh}${mm}${ss}-${String(code).padStart(6,'0')}` };
+}
+let finalPw = null;
+
+/* ================================================================
+   DATA — the 505 observations of Data_Outliers_Benford.xlsx,
+   embedded for the pictures only. The student
+   computes everything in Python.
+   ================================================================ */
+const DATA = {
+  N:505,
+  CHEATS:[0, 126, 252, 378, 504],
+  X:[7227692.451950151,2.024885883858732,27.60858126903227,7.361138023063264,178.2823500827654,13.60033396935133,54.41926538627089,0.3227601916055933,0.156964868717851,6.523417012861199,0.2359979907742319,5.065592611495914,157.6607641935508,162.2051854394324,6.037648896576866,1.222325672732002,15.18849089544371,0.009901205720840661,1.355699144185968,755.5768937353882,57.02692915182962,10.7980597612401,0.1175575916830979,0.8023573225699369,2.045409150556732,10.4523076675007,33.29836348666965,5.645434588471639,101.3677176068339,1.15498251804408,0.02048620162906538,573.73827601041,0.01025807398853125,0.5943633555784922,153.0050771406393,1.165923165857514,0.6927075929434977,2.6054949754092,1305.099168029191,29.24955042330446,0.3082637717867363,0.5338323333071172,0.476082310385248,0.01589501432343954,4.293903428950035,0.6939477601070879,3.496838825920376,2.283106907402022,0.5147947475294957,82.09664269814277,1855.595596472965,2.161526215586528,1168.799633711575,0.05515791703227284,4.864305699221527,8.662121576421509,6.173552363822548,0.1685521614167494,339.4943533914208,33.05293512010114,38.1486991883191,0.002879300904533441,0.3685437429489275,0.2310285991814539,40.75874023085849,50.83130302531069,15.60316416697449,0.06343612176282645,540.8828756342249,1.508205423692072,224.8970096138019,19.31193375922593,58.62212629552594,76.16156350096189,14.30576184561294,0.3685426398867606,20.19836884013158,11.07081040328274,107.7773878350508,0.1520290197685144,9.042753679877018,1.426480478322951,1793.649566170401,4.358711844029346,0.07617918955952675,3.636089534691519,142.890938293041,76.1823300123421,2.287361435758734,1.097954076664181,0.2702491800816981,43.03853483092352,47.92699402446654,84.89932960439766,0.004437548343493194,6.181855781929876,12.68511192757268,1929.842461131243,24.81813387099113,5.750142592170266,23.19433840193411,24.74776706251403,1666.541919263694,0.7483328152451872,0.001303094797736828,0.2713960370184186,53.88801512925956,9.480094708216836,5.60934516765483,23.4728151096064,53.03027555569048,7.841939406045879,21.44901998965166,0.1900954367191883,9.164291010921728,0.4896562014237884,0.3605712306016055,40.69280216382246,0.01748302389169199,1.853415613187287,727.5320665429317,5.123951088874686,5.276048764254457,75.29083198777852,63.79672523893491,0.3087317729145599,273968563.9367701,1.046587923167488,0.5241565892479201,14.01022027835036,31.2470560783271,1.748128812728978,2.328245285907484,0.7889176142698756,1.10471044097185,14.7660644689248,3.047068316713777,890.7364735338062,67.78448777082538,257.8216634750004,2716.055204186583,1.117359975525547,1716.057639993355,376.3186648517658,18.11940463346057,18.94853486763891,683.7260537754034,48.14484473472057,111.0895725826639,0.4446852170543302,1.366985363006754,442.5527639198087,0.04379954965308268,0.2602754289546165,1.611209070339896,1.394222604365692,0.005802652984813321,2.709288534905063,4.823009278828696,26.38472225334767,0.8154120678195753,3.42947722179448,3.031640373978993,158.268064295187,0.9212600838581242,0.4446678974000971,0.3583175408009182,6.139353918279769,30.90755341069082,0.2523516396320593,2943.652460518248,5.069635299871134,36.37175615683594,60.7171615124361,0.7238384732424716,9.530934115272615,5.724425657535388,1.100231876590224,9.00387791305718,0.2186908983735139,0.2600328453830515,4.34659362037202,3.643600663810592,77.09481235858024,0.1093706250946936,0.03598164660549365,2.570905839830326,6.804086935061739,3.620904577887635,4.479603388893572,180.7658953412307,7.222580089395351,0.12278515503115,10.88806922665293,13.48568538663252,5.350808610669688,2175.687991192047,471.1397847713653,3.092039194622163,0.6961974627305643,1.328121675857846,0.6806900584438411,0.04494906840543156,16.66128899773143,0.2079844333157687,16.14251629295806,0.5553314706883453,1.098104190694709,0.1003614874473077,0.3808918761207907,19.60209948133048,2.963899110899892,45.19585773360856,28128.5364414637,0.158349778204909,69.3513620364852,309.2763787210725,0.09271166230961246,11.47171841559903,5.934726980958607,23.4011175733784,1650.530377823714,39.05369289608115,2.290081180838368,2.713169714575831,0.7863604359363177,25.27186363642656,709.5629041704195,4.342618361843452,149.6867991999265,0.0821559172243571,4.084758617971549,1.996915670379289,9.763623061460494,5.121919975225885,14.99750407446406,0.05041388427060288,19.79380098108889,6.725510442627103,222.1270959803551,0.686150355040841,74.60456679096299,308.1256277275467,24.03706541991838,8.159958181602844,30.13085108482362,14.24166320218086,421.554675566115,204.9595294876534,9.497159251922618,0.05645931630733236,0.5052515692213148,15011711380.09456,26.4689991450355,8.992335651819822,1.385990405941991,0.0008325071014475468,0.2787574611532648,4350.232035112042,0.4095074519234126,91.62627489462797,0.4159381921429737,0.0304737772009051,0.4002305311479786,94.27087300304129,9.718033592609409,16.82600976251496,1.191257489189761,11.82385745983767,16.73828379977504,6.434610285940855,1.070319246440694,0.03824557420520749,94.16231885525656,20.04883083669109,4.381597553998197,0.05254244051398366,591.6752098969487,0.1390488841953993,52.19435048889667,18.67555651392506,0.06160335262432418,6.489547528976571,5520.522564480149,4.312926569616403,0.1203117526576894,1.864944767526759,3.674884942291368,40.2156885545749,58.06367450403858,0.9433318982927623,0.4723262783316384,48.00644288941601,751.6642609081457,0.05968154181492422,6.306342376021282,166.1056432496821,0.05236726642148219,4.122412632676162,384.8586947038218,33.08129342891217,0.577971356028252,182.2900377358087,3073.442697847524,110.3813875424624,298.91281145445,25.85987173121476,8.582032534523941,0.02403922579595277,28.1369026971335,566.9539443794524,0.05143832729665576,0.2251782346444625,0.5262991517399815,8.934676876236109,1.375377884162191,32.85173152747151,5.406859244097095,0.2151640007434883,114.0521347043114,4.857919696095094,40.93483601353635,0.0005495959754877171,1.579402369468619,0.1626409133535657,2.560945842748346,708.5616554134758,18.53391809388811,12.8281364845663,0.6467602368910487,23.84005640589954,1196.320609292656,730.1722358188059,0.1097450828414874,28.06179488199338,83.15688950763278,519.0576167355433,0.8327802046258198,0.09859204682043834,30.06518007409666,3.559264594542123,6.374127671609622,0.0442125091830751,4.580228054962814,31.84118211172192,56.11823332015242,0.02911125229914691,0.6573369053665059,35.64951543760237,3.378339057659387,3.687859287318693,125.4335368239875,0.08078310586939767,1.42692465894872,322.3813162287943,0.4571996132546421,0.634247839325536,63.9964619019879,0.07635965829122907,0.87331430068995,24.82698929160823,6.913589779705426,1.944197497301306,3.015647801049012,1.196379318385537,520.3811597772306,0.4493948694995637,1.788827654076808,203.2910936671616,2.376822524067593,34.17425495077275,0.06046128429781837,0.1614540357940082,17420.84985647945,85.35822878623492,0.7335149661851325,1.044387479806425,17.31428653701273,4151573190.288874,158.1319996480106,0.006661710698547004,1.249954413578575,82.62090029686601,0.6511080368935439,7728.670542020127,95.70633615131841,0.8571138774416764,41.61944521431973,65.48340309738923,102.4284578847975,0.7630021745591943,3.239083861290272,0.1457852171157396,1.664262332364601,0.1466523457140754,0.1458017392334801,4683.470180995479,219.7812759031494,4.137479849696073,0.3457057394467579,0.1743788918594513,2.734680652686387,23.0885117566597,60.65299645979134,89.54069289224778,37.15505863889103,13.81402030722399,144.6539534698348,42.91702403353587,31.46380373674065,0.1906579050855388,8.387009733217322,14.89397251403754,6.04860261956302,55.08791360479419,39.82489367979003,14.12106256483252,0.2198605514063325,29.51004835554215,0.04878903896510684,1.993922123409824,223.0276337196693,17.35025248940118,61.70998349891282,1.813881895989058,853.5983740862266,59.16554659350053,0.181850131446096,300.6797414269902,79.71281282027151,0.17918565886454,8.384174157523956,0.1158426305845439,0.393602337227397,0.04922081361926148,1.153174003557353,60.34033333382732,3.855829967967114,184.5981928484427,7.487724595779602,18.1045150339208,4.18347381252438,0.4287899024788619,0.1101589311710683,0.1192082011916338,1.467906705590163,7.607478124651809,1.329061498045065,35.0444261276224,5.541194698197753,4.480656554965864,6.193297370733172,33.79812756114649,89.63001767323118,17.09478867828665,33.49079116888642,751.8334412581183,0.01713929691872416,27.26170314454657,29.33804558969114,0.7299760509384264,0.1508436375602981,121.0078968820245,93.4444708324919,0.4710993577944983,0.2569428360047626,187.0548863621952,3.422417830100403,1.998960300179082,519.6163374935671,83.18537090568401,1.651627388888697,0.06389192757908248,0.06241758476007379,4.426265490218682,0.1049390902735366,34.43431758441893,267.9901752090106,292.0637142090364,229.7523051708214,123.2083079891155,6.404509988653105,1.531326990733986,5.031568861519462,3.986725071549782,0.227593213621636,8.989021466643297,925.9348791304877,44.37328420303827,5.025753934682313,5.062505227230997,445.230345369914,0.4699551140041511,12.55478865013248,410.1065677683193,0.2315343748879639,0.547896981850725,7.704267742791078,1.778393295505225,90.59128794741494,0.3104683741733559,23.10489675196986,84.630897872171,9.294065079190215,3078377168.150255],
+  /* bounds of the outlier rules and the number of observations outside them */
+  RULES:{"rawZ": {"lo": -1338945989.9158285, "hi": 1428145910.0939271}, "rawMAD": {"lo": -11.881606244689618, "hi": 24.62986158790886}, "logZ": {"lo": -4.886110400844737, "hi": 8.869964444322362}, "logMAD": {"lo": -4.36843419741783, "hi": 8.072928689129174}},
+  COUNT:{rawZ:3, rawMAD:176, logZ:15, logMAD:20},
+  /* counts of the first digits 1..9 of the ledger */
+  DIGITS:[142, 75, 61, 56, 53, 40, 30, 27, 21]
+};
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Python, or
+              drop-down choices ({kind:'select'})
+
+   The course margin rule decides what is accepted, for every number:
+   exact integers (exact:true) only exactly; 0.1 <= |value| < 1e6 within
+   ±0.01; otherwise within ±1% of the value.
+   'alt' lists common wrong values, each with its own feedback; an alt
+   uses the same margin around its own value unless it has its own 'tol'.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const H0 = 'H<sub>0</sub>', H1 = 'H<sub>1</sub>';
+const DIGITS = [1,2,3,4,5,6,7,8,9].map(d=>[String(d), 'digit '+d]);
+
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE I',
+  text:`Five cheats are hiding among five hundred honest numbers.
+  <span class="fx">The Master drops a thick ledger on the desk.</span>
+  The Academy simulated 500 honest observations from a <strong>unknown</strong> distribution. Then it
+  slipped in <strong>5 rogue observations</strong>, at positions
+  I shall not tell you. 505 positive numbers in all.
+  My method is simple : compute the mean and the standard deviation, and call an outlier anything
+  beyond the mean ± 1.96 standard deviations. One z-score catches every cheat. 
+  <span class="fx">At the end, the Academy hands you a password. Copy it and submit it on
+  Blackboard.</span>`,
+  widget:'table', banner:'CLAIM: ONE Z-SCORE CATCHES EVERY CHEAT', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE FILE',
+  text:`Download <span class="kbd">Data_Outliers_Benford.xlsx</span> with the DATA (XLSX) button, save it
+  in the folder of your notebook, and load it with pandas. Its only column is
+  <span class="kbd">Observations</span>.
+  <strong>How many observations are there, and what are their minimum, median and mean ?</strong>`,
+  q:'Report what Python prints.',
+  fields:[
+    {id:'n', label:'Number of observations', value:505, exact:true,
+     alt:[{value:506, msg:'Row 1 of the file holds the column name, not an observation. Load it with pd.read_excel(...) and its default header.'}],
+     msg:'Use len(x).'},
+    {id:'min', label:'Minimum', value:0.0005495959754877171,
+     msg:'Use np.min(x). It is a small positive number: three significant digits are enough, e.g., 0.000123.'},
+    {id:'med', label:'Median', value:6.374127671609622,
+     alt:[{value:44599960.08904929, msg:'That is the mean. The median is np.median(x).'}],
+     msg:'Use np.median(x).'},
+    {id:'mean', label:'Mean', value:44599960.08904929,
+     alt:[{value:6.374127671609622, msg:'That is the median. The mean is np.mean(x).'}],
+     msg:'Use np.mean(x). It is a large number: Python prints it in scientific notation, e.g., 1.23e+07. Type it that way.'}],
+  hint:`Load the file once, keep its column in a NumPy array <b>x</b>, and use the NumPy functions. A
+  very large number is printed in scientific notation : 1.23e+07 means 1.23 × 10⁷ = 12,300,000. Type
+  it as Python prints it.`,
+  code:`import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+df = pd.read_excel('Data_Outliers_Benford.xlsx')
+x = df['Observations'].to_numpy()
+print(len(x), np.min(x), np.median(x), np.mean(???))`,
+  say:'505 observations, all positive: the smallest is 0.00055, the median 6.37, and the mean 44.6 million.',
+  right:`<strong>505</strong> observations. The smallest is <strong>0.00055</strong>, the median
+  <strong>6.37</strong>, and the mean <strong>44.6 million</strong>.
+  <span class="fx">The Master reads the last two numbers twice.</span>
+  Half of the numbers are below 6.37, yet their average is seven million times larger. A handful of
+  enormous values must be pulling it up. Let us look before we compute anything else.`,
+  note:'N = 505, all > 0; min 0.00055, median 6.37, mean 4.46e+07' },
+
+{ id:'t1', type:'choice', bg:'lab', who:'master', qn:'1.a',
+  title:'TRIAL II · THE SHAPE',
+  text:`<strong>Plot the 505 observations in the order of the file</strong>, as in class, and draw their
+  histogram. Then tell me what you see.`,
+  q:'Which description fits your plots?',
+  options:[
+    {id:'b', label:'A symmetric, bell-shaped cloud around the mean, with a few points on each side.'},
+    {id:'c', label:'The values are spread evenly between the minimum and the maximum.'},
+    {id:'a', label:'All values are positive and the distribution is extremely skewed to the right: almost every point is crushed against zero, while a few gigantic values tower above them.'},
+    {id:'d', label:'Many negative values, balanced by a few large positive ones.'}
+  ], correct:'a',
+  hint:`<b>plt.plot(x, 'o')</b> draws each observation against its position in the file;
+  <b>plt.hist(x, bins=50)</b> counts how many fall in each interval. Look at where most of the points
+  are, and at the scale of the vertical axis.`,
+  code:`plt.plot(x, 'o')
+plt.show()
+plt.hist(x, bins=50)
+plt.show()`,
+  right:`Exactly : positive and <strong>highly skewed</strong>. Nearly all the points lie on the zero line,
+  because the vertical axis must stretch to 15 billion to reach the largest value. The histogram is a
+  single tall bar.
+  <span class="fx">The Master frowns at his own method.</span>
+  My rule, the mean ± 1.96 standard deviations, comes from the normal distribution : symmetric and
+  bell-shaped. These data are neither. Let us see what it does anyway.`,
+  wrong:{b:`Symmetric ? The mean is 44.6 million and the median 6.37. And your histogram has one tall bar,
+  not a bell.`,
+  c:`Evenly spread ? Nearly every point sits on the zero line of your plot, and a few are far above.`,
+  d:`Check np.min(x) : the smallest value is positive. There is no negative value in this file.`},
+  widgetAfter:'raw', note:'positive, extremely right-skewed: a few gigantic values' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'1.b',
+  title:'TRIAL III · THE Z-SCORE ON THE RAW DATA',
+  text:`My rule, as in class : an observation is an outlier when it lies outside
+  <br><span class="kbd">[ mean − 1.96 · s ; mean + 1.96 · s ]</span><br>
+  where s is the empirical standard deviation. Equivalently, its z-score (x − mean) / s is larger than
+  1.96 in absolute value.
+  <strong>Compute s, the two bounds, and the number of observations outside them.</strong>`,
+  q:'Apply the rule to the raw observations.',
+  fields:[
+    {id:'s', label:'Standard deviation s', value:705890790.8188152,
+     msg:'Use np.std(x, ddof=1).'},
+    {id:'lo', label:'Lower bound', value:-1338945989.9158285,
+     msg:'Lower bound = mean − 1.96 × s. Look at its sign.'},
+    {id:'hi', label:'Upper bound', value:1428145910.0939271,
+     msg:'Upper bound = mean + 1.96 × s.'},
+    {id:'k', label:'Number of observations outside the bounds', value:3, exact:true,
+     alt:[{value:502, msg:'That is the number of observations inside the interval. Count those below the lower bound or above the upper bound.'},
+          {value:0, msg:'Count the observations below the lower bound OR above the upper bound: np.sum((x < lo) | (x > hi)).'}],
+     msg:'Count them with np.sum((x < lo) | (x > hi)).'}],
+  hint:`Compute the mean and the standard deviation once, then the bounds. The Boolean mask
+  <b>(x &lt; lo) | (x &gt; hi)</b> is True for the observations outside the interval, and <b>np.sum</b>
+  counts the True values. The bounds are huge : Python prints them in scientific notation.`,
+  code:`ave = np.mean(x)
+sigma = np.std(x, ddof=???)
+bound_out = [ave - 1.96*sigma, ave + 1.96*sigma]
+idx_out = (x < bound_out[0]) | (x > bound_out[1])
+print(sigma, bound_out, np.sum(idx_out))`,
+  say:'s ≈ 7.06e+08, the bounds are about −1.34e+09 and 1.43e+09, and 3 observations lie outside.',
+  right:`s ≈ <strong>706 million</strong>, bounds ≈ <strong>[−1.34 ; 1.43] billion</strong>, and
+  <strong>3</strong> observations outside, all of them above.
+  <span class="fx">The Master taps the lower bound.</span>
+  Minus 1.34 billion. Every observation is positive : none can ever fall below this bound. Half of my
+  interval guards an empty place. And three outliers, when five cheats were slipped in. Keep these
+  numbers; we shall come back to them.`,
+  widgetAfter:'rawz', hud:{raw:'3 (z)'}, note:'raw z rule: s = 7.06e+08, bounds [-1.34e+09 ; 1.43e+09], 3 flagged' },
+
+{ id:'t3', type:'numeric', bg:'lab', who:'master', qn:'1.c',
+  title:'TRIAL IV · THE MAD ON THE RAW DATA',
+  text:`The standard deviation is blown up by a few giants. In class you met its robust cousin : the
+  <strong>MAD</strong>, the median of the absolute deviations from the median, and the robust estimate
+  of the standard deviation
+  <br><span class="kbd">σ̂ = 1.48 · MAD</span><br>
+  The robust rule flags the observations outside
+  <span class="kbd">[ median − 1.96 · σ̂ ; median + 1.96 · σ̂ ]</span>.
+  <strong>Compute σ̂, the two bounds, and the number of observations outside them.</strong>`,
+  q:'Apply the robust rule to the raw observations.',
+  fields:[
+    {id:'sm', label:'Robust standard deviation σ̂ = 1.48 · MAD', value:9.31414995729553,
+     alt:[{value:6.293344565740224, msg:'That is the MAD itself. The robust standard deviation is 1.48 × MAD.'},
+          {value:66007931.79493544, msg:'The deviations are taken from the median, not from the mean: np.abs(x - np.median(x)).'}],
+     msg:'σ̂ = 1.48 × median(|x − median(x)|).'},
+    {id:'lo', label:'Lower bound', value:-11.881606244689618,
+     alt:[{value:-12.25417224298144, msg:'Use 1.96, not 2.'}],
+     msg:'Lower bound = median − 1.96 × σ̂, with σ̂ = 1.48 × MAD (not 1.4826).'},
+    {id:'hi', label:'Upper bound', value:24.62986158790886,
+     alt:[{value:25.00242758620068, msg:'Use 1.96, not 2.'}],
+     msg:'Upper bound = median + 1.96 × σ̂, with σ̂ = 1.48 × MAD (not 1.4826).'},
+    {id:'k', label:'Number of observations outside the bounds', value:176, exact:true,
+     alt:[{value:329, msg:'That is the number of observations inside the interval. Count those outside.'},
+          {value:3, msg:'That is the count of the z-score rule. Use the median and σ̂ here.'}],
+     msg:'Count them with np.sum((x < lo) | (x > hi)), with the robust bounds.'}],
+  hint:`Two medians : first the median of x, then the median of the absolute deviations
+  <b>|x − median(x)|</b>. Multiply that MAD by 1.48, then build the bounds and count as before.`,
+  code:`med_x = np.median(x)
+MAD_x = np.median(np.abs(x - ???))
+sigma_MAD = 1.48*MAD_x
+bound_MAD = [med_x - 1.96*sigma_MAD, med_x + 1.96*sigma_MAD]
+idx_MAD = (x < bound_MAD[0]) | (x > bound_MAD[1])
+print(sigma_MAD, bound_MAD, np.sum(idx_MAD))`,
+  say:'σ̂ ≈ 9.31, the bounds are about −11.88 and 24.63, and 176 observations lie outside.',
+  right:`σ̂ ≈ <strong>9.31</strong>, bounds ≈ <strong>[−11.88 ; 24.63]</strong>, and <strong>176</strong>
+  observations outside : more than a third of the ledger.
+  <span class="fx">The Master counts on his fingers, then gives up.</span>
+  The MAD is not fooled by the giants this time : it is fooled by the shape. In a lognormal sample, a
+  long right tail of perfectly honest values lies far above the median. And the lower bound is negative
+  again.`,
+  widgetAfter:'rawmad', hud:{raw:'3 (z) · 176 (MAD)'}, note:'raw MAD rule: sigma_MAD = 9.31, bounds [-11.88 ; 24.63], 176 flagged (35%)' },
+
+{ id:'t4', type:'choice', bg:'lab', who:'master', mood:'raised', qn:'1.c',
+  title:'TRIAL IV · WHAT WENT WRONG ?',
+  text:`Three outliers with one rule, 176 with the other, and five cheats in the ledger.
+  <strong>What went wrong ?</strong>`,
+  q:'Choose the diagnosis.',
+  options:[
+    {id:'b', label:'Nothing: the MAD rule is robust, so the ledger really contains 176 cheats.'},
+    {id:'a', label:'Both rules build a symmetric interval, which suits a symmetric, bell-shaped distribution. These data are positive and highly skewed: the lower bounds are negative and useless, a few giant values inflate the standard deviation, and the MAD rule mistakes the honest right tail for outliers.'},
+    {id:'c', label:'Nothing: the z-score rule found 3 outliers, and the 2 others are too small to matter.'},
+    {id:'d', label:'The multiplier 1.96 is too small: with 3 instead, both rules would find exactly the 5 cheats.'}
+  ], correct:'a',
+  hint:`Look at your two lower bounds, and remember where 1.96 comes from : the symmetric normal
+  distribution. Is the histogram of x symmetric ?`,
+  right:`Exactly. A rule built for a symmetric bell cannot be applied as such to a positive, skewed
+  variable. The cure is old : take the <strong>logarithm</strong>.`,
+  wrong:{b:`The MAD is robust to a few extreme values, not to a skewed shape. 176 cheats would be a third
+  of the ledger; the Academy slipped in five.`,
+  c:`Five cheats were slipped in. The giants inflate the standard deviation so much that two smaller
+  cheats hide behind them : that is called masking.`,
+  d:`Try it : with 3, the z-score rule still flags 3 observations, and the MAD rule 149. The problem is not
+  the multiplier, it is the shape of the data.`},
+  note:'symmetric rules on skewed data fail: negative lower bounds, masking, honest tail flagged' },
+
+{ id:'t5', type:'numeric', bg:'lab', who:'master', qn:'1.d',
+  title:'TRIAL V · THE LOGARITHM',
+  text:`Transform the observations : <span class="kbd">y = ln(x)</span>.
+  <strong>Compute the mean, the standard deviation s, the median, and the robust standard deviation
+  σ̂ = 1.48 · MAD of y.</strong>`,
+  q:'Describe the log-observations.',
+  fields:[
+    {id:'m', label:'Mean of y', value:1.9919270217388116,
+     alt:[{value:0.8650829138951446, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'}],
+     msg:'Use np.mean(y), with y = np.log(x).'},
+    {id:'s', label:'Standard deviation s of y', value:3.50920276662426,
+     alt:[{value:1.5240273974245409, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'}],
+     msg:'Use np.std(y, ddof=1).'},
+    {id:'med', label:'Median of y', value:1.8522472458556725,
+     alt:[{value:0.8044207579956144, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'}],
+     msg:'Use np.median(y).'},
+    {id:'sm', label:'σ̂ = 1.48 · MAD of y', value:3.1738170628946443,
+     alt:[{value:2.144470988442327, msg:'That is the MAD itself. Multiply it by 1.48.'},
+          {value:1.3783712369855299, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'},
+          {value:3.1291630573816906, msg:'The deviations are taken from the median of y, not from its mean.'}],
+     msg:'σ̂ = 1.48 × median(|y − median(y)|).'}],
+  hint:`<b>np.log</b> is the natural logarithm, ln; <b>np.log10</b> is the logarithm in base 10. Then
+  reuse the code of the previous trials, on y instead of x.`,
+  code:`y = np.log(x)
+print(np.mean(y), np.std(y, ddof=1), np.median(y))
+MAD_y = np.median(np.abs(y - np.median(y)))
+print(1.48*???)`,
+  say:'For y = ln(x): mean ≈ 1.99, s ≈ 3.51, median ≈ 1.85 and σ̂ ≈ 3.17.',
+  right:`Mean <strong>1.99</strong> and median <strong>1.85</strong> : close to each other, as in a
+  symmetric distribution, and close to the 2 used to simulate the honest numbers.
+  s ≈ <strong>3.51</strong> and σ̂ ≈ <strong>3.17</strong>. Now, I can tell you that the true value is 3. The cheats still
+  push the standard deviation up, the MAD much less. Now plot y.`,
+  note:'y = ln(x): mean 1.99, median 1.85, s 3.51, sigma_MAD 3.17 (true sigma: 3)' },
+
+{ id:'t6', type:'choice', bg:'lab', who:'master', qn:'1.d',
+  title:'TRIAL V · THE SHAPE, AGAIN',
+  text:`<strong>Plot y = ln(x) in the order of the file, and its histogram.</strong>
+  How many observations stand apart from the cloud ?`,
+  q:'What does the plot of the log-observations show?',
+  options:[
+    {id:'b', label:'A cloud still skewed to the right, with three observations above it, as on the raw scale.'},
+    {id:'c', label:'A symmetric cloud, with no observation standing apart.'},
+    {id:'d', label:'A symmetric cloud, with about fifteen observations above it and fifteen below it.'},
+    {id:'a', label:'A symmetric, bell-shaped cloud around 2, and five observations far above it, between 15 and 24.'}
+  ], correct:'a',
+  hint:`The same commands as in Trial II, with y instead of x. Count the points that sit alone, separated
+  from the main band by an empty space.`,
+  code:`plt.plot(y, 'o')
+plt.show()
+plt.hist(y, bins=50)
+plt.show()`,
+  right:`Exactly : <strong>five</strong> points, between 15 and 24, far above an honest cloud that never
+  goes beyond about 10.
+  <span class="fx">The Master opens a sealed envelope.</span>
+  The five cheats sit at positions 0, 126, 252, 378 and 504 of the file. On the raw scale, my z-score
+  caught 252, 378 and 504 only : the two smaller cheats, 7 million and 274 million, hid behind the three
+  giants that inflated the standard deviation. On the log scale, nobody hides.`,
+  wrong:{b:`Is the cloud still skewed ? Compare the mean and the median of y. And count again : the two
+  smaller cheats are visible now.`,
+  c:`Look above the cloud : a few points sit alone, far higher than all the others.`,
+  d:`Those points are on the edges of the cloud, not apart from it. Look for points separated from the
+  cloud by an empty band.`},
+  widgetAfter:'log', note:'log scale: symmetric cloud around 2; 5 cheats apart (rows 0, 126, 252, 378, 504)' },
+
+{ id:'t7', type:'numeric', bg:'lab', who:'master', qn:'1.e',
+  title:'TRIAL VI · THE Z-SCORE ON THE LOGARITHM',
+  text:`My rule again, on y :
+  <span class="kbd">[ mean(y) − 1.96 · s ; mean(y) + 1.96 · s ]</span>.
+  <strong>Give the two bounds and the number of observations outside them.</strong>`,
+  q:'Apply the z-score rule to y = ln(x).',
+  fields:[
+    {id:'lo', label:'Lower bound', value:-4.886110400844737,
+     alt:[{value:-2.1220107850569554, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'},
+          {value:-5.026478511509708, msg:'Use 1.96, not 2.'}],
+     msg:'Lower bound = mean(y) − 1.96 × s.'},
+    {id:'hi', label:'Upper bound', value:8.869964444322362,
+     alt:[{value:3.8521766128472446, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'},
+          {value:9.01033255498733, msg:'Use 1.96, not 2.'}],
+     msg:'Upper bound = mean(y) + 1.96 × s.'},
+    {id:'k', label:'Number of observations outside the bounds', value:15, exact:true,
+     alt:[{value:13, msg:'That count uses 2 instead of 1.96.'},
+          {value:3, msg:'That is the count on the raw data. Apply the rule to y.'},
+          {value:490, msg:'That is the number of observations inside the interval. Count those outside.'}],
+     msg:'Count them with np.sum((y < lo) | (y > hi)).'}],
+  hint:`Exactly the code of Trial III, applied to y.`,
+  code:`ave_y = np.mean(y)
+sigma_y = np.std(y, ddof=1)
+bound_out = [ave_y - 1.96*sigma_y, ave_y + 1.96*sigma_y]
+idx_out = (y < ???) | (y > ???)
+print(bound_out, np.sum(idx_out))`,
+  say:'The bounds are about −4.89 and 8.87, and 15 observations lie outside.',
+  right:`Bounds ≈ <strong>[−4.89 ; 8.87]</strong>, and <strong>15</strong> observations outside : the five
+  cheats, all of them, and 10 honest observations, 7 below and 3 above.
+  <span class="fx">The Master nods slowly.</span>
+  The same z-score, the same 1.96. Only the scale has changed.`,
+  widgetAfter:'logz', hud:{log:'15 (z)'}, note:'log z rule: bounds [-4.89 ; 8.87], 15 flagged, all 5 cheats among them' },
+
+{ id:'t8', type:'numeric', bg:'lab', who:'master', qn:'1.e',
+  title:'TRIAL VI · THE MAD ON THE LOGARITHM',
+  text:`And the robust rule, on y :
+  <span class="kbd">[ median(y) − 1.96 · σ̂ ; median(y) + 1.96 · σ̂ ]</span>.
+  <strong>Give the two bounds and the number of observations outside them.</strong>`,
+  q:'Apply the MAD rule to y = ln(x).',
+  fields:[
+    {id:'lo', label:'Lower bound', value:-4.36843419741783,
+     alt:[{value:-1.897186866496024, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'},
+          {value:-4.495386879933616, msg:'Use 1.96, not 2.'}],
+     msg:'Lower bound = median(y) − 1.96 × σ̂, with σ̂ = 1.48 × MAD (not 1.4826).'},
+    {id:'hi', label:'Upper bound', value:8.072928689129174,
+     alt:[{value:3.506028382487253, msg:'np.log10 is the logarithm in base 10. Use the natural logarithm, np.log.'},
+          {value:8.199881371644961, msg:'Use 1.96, not 2.'}],
+     msg:'Upper bound = median(y) + 1.96 × σ̂, with σ̂ = 1.48 × MAD (not 1.4826).'},
+    {id:'k', label:'Number of observations outside the bounds', value:20, exact:true,
+     alt:[{value:176, msg:'That is the count on the raw data. Apply the rule to y.'},
+          {value:15, msg:'That is the count of the z-score rule. Use the median and σ̂ here.'},
+          {value:485, msg:'That is the number of observations inside the interval. Count those outside.'}],
+     msg:'Count them with np.sum((y < lo) | (y > hi)), with the robust bounds.'}],
+  hint:`Exactly the code of Trial IV, applied to y.`,
+  code:`med_y = np.median(y)
+sigma_MAD_y = 1.48*np.median(np.abs(y - med_y))
+bound_MAD = [med_y - 1.96*sigma_MAD_y, med_y + 1.96*sigma_MAD_y]
+idx_MAD = (y < ???) | (y > ???)
+print(bound_MAD, np.sum(idx_MAD))`,
+  say:'The bounds are about −4.37 and 8.07, and 20 observations lie outside.',
+  right:`Bounds ≈ <strong>[−4.37 ; 8.07]</strong>, and <strong>20</strong> observations outside : again the
+  five cheats, and 15 honest observations.
+  Compare with the truth : the honest log-observations are N(2, 3²), whose 95% interval is
+  2 ± 1.96 × 3 = [−3.88 ; 7.88]. The robust bounds are closer to it than the z-score bounds, because
+  σ̂ ≈ 3.17 is closer to 3 than s ≈ 3.51.`,
+  widgetAfter:'logmad', hud:{log:'15 (z) · 20 (MAD)'}, note:'log MAD rule: bounds [-4.37 ; 8.07], 20 flagged, all 5 cheats among them' },
+
+{ id:'t9', type:'choice', bg:'lab', who:'master', qn:'1.e',
+  title:'TRIAL VI · HONEST SUSPECTS',
+  text:`Both rules now catch the five cheats. But they also flag 10 and 15 honest observations.
+  <strong>How do you read these honest suspects ?</strong>`,
+  q:'Choose the right reading.',
+  options:[
+    {id:'a', label:'A 95% fluctuation interval leaves out 5% of a normal sample by construction: among 500 honest observations, about 25 are expected outside. Being outside the interval is a reason to look, not a proof of fraud.'},
+    {id:'b', label:'They are cheats too: the Academy slipped in more than five.'},
+    {id:'c', label:'The rules are wrong: a correct rule never flags an honest observation.'},
+    {id:'d', label:'The logarithm created them: they were not outliers on the raw scale, so they are not outliers.'}
+  ], correct:'a',
+  hint:`Which share of a normal sample lies outside the mean ± 1.96 standard deviations ? Multiply it by
+  500.`,
+  right:`Exactly. 5% of 500 is 25 : about 25 honest numbers are expected outside a 95% interval, by chance
+  alone. The z-score flags fewer, because its s is still inflated by the cheats. An outlier rule points
+  at suspects; the investigation comes after.
+  <span class="fx">The Master writes in the margin : plot first, take the logarithm of a positive skewed
+  variable, then measure.</span>`,
+  wrong:{b:`The Academy told you : five cheats. The honest log-observations are N(2, 3²), and some of them
+  fall in the tails by chance.`,
+  c:`Any interval that keeps 95% of the honest data leaves the other 5% out. Only a rule that flags
+  nothing never flags an honest observation, and it never catches a cheat either.`,
+  d:`The logarithm changes the scale, not the order : the smallest x are the smallest y. On the raw
+  scale, the bounds were simply meaningless.`},
+  note:'95% interval: ~5% of honest data flagged by chance (25 of 500); a suspect is not a cheat' },
+
+{ id:'beat', type:'info', bg:'court', who:'master', qn:'—',
+  title:'THE SECOND WITNESS · BENFORD',
+  text:`The ledger has a second way to betray a cheat : its <strong>first digits</strong>.
+  The first non-zero digit of 274,000 is 2; that of 0.0055 is 5. You might expect each digit from 1 to 9
+  to start one number in nine. In many real ledgers it does not : 1 starts about 30% of the numbers, and
+  9 less than 5%. This is <strong>Benford's law</strong> :
+  <br><span class="kbd">P(first digit = d) = log<sub>10</sub>(1 + 1/d),  d = 1, …, 9</span><br>
+  It holds for numbers spread over several orders of magnitude, with no typical size. It typically
+  works for <strong>Pareto distributions</strong>, the power laws of incomes, city sizes, firm sizes or
+  invoice amounts, and for a lognormal with a large variance, like ours : our numbers run from 0.0005 to
+  15 billion, over thirteen orders of magnitude. Honest accounts tend to follow it but people who invent
+  numbers do not.
+  <span class="fx">Auditors and tax offices use it to choose which accounts to examine.</span>`,
+  widget:'benford', banner:'BENFORD: P(d) = LOG10(1 + 1/d)', cont:'Ask the digits' },
+
+{ id:'b1', type:'numeric', bg:'court', who:'master', qn:'2.a',
+  title:'TRIAL VII · THE LAW',
+  text:`Benford's law gives the probability that the first non-zero digit of a number is d :
+  <br><span class="kbd">P(first digit = d) = log<sub>10</sub>(1 + 1/d),  d = 1, 2, …, 9</span><br>
+  For instance, P(first digit = 9) = log<sub>10</sub>(1 + 1/9) = log<sub>10</sub>(10/9).
+  <strong>According to Benford's law, which share of the numbers should start with 1, and which
+  share with 3 ?</strong> Give them in percent, with two decimals.`,
+  q:'Compute the Benford proportions, in percent.',
+  fields:[
+    {id:'p1', label:'Benford share of first digit 1 (%)', value:30.10299956639812,
+     alt:[{value:0.3010299956639812, msg:'Give it in percent: multiply the proportion by 100.'},
+          {value:69.31471805599453, msg:'np.log is the natural logarithm. Benford uses the logarithm in base 10, np.log10.'}],
+     msg:'100 × log10(1 + 1/1).'},
+    {id:'p3', label:'Benford share of first digit 3 (%)', value:12.493873660829994,
+     alt:[{value:0.12493873660829993, msg:'Give it in percent: multiply the proportion by 100.'},
+          {value:28.768207245178086, msg:'np.log is the natural logarithm. Benford uses the logarithm in base 10, np.log10.'}],
+     msg:'100 × log10(1 + 1/3).'}],
+  hint:`Plug d = 1 and d = 3 into P(d) = log<sub>10</sub>(1 + 1/d), then multiply by 100. The formula
+  uses the logarithm in base 10, <b>np.log10</b>. Compute it for the nine digits
+  at once with <b>np.arange(1, 10)</b>.`,
+  code:`digits = np.arange(1, 10)
+p_benford = np.log10(1 + 1/???)
+print(100*p_benford)`,
+  say:'Benford expects 30.10% of the first digits to be 1, and 12.49% to be 3.',
+  right:`<strong>30.10%</strong> for 1, <strong>12.49%</strong> for 3, and only 4.58% for 9. The nine
+  proportions sum to 1 : log<sub>10</sub>(2/1 × 3/2 × … × 10/9) = log<sub>10</sub>(10) = 1.`,
+  note:'Benford: P(1) = 30.10%, P(3) = 12.49%, P(9) = 4.58%' },
+
+{ id:'b2', type:'numeric', bg:'court', who:'master', qn:'2.b',
+  title:'TRIAL VIII · THE FIRST DIGITS',
+  text:`Now extract the <strong>first non-zero digit</strong> of each of the 505 observations. Careful :
+  0.0055 starts with 5, not with 0.
+  <strong>How many observations start with 1, and which share is that, in percent ?</strong>`,
+  q:'Count the first digits equal to 1.',
+  fields:[
+    {id:'n1', label:'Observations whose first digit is 1', value:142, exact:true,
+     alt:[{value:111, msg:'Your count misses the numbers below 1: the first character of 0.0123 is 0. Strip the leading zeros and the dot first, or use the logarithm method.'}],
+     msg:'Count them with np.sum(d == 1), where d holds the first non-zero digits.'},
+    {id:'p1', label:'Share of first digit 1 (%)', value:28.118811881188122,
+     alt:[{value:0.2811881188118812, msg:'Give it in percent: multiply the proportion by 100.'},
+          {value:21.980198019801982, msg:'Your count misses the numbers below 1: the first character of 0.0123 is 0. Strip the leading zeros and the dot first, or use the logarithm method.'}],
+     msg:'Share = 100 × (count of 1s) / 505.'}],
+  hint:`Two ways. With strings : write each number as text, strip the leading <b>0</b> and <b>.</b>
+  characters, and keep the first character. With logarithms : divide each number by 10 to the power of
+  its order of magnitude, <b>floor(log<sub>10</sub>(x))</b>, and keep the integer part.`,
+  code:`# with strings
+d = df['Observations'].astype(str).str.lstrip('0.').str[0].astype(int).to_numpy()
+# or with logarithms
+d = np.floor(x / 10**np.floor(np.log10(x))).astype(int)
+print(np.sum(d == ???), 100*np.mean(d == ???))`,
+  say:'142 of the 505 observations start with 1, i.e., 28.12%.',
+  right:`<strong>142</strong> observations, i.e., <strong>28.12%</strong>, against 30.10% for Benford.
+  Close, but not equal. Is the gap a sign of fraud, or the noise of a sample of 505 numbers ? Plot the
+  nine digits first.`,
+  note:'first digit 1: 142 / 505 = 28.12% (Benford: 30.10%)' },
+
+{ id:'b3', type:'choice', bg:'court', who:'master', qn:'2.b',
+  title:'TRIAL VIII · NINE BARS',
+  text:`<strong>Make a bar chart of the observed proportions of the nine first digits, and add the
+  Benford proportions.</strong> What does it show ?`,
+  q:'Which description fits your chart?',
+  options:[
+    {id:'b', label:'The nine digits are about equally frequent, near 11% each.'},
+    {id:'c', label:'The observed proportions increase from 1 to 9: the large digits are the most frequent.'},
+    {id:'a', label:'The observed proportions decrease from 1 to 9 and follow the Benford proportions closely, with small gaps in both directions.'},
+    {id:'d', label:'The digits 1 and 2 are far more frequent than Benford predicts, and 4 to 9 far rarer.'}
+  ], correct:'a',
+  hint:`<b>np.bincount(d, minlength=10)[1:]</b> counts the digits 1 to 9; divide by N to get proportions.
+  Then <b>plt.bar</b> for the observed proportions, and red points for Benford.`,
+  code:`N = len(d)
+p_obs = np.bincount(d, minlength=10)[1:] / N
+plt.bar(digits, p_obs, label='observed')
+plt.plot(digits, p_benford, 'or', label='Benford')
+plt.legend()
+plt.show()`,
+  right:`Exactly. The bars fall from 1 to 9 and hug the Benford proportions : 28.1% against 30.1% for 1,
+  14.9% against 17.6% for 2, 10.5% against 7.9% for 5. These are honest numbers, by construction. Does
+  a test agree ?`,
+  wrong:{b:`That is what a forger who picks his digits at random would produce. Look again at the height of
+  your bar for 1.`,
+  c:`Your tallest bar should be the first one. Check that you extract the first digit, not the last.`,
+  d:`Gaps that large would betray numbers that do not follow Benford. Compare your bars with the Benford
+  points digit by digit : the gaps are a few points only.`},
+  widgetAfter:'benfobs', note:'nine bars: observed proportions close to Benford' },
+
+{ id:'b4', type:'numeric', bg:'court', who:'master', qn:'2.c',
+  title:'TRIAL IX · THE Z-SCORE OF A PROPORTION',
+  text:`Test the digit 1 : <span class="kbd">${H0} : p<sub>1</sub> = 0.3010</span> (Benford) against
+  <span class="kbd">${H1} : p<sub>1</sub> ≠ 0.3010</span>. Under ${H0}, the observed proportion p̂ in a
+  sample of N numbers has a standard deviation √(p (1 − p) / N), and
+  <br><span class="kbd">z = (p̂ − p) / √( p (1 − p) / N )</span><br>
+  approximately follows N(0, 1).
+  <strong>Compute z for the digit 1, and decide at the 5% significance level.</strong>`,
+  q:'Run the z-test for the digit 1.',
+  fields:[
+    {id:'z', label:'z-score of the digit 1', value:-0.9720627104426306,
+     alt:[{value:-0.9917959541660863, tol:0.005, msg:'That z uses p̂ in the standard error. Under H₀, use the Benford proportion: √(p (1 − p) / N).'},
+          {value:-47.62180110663616, msg:'You forgot the square root in the standard error: √(p (1 − p) / N).'},
+          {value:-97.20627104426306, msg:'You mixed a percent with a proportion. Use proportions everywhere: p̂ = 142/505 and p = log10(2).'}],
+     msg:'z = (p̂ − p) / √(p (1 − p) / N), with proportions, p = log10(2) and N = 505.'},
+    {id:'d', kind:'select', label:'Decision at the 5% significance level', correct:'fail',
+     options:[['reject','Reject H₀: the digit 1 betrays numbers that do not follow Benford'],
+              ['fail','Do not reject H₀: the gap is compatible with Benford']],
+     msg:'Compare the absolute value of z with 1.96.'}],
+  hint:`Use proportions, not percents : p̂ = 142/505 and p = log<sub>10</sub>(2), with N = 505. Reject
+  ${H0} when |z| &gt; 1.96.`,
+  code:`p_hat = np.mean(d == 1)
+p = np.log10(2)
+z1 = (p_hat - p) / np.sqrt(p*(1 - p)/???)
+print(z1)`,
+  say:'z ≈ −0.97: |z| is below 1.96, so we do not reject Benford for the digit 1.',
+  right:`z ≈ <strong>−0.97</strong>. A gap of two points, on 505 numbers, is less than one standard
+  deviation : <strong>no reason to reject ${H0}</strong>. The digit 1 is compatible with Benford's law.
+  <span class="fx">Under ${H0}, the standard error uses Benford's p, not p̂ : the test measures the gap
+  in the units that the law predicts.</span>`,
+  hud:{z1:'-0.97'}, note:'digit 1: z = -0.97, |z| < 1.96: do not reject Benford' },
+
+{ id:'b5', type:'numeric', bg:'court', who:'master', qn:'2.d',
+  title:'TRIAL X · NINE WITNESSES',
+  text:`The ledger is honest by construction. Let us interrogate every digit.
+  <strong>Compute z for each of the nine digits. How many have |z| &gt; 1.96, which digit is the
+  strongest suspect, and what is its z ?</strong>`,
+  q:'Run the nine z-tests.',
+  fields:[
+    {id:'k', label:'Number of digits with |z| > 1.96', value:1, exact:true,
+     alt:[{value:0, msg:'With p̂ in the standard error, one z drops just below 1.96. Under H₀, the standard error uses the Benford proportions.'}],
+     msg:'Compute the nine z at once with arrays, then count np.sum(np.abs(z) > 1.96).'},
+    {id:'dig', kind:'select', label:'Strongest suspect', correct:'5', options:DIGITS,
+     msg:'Look for the digit with the largest |z|.'},
+    {id:'z', label:'z-score of that digit', value:2.1446143482713205,
+     alt:[{value:1.8894337861461945, msg:'That z uses p̂ in the standard error. Under H₀, use the Benford proportion.'}],
+     msg:'z = (p̂ − p) / √(p (1 − p) / N), for the suspect digit.'}],
+  hint:`p̂ and p become arrays of nine proportions : the same formula then gives the nine z at once.`,
+  code:`z = (p_obs - p_benford) / np.sqrt(p_benford*(1 - p_benford)/N)
+print(np.round(z, 2))
+print(np.sum(np.abs(z) > ???))`,
+  say:'One digit out of nine is rejected: the digit 5, with z ≈ 2.14.',
+  right:`<strong>One</strong> rejection : the digit <strong>5</strong>, with z ≈ <strong>2.14</strong>. Yet
+  the ledger is honest : the Academy simulated it from a law that follows Benford.
+  <span class="fx">The Master shrugs.</span>
+  Each test has a 5% chance of a false alarm. Nine tests give nine chances : if they were independent,
+  the probability of at least one false alarm would be 1 − 0.95<sup>9</sup> ≈ 37%. Interrogate enough
+  witnesses, and one of them will accuse an honest man.`,
+  widgetAfter:'zall', note:'9 z-tests on an honest ledger: 1 false alarm (digit 5, z = 2.14); P(at least 1) ~ 37%' },
+
+{ id:'b7', type:'choice', bg:'court', who:'master', mood:'raised', qn:'2.e',
+  title:'TRIAL XI · THE LIMITS OF ONE DIGIT',
+  text:`An honest ledger, accused by the digit 5.
+  <strong>What do you conclude about the z-score of one proportion ?</strong>`,
+  q:'Choose the conclusion.',
+  options:[
+    {id:'b', label:'The z-test is wrong: Benford’s law cannot be tested.'},
+    {id:'a', label:'Each z-test has a 5% chance of a false alarm, and running it on the nine digits one by one multiplies these chances: about 37% of honest ledgers would be accused by at least one digit. We need one test that weighs the nine proportions together.'},
+    {id:'c', label:'The digit 5 proves that the ledger was forged: one rejection is enough.'},
+    {id:'d', label:'Test the nine digits and reject as soon as one |z| exceeds 1.96: that is the most reliable rule.'}
+  ], correct:'a',
+  hint:`The ledger is honest by construction. With nine tests at the 5% level, how likely is at least one
+  false alarm ?`,
+  right:`Exactly. Nine tests at 5% each, and an honest ledger has about a 37% chance of being accused by one
+  digit : that is the <strong>multiple testing</strong> problem. The z-score of one digit is a good first
+  look, not a verdict. A global test that weighs the nine gaps together comes next.`,
+  wrong:{b:`It can be tested, and you just did. The point is what nine separate tests can conclude, and what
+  they cannot.`,
+  c:`The Academy simulated this ledger from a law that follows Benford : it is honest. With nine tests,
+  one false alarm is no surprise.`,
+  d:`That rule is how the honest ledger was accused by the digit 5 : with nine chances, about 37% of honest
+  ledgers would be rejected.`},
+  note:'nine one-digit z-tests: multiple testing, ~37% false alarms on honest data: a global test is needed' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`One z-score does not catch every cheat. It catches them on the right scale, read with humility.
+  Four rules leave with you.
+  <strong>One.</strong> Plot first. A positive, highly skewed variable must be transformed, usually with the
+  logarithm, before a symmetric rule such as mean ± 1.96 s or median ± 1.96 σ̂ makes sense.
+  <strong>Two.</strong> A few extreme values inflate the standard deviation and hide other outliers. The MAD
+  resists them; it does not resist a skewed shape.
+  <strong>Three.</strong> A 95% fluctuation interval flags about 5% of the honest observations. A suspect is
+  not a cheat.
+  <strong>Four.</strong> Benford's law describes numbers spread over many orders of magnitude, such as Pareto
+  amounts. A z-test on one digit is a first look; nine of them, run one by one, raise false alarms.`,
+  banner:'PLOT. TRANSFORM. TEST. STAY HUMBLE.', cont:'Finish', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {raw:'—', log:'—', z1:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the 505 observations in the order of the file, on the
+   raw scale and on the log scale, with the bounds of the two outlier
+   rules; then the first digits against Benford's law, and the nine
+   z-scores. Points are never connected;
+   hovering a point shows its row and its value.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series (one colour per point if colorAt is given),
+   straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="7 6"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.rAt?s.rAt(i):(s.r||4)}"
+        fill="${s.colorAt?s.colorAt(i):(s.color||PLOT.ink)}" fill-opacity="${s.alpha||0.8}" stroke="${PLOT.paper}" stroke-width="1">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{
+    if(p.box){ const w=p.text.length*7.6+10, x0=px(p.x)-(p.anchor==='end'?w-5:5);
+      labels += `<rect x="${x0.toFixed(1)}" y="${(py(p.y)-14).toFixed(1)}" width="${w.toFixed(1)}" height="19" fill="${PLOT.paper}" fill-opacity=".92"/>`; }
+    labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* a bar panel over the digits 1 to 9: one or two series side by side */
+function barsSVG(o){
+  const W=700, H=300, L=70, R=684, T=46, B=240;
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  const slot = (R-L)/9, n = o.series.length, bw = slot*0.62/n;
+  let bars='';
+  o.series.forEach((s,k)=>{
+    s.v.forEach((v,i)=>{
+      const x = L + slot*i + slot*0.19 + k*bw, y0 = py(Math.max(0,o.ymin)), y1 = py(v);
+      const col = s.colorAt ? s.colorAt(i) : s.color;
+      bars += `<rect x="${x.toFixed(1)}" y="${Math.min(y0,y1).toFixed(1)}" width="${(bw-2).toFixed(1)}" height="${Math.abs(y1-y0).toFixed(1)}"
+        fill="${col}" fill-opacity=".85"><title>${escapeAttr(s.label+', digit '+(i+1)+': '+(o.tipfmt?o.tipfmt(v):v))}</title></rect>`;
+    });
+  });
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${L}" y1="${py(l.y).toFixed(1)}" x2="${R}" y2="${py(l.y).toFixed(1)}" stroke="${l.color||PLOT.fit}"
+      stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="7 6"`:''}/>`;
+    if(l.text) lines += TXT(R-4, (py(l.y)+(l.dy||-6)).toFixed(1), l.text, {sz:15, col:l.color||PLOT.fit, anchor:'end'});
+  });
+  let ticks='';
+  for(let i=0;i<9;i++) ticks += TXT((L+slot*(i+0.5)).toFixed(1), B+21, i+1, {sz:16});
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  let legend='';
+  if(n>1) o.series.forEach((s,k)=>{
+    const x = 420 + k*130;
+    legend += `<rect x="${x}" y="13" width="14" height="14" fill="${s.color}" fill-opacity=".85"/>` + TXT(x+20, 25, s.label, {sz:16, anchor:'start'});
+  });
+  (o.labels||[]).forEach(p=>{ legend += TXT((L+slot*(p.d-0.5)).toFixed(1), py(p.y).toFixed(1), p.text, {sz:16, col:p.col||PLOT.label}); });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${bars}${lines}${legend}
+    <line x1="${L}" y1="${py(Math.max(0,o.ymin)).toFixed(1)}" x2="${R}" y2="${py(Math.max(0,o.ymin)).toFixed(1)}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-14, o.xlab||'first non-zero digit', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* ---- helpers on the embedded data ---- */
+const ROWS = DATA.X.map((v,i)=>i);
+const LOGX = DATA.X.map(v=>Math.log(v));
+const isCheat = i => DATA.CHEATS.includes(i);
+/* Python's way of printing a float in scientific notation: 7.227692e+06 */
+function pySci(v, digits){
+  const [m,e] = v.toExponential(digits).split('e');
+  const n = parseInt(e,10);
+  return m + 'e' + (n<0?'-':'+') + String(Math.abs(n)).padStart(2,'0');
+}
+const BN = v => v===0 ? '0' : (v/1e9) + ' bn';
+const PCT = v => v + '%';
+
+/* ---- the cold open: the first rows of the file, as pandas prints them ---- */
+function playTable(host){
+  let rows='';
+  for(let i=0;i<6;i++){
+    const y=104+i*23;
+    rows += TXT(250,y,i,{sz:19,anchor:'end'}) + TXT(450,y,pySci(DATA.X[i],6),{sz:19,anchor:'end'});
+  }
+  const svg=`<svg viewBox="0 0 700 270" style="width:100%;height:auto;display:block">
+    <rect width="700" height="270" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'DATA_OUTLIERS_BENFORD.XLSX · df.head(6)',{sz:18,anchor:'start'})}
+    ${TXT(450,72,'Observations',{sz:19,col:PLOT.ink,anchor:'end'})}
+    <line x1="200" y1="82" x2="470" y2="82" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(350,256,'505 rows, one column. pandas prints it in scientific notation: 7.227692e+06 = 7,227,692.',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE LEDGER', svg, 'Simulated data: 500 honest observations and 5 cheats, at positions unknown to you.');
+  return 600;
+}
+
+/* ---- the raw observations, alone or with the bounds of a rule ---- */
+function playRaw(host, mode){
+  const tip = i=>`row ${i}: ${pySci(DATA.X[i],3)}`;
+  if(mode==='mad'){
+    const R = DATA.RULES.rawMAD, top = 100;
+    const out = i => DATA.X[i]<R.lo || DATA.X[i]>R.hi;
+    const o = {
+      series:[{x:ROWS, y:DATA.X.map(v=>Math.min(v,top)), tip, r:3.5,
+               colorAt:i=>out(i)?PLOT.second:PLOT.ink}],
+      lines:[{x1:-5, y1:R.hi, x2:510, y2:R.hi, dash:true}, {x1:-5, y1:R.lo, x2:510, y2:R.lo, dash:true}],
+      labels:[{x:505, y:R.hi+4, text:'median + 1.96 × 1.48 MAD', anchor:'end', col:PLOT.fit, box:true},
+              {x:505, y:R.lo-11, text:'median − 1.96 × 1.48 MAD', anchor:'end', col:PLOT.fit, box:true}],
+      xmin:-5, xmax:510, ymin:-30, ymax:100,
+      xticks:[0,100,200,300,400,500], yticks:[-20,0,20,40,60,80,100],
+      title:'Zoom on the values below 100, with the MAD bounds',
+      xlab:'position in the file', ylab:'observation'
+    };
+    host.innerHTML = plotFrame('EVIDENCE · THE MAD ON THE RAW SCALE', panelSVG(o),
+      `${DATA.COUNT.rawMAD} observations lie above the upper bound (in brown; those above 100 are drawn on the top edge). The lower bound is negative.`);
+    return 900;
+  }
+  const withZ = mode==='z', R = DATA.RULES.rawZ;
+  const out = i => DATA.X[i]<R.lo || DATA.X[i]>R.hi;
+  const o = {
+    series:[{x:ROWS, y:DATA.X, tip, r:3.5, colorAt:i=>(withZ && out(i))?PLOT.second:PLOT.ink}],
+    lines:[], labels:[],
+    xmin:-5, xmax:510, ymin:withZ?-3e9:-0.6e9, ymax:1.6e10,
+    xticks:[0,100,200,300,400,500], yticks:[0,4e9,8e9,1.2e10,1.6e10], yfmt:BN,
+    title: withZ ? 'The raw observations and the bounds mean ± 1.96 s' : 'The 505 observations, in the order of the file',
+    xlab:'position in the file', ylab:'observation', L:78
+  };
+  if(withZ){
+    o.lines.push({x1:-5, y1:R.hi, x2:510, y2:R.hi, dash:true}, {x1:-5, y1:R.lo, x2:510, y2:R.lo, dash:true});
+    o.labels.push({x:5, y:R.hi+0.5e9, text:'mean + 1.96 s', col:PLOT.fit, box:true},
+                  {x:5, y:R.lo-1.3e9, text:'mean − 1.96 s', col:PLOT.fit, box:true});
+  }
+  host.innerHTML = plotFrame(withZ ? 'EVIDENCE · THE Z-SCORE ON THE RAW SCALE' : 'EVIDENCE · THE RAW OBSERVATIONS', panelSVG(o),
+    withZ ? `${DATA.COUNT.rawZ} observations above the upper bound (in brown). The lower bound is negative: no positive value can fall below it.`
+          : 'Almost every point is crushed on the zero line: the vertical axis must reach 15 billion.');
+  return 900;
+}
+
+/* ---- the log-observations, alone (cheats shown) or with the bounds of a rule ---- */
+function playLog(host, mode){
+  const tip = i=>`row ${i}: ln(x) = ${LOGX[i].toFixed(2)}`;
+  const o = {
+    series:[], lines:[], labels:[],
+    xmin:-5, xmax:510, ymin:-10, ymax:26,
+    xticks:[0,100,200,300,400,500], yticks:[-10,-5,0,5,10,15,20,25],
+    xlab:'position in the file', ylab:'y = ln(x)'
+  };
+  let foot;
+  if(mode==='plain'){
+    o.series.push({x:ROWS, y:LOGX, tip, r:3.5, rAt:i=>isCheat(i)?6:3.5, colorAt:i=>isCheat(i)?PLOT.fit:PLOT.ink});
+    o.labels.push({x:30, y:13, text:'the five cheats, rows 0, 126, 252, 378, 504', col:PLOT.fit});
+    o.title = 'The log-observations, in the order of the file';
+    foot = 'A symmetric honest cloud around 2, and five cheats far above it.';
+  } else {
+    const R = mode==='z' ? DATA.RULES.logZ : DATA.RULES.logMAD;
+    const out = i => LOGX[i]<R.lo || LOGX[i]>R.hi;
+    o.series.push({x:ROWS, y:LOGX, tip, r:3.5, colorAt:i=>out(i)?PLOT.second:PLOT.ink});
+    o.lines.push({x1:-5, y1:R.hi, x2:510, y2:R.hi, dash:true}, {x1:-5, y1:R.lo, x2:510, y2:R.lo, dash:true});
+    const name = mode==='z' ? 'mean ± 1.96 s' : 'median ± 1.96 × 1.48 MAD';
+    const spread = mode==='z' ? 'mean $ 1.96 s' : 'median $ 1.96 × 1.48 MAD';
+    o.labels.push({x:505, y:R.hi+0.9, text:spread.replace('$','+'), anchor:'end', col:PLOT.fit, box:true},
+                  {x:505, y:R.lo-2.4, text:spread.replace('$','−'), anchor:'end', col:PLOT.fit, box:true});
+    o.title = 'y = ln(x) and the bounds ' + name;
+    const n = mode==='z' ? DATA.COUNT.logZ : DATA.COUNT.logMAD;
+    foot = `${n} observations outside (in brown): the 5 cheats and ${n-5} honest observations.`
+         + (mode==='mad' ? ' The true 95% interval of the honest data is 2 ± 1.96 × 3 = [−3.88 ; 7.88].' : '');
+  }
+  host.innerHTML = plotFrame(mode==='plain' ? 'EVIDENCE · THE LOG SCALE' :
+    (mode==='z' ? 'EVIDENCE · THE Z-SCORE ON THE LOG SCALE' : 'EVIDENCE · THE MAD ON THE LOG SCALE'), panelSVG(o), foot);
+  return 900;
+}
+
+/* ---- Benford's law, the observed digits, the nine z ---- */
+const BENF = [1,2,3,4,5,6,7,8,9].map(d=>Math.log10(1+1/d));
+const P_OBS = DATA.DIGITS.map(c=>c/DATA.N);
+const ZS = P_OBS.map((p,i)=>(p-BENF[i])/Math.sqrt(BENF[i]*(1-BENF[i])/DATA.N));
+
+function playBenford(host){
+  const o = { series:[{v:BENF.map(p=>100*p), color:PLOT.second, label:'Benford'}],
+    ymin:0, ymax:35, yticks:[0,5,10,15,20,25,30,35], yfmt:PCT, tipfmt:v=>v.toFixed(2)+'%',
+    title:'Benford’s law: P(d) = log10(1 + 1/d)', ylab:'share of the numbers' };
+  host.innerHTML = plotFrame('THE LAW · BENFORD', barsSVG(o), 'The share of each first digit falls from 1 to 9.');
+  return 600;
+}
+function playBenfObs(host){
+  const o = { series:[{v:P_OBS.map(p=>100*p), color:PLOT.ink, label:'observed'},
+                      {v:BENF.map(p=>100*p), color:PLOT.second, label:'Benford'}],
+    ymin:0, ymax:35, yticks:[0,5,10,15,20,25,30,35], yfmt:PCT, tipfmt:v=>v.toFixed(2)+'%',
+    title:'First digits of the 505 observations', ylab:'share of the numbers' };
+  host.innerHTML = plotFrame('EVIDENCE · NINE BARS', barsSVG(o), 'The observed shares follow Benford closely, with small gaps in both directions.');
+  return 900;
+}
+function playZall(host){
+  const o = { series:[{v:ZS, label:'z', colorAt:i=>Math.abs(ZS[i])>1.96?PLOT.fit:PLOT.ink}],
+    ymin:-3, ymax:3, yticks:[-3,-2,-1,0,1,2,3], tipfmt:v=>v.toFixed(2),
+    lines:[{y:1.96, dash:true, text:'+1.96'}, {y:-1.96, dash:true, text:'−1.96', dy:16}],
+    title:'z-score of each digit, honest ledger', ylab:'z' };
+  host.innerHTML = plotFrame('EVIDENCE · NINE WITNESSES', barsSVG(o),
+    'One bar out of nine crosses the dashed lines: a false alarm on an honest ledger.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='raw')     return playRaw(host, 'plain');
+  if(name==='rawz')    return playRaw(host, 'z');
+  if(name==='rawmad')  return playRaw(host, 'mad');
+  if(name==='log')     return playLog(host, 'plain');
+  if(name==='logz')    return playLog(host, 'z');
+  if(name==='logmad')  return playLog(host, 'mad');
+  if(name==='benford') return playBenford(host);
+  if(name==='benfobs') return playBenfObs(host);
+  if(name==='zall')    return playZall(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your code step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example of Python code ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE PYTHON · RUN IT IN YOUR NOTEBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Python, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim()
+    .replace(/^(?:np|numpy)\.(?:float|int)\d*\(\s*(.*?)\s*\)$/i,'$1')
+    .replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+/* the course margin rule: exact integers; ±0.01 when 0.1 ≤ |value| < 1e6;
+   ±1% of the value otherwise. The tiny extra absorbs floating-point error. */
+function marginOf(value, exact){
+  if(exact) return 0;
+  const a = Math.abs(value);
+  return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
+}
+function tolerance(f){ return marginOf(f.value, f.exact); }
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){
+    const at = (a.tol !== undefined) ? a.tol : marginOf(a.value, f.exact);
+    if(Math.abs(v-a.value) <= at) return a.msg;
+  }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Python.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   PYTHON HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openPythonHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelperE1',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Empirical Exercise I</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference syntax only. Compute in Python; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-python-helper]').forEach(b=>b.onclick=openPythonHelper);
+/* the data file: the button names it in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — the completion record and the final password
+   ================================================================ */
+function finish(){
+  if(!finalPw) finalPw = makeFinalPassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = finalPw.time;
+  $('#pw-code').textContent = finalPw.code;
+  $('#endblurb').innerHTML =
+    `You looked at the shape of the ledger before testing it, watched the z-score and the MAD fail on
+     positive, skewed data and succeed on their logarithm, and met the honest suspects of every 95%
+     interval. Then you asked the first digits: Benford's law fits the honest ledger, the z-score of a
+     proportion accused it once by chance among nine digits: the price of multiple testing.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: ONE Z-SCORE CATCHES EVERY CHEAT';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  copyText($('#pw-code').textContent,
+    ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); },
+    ()=>{ $('#copymsg').textContent='select and copy manually'; });
+};
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v1.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE I ......... THE LEDGER",
+  "DATA ........................ 505 POSITIVE NUMBERS",
+  "CHEATS ...................... 5, POSITIONS SEALED",
+  "FIRST DIGITS ................ BENFORD, 1938",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "PASSWORD .................... AT THE END, FOR BLACKBOARD",
+  "",
+  "> KEEP PYTHON AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
