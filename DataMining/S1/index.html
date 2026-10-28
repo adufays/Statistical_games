@@ -705,7 +705,7 @@ const STEPS = [
     {id:'n', label:'Number of observations', value:505, exact:true,
      alt:[{value:506, msg:'Row 1 of the file holds the column name, not an observation. Load it with pd.read_excel(...) and its default header.'}],
      msg:'Use len(x).'},
-    {id:'min', label:'Minimum', value:0.0005495959754877171,
+    {id:'min', label:'Minimum', value:0.0005495959754877171, tol:0.00001,
      msg:'Use np.min(x). It is a small positive number: three significant digits are enough, e.g., 0.000123.'},
     {id:'med', label:'Median', value:6.374127671609622,
      alt:[{value:44599960.08904929, msg:'That is the mean. The median is np.median(x).'}],
@@ -1875,7 +1875,7 @@ function marginOf(value, exact){
   const a = Math.abs(value);
   return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
 }
-function tolerance(f){ return marginOf(f.value, f.exact); }
+function tolerance(f){ return (f.tol !== undefined) ? f.tol : marginOf(f.value, f.exact); }
 function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
 /* null when the answer is right, otherwise the message to show */
 function checkField(f, raw){
