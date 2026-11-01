@@ -1,1 +1,1921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 2: The Ring and the Silhouette</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 2
+  "The Ring and the Silhouette"  (Topic 1: hierarchical clustering,
+  exercise 1, plus the two extensions done in class)
+  EDHEC · Data Mining · Exo 2 in class
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  No checkpoints, no SHOW THE ANSWER button. Every question has a HINT
+  button. Students compute everything in Python. One final password.
+
+  QUESTIONS
+  ---------
+  setup  N, mean of the first variable (header=None)              -> numbers
+  1.a    scatter plot: a compact core inside a ring               -> MCQ
+  1.b    Euclidean proximity matrix: d(obs 1, obs 2), largest d   -> numbers
+  1.c    single linkage: rows of the linkage matrix, last height  -> numbers
+         reading of the dendrogram                                -> MCQ
+         cut into 2 clusters: the core and the ring               -> MCQ
+  1.d    silhouette for K = 1..10: s(2), best K, best s           -> numbers
+         comment: the silhouette cuts the ring into arcs          -> MCQ
+  extra  complete linkage, K = 2: sizes, silhouette               -> numbers
+         reading: complete linkage cuts an arc off the ring       -> MCQ
+  extra  radius r = sqrt(x1^2 + x2^2): r of obs 1; complete on r,
+         K = 2: size, silhouette on r, best K on r                -> numbers
+         conclusion                                               -> MCQ
+
+  DATA
+  ----
+  Ring_simulation.xlsx: one sheet, NO header row, two columns, 40 rows.
+  Loaded with pd.read_excel(file, header=None): columns 0 and 1.
+  20 points in a compact core (distance to the origin <= 2.76) and 20
+  points on a ring (distance to the origin between 28.10 and 35.85).
+
+  FINAL PASSWORD (one, at the end; no checkpoints)
+  --------------
+  DM2-hhmmss-cccccc, hhmmss = time of completion on the student's clock.
+  m = h*3600 + min*60 + sec
+  a = (m*m + 419*m + 60493) mod 999959
+  b = (a*(m + 233) + 5*m*m + 7) mod 999959
+  code = (48611*b + 27449*a + 83137*m + 271829) mod 1e6
+  Checked by check_passwords_DM2.py.
+
+  TARGET VALUES (computed with Python on the Excel file)
+  -------------
+  N                40
+  N_hdr            39
+  mean0            2.2757928010172517
+  mean0_hdr        2.3608518449458007
+  mean0_cols       1.5456154605856605
+  mean1            0.8154381201540695
+  d01              2.4029750605364346
+  d12              0.6582736702052726
+  d01_sq           5.774289141560081
+  d01_man          3.28663189959567
+  d01_cheb         2.0753544433607134
+  dmax             68.22871127683014
+  dmax_sq          4655.157042497049
+  dmax_man         94.68759978383974
+  top_single       25.337910556754544
+  top_complete     68.22871127683014
+  top_average      41.09799009427822
+  top_ward         120.22800037310431
+  core_merge_max   1.7031114367972275
+  ring_merge_min   1.970512407966887
+  kbest            8
+  silbest          0.8065800474122684
+  kbest_complete   7
+  sil2_core_mean   0.9382031839122599
+  sil2_ring_mean   -0.22757806694376312
+  sil2_ring_neg    20
+  ring_to_ring     40.98534610711555
+  ring_to_core     31.509092141714213
+  complete2_sizes  [7, 33]
+  complete2_sil    0.5055389867713069
+  average2_sizes   [7, 33]
+  ward2_sizes      [7, 33]
+  r0               1.5839271936127504
+  radius2_sizes    [20, 20]
+  radius2_sil_r    0.9497998500178809
+  radius2_sil_y    0.35531255848424836
+  radius_kbest     2
+  xr2_sizes        [13, 27]
+  core_rmax        2.762539753006631
+  ring_rmin        28.09843488912353
+  ring_rmax        35.8457711848179
+  sil_single       [0.0, 0.3553, 0.4429, 0.48, 0.5895, 0.7382, 0.8022, 0.8066, 0.7763, 0.7426]
+  sil_complete     [0.0, 0.5055, 0.5847, 0.6159, 0.66, 0.7273, 0.8022, 0.7745, 0.7803, 0.7642]
+  rows of link     39
+  linkage(prox)    137.98572560189564  (trap: proximity matrix given to sc.linkage)
+  sil(prox, K=2)   0.6061838072272753  (trap: prox_mat given to silhouette_score)
+  =====================================================================
+-->
+
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example of Python code ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Python helper ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#1e3f66,#306998);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:38%}
+.xlguide td:nth-child(2){width:34%}
+.xlguide td:nth-child(3){width:28%}
+.xlguide pre{margin:8px 0; padding:8px 10px; background:#06110a; color:var(--green);
+  font:17px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+/* the setup block must scroll inside the card, not widen the page on a phone */
+#wrap{min-width:0}
+.pwline{flex-wrap:wrap; gap:4px 12px}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'PYTHON'}
+  .xlguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE II</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="ring">DATA (XLSX)</button>
+      <button class="toolbtn" data-python-helper>PYTHON HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE RING AND<br>THE SILHOUETTE</h1>
+      <h2>Empirical Exercise II &nbsp;·&nbsp; Data Mining</h2>
+      <p>Master Scepticus believes that the silhouette score always knows the number of clusters. 40
+      simulated points will test him. You will compute a proximity matrix, build a dendrogram with the
+      single linkage, choose the number of clusters with the silhouette, then compare with the complete
+      linkage and with a transformation of the data.</p>
+      <p><strong style="color:var(--amber)">A password waits for you at the end.</strong> When you complete
+      the exercise, the game gives you a personal password. <strong>Copy it and submit it on
+      Blackboard</strong>: it is the proof that you finished. Copy it before you close this page, because
+      it is not kept.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · PYTHON</b>Download <code>Ring_simulation.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and save it in the folder of your notebook. Load it
+        with pandas, compute every number and draw every plot in Python, and keep your notebook: each
+        question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your plots, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example of Python code, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers as Python prints them, e.g., <code>36.18</code> or <code>-8.544e-05</code>
+      (a comma is also accepted as the decimal separator). Give two decimals: your answer is accepted
+      within 0.01 of the exact value. Very small or very large numbers are accepted within 1%, so three
+      significant digits are enough. Counts must be exact. Use <code>print(...)</code> to see a full
+      number.</p>
+      <div class="xlguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <div class="guideintro">The file has <strong>no header row</strong>: 40 rows, one per observation,
+        and two columns of numbers, the two variables. With <code>header=None</code>, pandas keeps the
+        first row as an observation and names the columns <code>0</code> and <code>1</code>. Start your
+        notebook with:
+<pre>import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import scipy.cluster.hierarchy as sc
+from sklearn.metrics import silhouette_score
+data = pd.read_excel('Ring_simulation.xlsx', header=None)
+y = data.to_numpy()</pre>
+        If Python cannot find the file, put it in the same folder as your notebook, or give its full
+        path.</div>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>PYTHON</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>pd.read_excel(file, header=None)</code></td><td>Loads a sheet without column names. Without <code>header=None</code>, the first row becomes the column names and one observation is lost.</td><td><code>data.head()</code></td></tr>
+            <tr><td><code>y = data.to_numpy()</code>, <code>len(y)</code>, <code>y[:, 0]</code></td><td>NumPy array of the data; number of observations; first variable (Python counts from 0).</td><td><code>np.mean(y[:, 0])</code></td></tr>
+            <tr><td><code>plt.plot(y[:, 0], y[:, 1], 'o')</code>, <code>plt.axis('equal')</code></td><td>Scatter plot of the two variables; same scale on both axes, so that a circle looks round.</td><td><code>plt.show()</code></td></tr>
+            <tr><td><code>np.sqrt(np.sum((y[i, :] - y[j, :])**2))</code></td><td>Euclidean distance between observations i and j. Two loops over i and j fill the N × N proximity matrix.</td><td><code>prox_mat[0, 1]</code></td></tr>
+            <tr><td><code>np.max(prox_mat)</code></td><td>Largest value of a matrix.</td><td><code>np.max(prox_mat)</code></td></tr>
+            <tr><td><code>sc.linkage(y, method='single')</code></td><td>Hierarchical clustering of the observations. One row per merge: [cluster, cluster, height, size]. Give it the data <code>y</code>, not the proximity matrix.</td><td><code>out_link[-1, 2]</code>: height of the last merge</td></tr>
+            <tr><td><code>sc.dendrogram(out_link)</code></td><td>Draws the dendrogram.</td><td><code>plt.show()</code></td></tr>
+            <tr><td><code>sc.cut_tree(out_link, n_clusters=K).flatten()</code></td><td>Cuts the tree into K clusters: one label (0, 1, …, K − 1) per observation.</td><td><code>np.bincount(idx)</code>: size of each cluster</td></tr>
+            <tr><td><code>y[idx == 0, 0]</code></td><td>First variable of the observations of cluster 0.</td><td><code>plt.plot(y[idx==0, 0], y[idx==0, 1], 'or')</code></td></tr>
+            <tr><td><code>silhouette_score(y, idx)</code></td><td>Average silhouette of a partition, between −1 and 1. Needs at least 2 clusters.</td><td><code>silhouette_score(y, idx)</code></td></tr>
+            <tr><td><code>np.argmax(sil_score)</code></td><td>Position of the largest value, counted from 0.</td><td><code>np.argmax(sil_score) + 1</code></td></tr>
+            <tr><td><code>np.sum(y**2, axis=1)</code>, <code>r.reshape(-1, 1)</code></td><td>Sum over the columns, one value per row; turns a vector into a one-column matrix, the shape <code>sc.linkage</code> expects.</td><td><code>np.sqrt(np.sum(y**2, axis=1))</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>distance 1–2</span><b id="hud-dist">—</b></div>
+            <div class="hudrow"><span>best K, silhouette</span><b id="hud-kbest">—</b></div>
+            <div class="hudrow"><span>K = 2 split</span><b id="hud-split">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise II &nbsp;·&nbsp; The Ring and the Silhouette</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">COMPLETED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, dashes included. It is not kept: copy it before you close this page.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button: paste its Dropbox link (…&raw=1) here */
+  DATA_FILES: {
+    ring: "https://www.dropbox.com/scl/fi/u9o9r33756e5awm7ehyfc/Ring_simulation.xlsx?rlkey=9li02pdl1xrmlcrmlmh8v747f&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   FINAL PASSWORD — one per student, created the first time the
+   exercise is completed, never regenerated (REPLAY keeps it). It
+   contains the time of completion, on the student's clock:
+       DM2-hhmmss-cccccc
+     m    = h*3600 + min*60 + sec
+     a    = (m*m + 419*m + 60493) mod 999959
+     b    = (a*(m + 233) + 5*m*m + 7) mod 999959
+     code = (48611*b + 27449*a + 83137*m + 271829) mod 1e6
+   The code depends on the time, so the time cannot be edited.
+   Every intermediate value stays below 2^53, so the arithmetic is exact.
+   Checked by check_passwords_DM2.py.
+   ================================================================ */
+function makeFinalPassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const a = (m*m + 419*m + 60493) % 999959;
+  const b = (a*(m + 233) + 5*m*m + 7) % 999959;
+  const code = (48611*b + 27449*a + 83137*m + 271829) % 1000000;
+  return { time:`${hh}:${mm}:${ss}`,
+           code:`DM2-${hh}${mm}${ss}-${String(code).padStart(6,'0')}` };
+}
+let finalPw = null;
+
+/* ================================================================
+   DATA — the 40 observations of Ring_simulation.xlsx (rounded), the
+   partitions and the dendrogram coordinates computed with scipy,
+   embedded for the pictures only. The student
+   computes everything in Python.
+   ================================================================ */
+const DATA = {"N":40,"X":[-1.042,0.17,-0.293,-2.377,1.692,-0.663,-2.672,0.534,0.949,-1.359,0.869,-0.905,-0.185,-0.182,-1.329,1.052,-0.474,0.242,-1.306,0.287,-26.901,27.197,29.228,7.318,29.479,20.871,-30.054,11.026,15.057,6.559,23.0,-23.218,4.379,-6.89,-13.623,14.591,-21.923,-10.252,28.638,13.542],"Y":[-1.193,0.882,0.413,1.368,-0.696,0.182,-0.701,0.962,-0.702,0.917,0.304,-1.205,1.105,1.385,0.371,-1.595,1.797,1.85,0.869,0.751,-8.115,10.336,2.533,28.501,0.578,-21.471,0.924,28.247,27.336,30.802,21.945,21.805,31.799,-31.352,-29.325,-29.428,25.098,-32.439,-19.029,-33.189],"R":[1.584,0.898,0.507,2.742,1.83,0.687,2.763,1.1,1.18,1.639,0.921,1.507,1.121,1.397,1.38,1.911,1.858,1.866,1.569,0.804,28.098,29.094,29.337,29.426,29.485,29.943,30.068,30.323,31.208,31.493,31.79,31.852,32.099,32.1,32.335,32.847,33.324,34.02,34.384,35.846],"HEAD":[[-1.0415099121961575,-1.1933492604695055],[0.16976754403879873,0.8820051828912078],[-0.2926418240593087,0.41349498963963194],[-2.3766354845139546,1.36762072475772],[1.6921329718879743,-0.6961313886928393]],"SINGLE2":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"SINGLE8":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,3,2,4,1,3,3,3,3,5,3,6,6,7,5,6,4,7],"COMPLETE2":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,1,0,1,1,1],"RADIUS2":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"SIL":[0.0,0.3553,0.4429,0.48,0.5895,0.7382,0.8022,0.8066,0.7763,0.7426],"SILC":[0.0,0.5055,0.5847,0.6159,0.66,0.7273,0.8022,0.7745,0.7803,0.7642],"DENDRO":{"icoord":[[15.0,15.0,25.0,25.0],[65.0,65.0,75.0,75.0],[55.0,55.0,70.0,70.0],[85.0,85.0,95.0,95.0],[125.0,125.0,135.0,135.0],[155.0,155.0,165.0,165.0],[145.0,145.0,160.0,160.0],[130.0,130.0,152.5,152.5],[115.0,115.0,141.25,141.25],[105.0,105.0,128.12,128.12],[90.0,90.0,116.56,116.56],[62.5,62.5,103.28,103.28],[45.0,45.0,82.89,82.89],[185.0,185.0,195.0,195.0],[175.0,175.0,190.0,190.0],[63.95,63.95,182.5,182.5],[35.0,35.0,123.22,123.22],[20.0,20.0,79.11,79.11],[5.0,5.0,49.56,49.56],[215.0,215.0,225.0,225.0],[205.0,205.0,220.0,220.0],[235.0,235.0,245.0,245.0],[255.0,255.0,265.0,265.0],[240.0,240.0,260.0,260.0],[285.0,285.0,295.0,295.0],[275.0,275.0,290.0,290.0],[345.0,345.0,355.0,355.0],[335.0,335.0,350.0,350.0],[325.0,325.0,342.5,342.5],[315.0,315.0,333.75,333.75],[305.0,305.0,324.38,324.38],[282.5,282.5,314.69,314.69],[250.0,250.0,298.59,298.59],[212.5,212.5,274.3,274.3],[365.0,365.0,375.0,375.0],[385.0,385.0,395.0,395.0],[370.0,370.0,390.0,390.0],[243.4,243.4,380.0,380.0],[27.28,27.28,311.7,311.7]],"dcoord":[[0.0,0.137,0.137,0.0],[0.0,0.071,0.071,0.0],[0.0,0.498,0.498,0.071],[0.0,0.436,0.436,0.0],[0.0,0.279,0.279,0.0],[0.0,0.176,0.176,0.0],[0.0,0.325,0.325,0.176],[0.279,0.419,0.419,0.325],[0.0,0.505,0.505,0.419],[0.0,0.63,0.63,0.505],[0.436,0.658,0.658,0.63],[0.498,0.692,0.692,0.658],[0.0,0.734,0.734,0.692],[0.0,0.744,0.744,0.0],[0.0,0.899,0.899,0.744],[0.734,1.01,1.01,0.899],[0.0,1.113,1.113,1.01],[0.137,1.408,1.408,1.113],[0.0,1.703,1.703,1.408],[0.0,3.533,3.533,0.0],[0.0,4.589,4.589,3.533],[0.0,3.905,3.905,0.0],[0.0,8.142,8.142,0.0],[3.905,10.137,10.137,8.142],[0.0,1.971,1.971,0.0],[0.0,8.063,8.063,1.971],[0.0,2.397,2.397,0.0],[0.0,2.423,2.423,2.397],[0.0,3.716,3.716,2.423],[0.0,4.133,4.133,3.716],[0.0,9.6,9.6,4.133],[8.063,12.344,12.344,9.6],[10.137,19.625,19.625,12.344],[4.589,20.514,20.514,19.625],[0.0,3.538,3.538,0.0],[0.0,9.573,9.573,0.0],[3.538,21.972,21.972,9.573],[20.514,25.024,25.024,21.972],[1.703,25.338,25.338,25.024]],"leaves":[6,0,11,3,10,14,9,18,2,5,17,16,12,13,7,1,19,15,4,8,34,33,37,35,39,25,38,21,22,24,30,28,27,23,29,32,31,36,20,26]}};
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Python, or
+              drop-down choices ({kind:'select'})
+
+   The course margin rule decides what is accepted, for every number:
+   exact integers (exact:true) only exactly; 0.1 <= |value| < 1e6 within
+   ±0.01; otherwise within ±1% of the value. A field's own 'tol'
+   (an absolute margin) overrides this rule.
+   'alt' lists common wrong values, each with its own feedback; an alt
+   uses the same margin around its own value unless it has its own 'tol'.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE II',
+  text:`Forty points, two variables, and one question : how many groups ?
+  <span class="fx">The Master slides a single sheet across the desk.</span>
+  The Academy simulated these 40 observations. I shall not tell you how.
+  My method needs no drawing : build the tree of the hierarchical clustering, compute the
+  <strong>silhouette score</strong> for every number of clusters, and take the largest. The silhouette
+  knows the number of clusters. Looking at the data is for the weak.
+  <span class="fx">At the end, the Academy hands you a password. Copy it and submit it on
+  Blackboard.</span>`,
+  widget:'table', banner:'CLAIM: THE SILHOUETTE KNOWS THE NUMBER OF CLUSTERS', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE FILE',
+  text:`Download <span class="kbd">Ring_simulation.xlsx</span> with the DATA (XLSX) button, save it in
+  the folder of your notebook, and load it with pandas. Careful : the sheet has <strong>no header
+  row</strong>. Every row is an observation, every column a variable.
+  <strong>How many observations are there, and what is the mean of the first variable ?</strong>`,
+  q:'Report what Python prints.',
+  fields:[
+    {id:'n', label:'Number of observations', value:40, exact:true,
+     alt:[{value:39, msg:'One observation is missing: pandas used the first row as column names. The file has no header row: load it with pd.read_excel(..., header=None).'}],
+     msg:'Use len(y), with y = data.to_numpy().'},
+    {id:'m', label:'Mean of the first variable', value:2.2757928010172517,
+     alt:[{value:2.3608518449458007, msg:'This mean misses the first observation: pandas used it as column names. Load the file with header=None.'},
+          {value:1.5456154605856605, msg:'np.mean(y) averages the two variables together. Take the first column only: y[:, 0].'},
+          {value:0.8154381201540695, msg:'That is the mean of the second variable. Python counts from 0: the first variable is y[:, 0].'}],
+     msg:'Use np.mean(y[:, 0]).'}],
+  hint:`Without <b>header=None</b>, pandas takes the first row of the sheet for column names, and you lose an
+  observation. Then turn the table into a NumPy array, as in class : <b>y[:, 0]</b> is the first column,
+  because Python counts from 0.`,
+  code:`import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+data = pd.read_excel('Ring_simulation.xlsx', header=???)
+print(data.head())
+y = data.to_numpy()
+print(len(y), np.mean(y[:, 0]))`,
+  say:'40 observations, and the first variable has a mean of 2.28.',
+  right:`<strong>40</strong> observations, and a mean of <strong>2.28</strong> for the first variable.
+  <span class="fx">The Master shrugs.</span>
+  A mean. It tells you where the centre of gravity is, nothing about groups. Still, you insist on
+  looking. Go on, draw them.`,
+  note:'N = 40 (no header row: header=None); mean of variable 1 = 2.28' },
+
+{ id:'t1', type:'choice', bg:'lab', who:'master', qn:'1.a',
+  title:'TRIAL II · THE SHAPE',
+  text:`<strong>Make a scatter plot of the two variables</strong>, the first on the horizontal axis.
+  Put the same scale on both axes. Then tell me what you see.`,
+  q:'Which description fits your scatter plot?',
+  options:[
+    {id:'b', label:'Two elongated clouds side by side, one on the left and one on the right, of about 20 points each.'},
+    {id:'c', label:'One elliptical cloud around the origin, denser in the middle, with no visible group.'},
+    {id:'a', label:'A small, dense cloud of about 20 points around the origin, surrounded by a ring of about 20 points, roughly 30 away from the centre.'},
+    {id:'d', label:'Points spread along a straight line: the two variables are strongly correlated.'}
+  ], correct:'a',
+  hint:`<b>plt.plot(x, y, 'o')</b> draws one point per observation. <b>plt.axis('equal')</b> puts the same
+  scale on both axes, so that a circle looks like a circle. Look at the middle of the plot, then at its
+  edges.`,
+  code:`plt.plot(y[:, 0], y[:, 1], 'o')
+plt.xlabel('First var.')
+plt.ylabel('Second var.')
+plt.axis('equal')
+plt.show()`,
+  right:`Exactly : a <strong>compact core</strong> of 20 points, all within 2.8 of the origin, and a
+  <strong>ring</strong> of 20 points, between 28 and 36 from it.
+  <span class="fx">The Master squints, then pretends he has not.</span>
+  Two groups, you will say. The eye is easily fooled. A ring has no centre of its own : its points are
+  as far from each other as they are from the core. Let the distances speak.`,
+  wrong:{b:`Left and right ? Look at the centre of your plot : a dense little cloud sits there, and the
+  other points surround it.`,
+  c:`Look again with plt.axis('equal') : the outer points form a circle, with an empty band between them
+  and the dense cloud in the middle.`,
+  d:`A straight line ? The outer points go all the way around the centre. Use the same scale on both axes.`},
+  widgetAfter:'scatter', note:'scatter: a compact core (20 points, r < 2.8) inside a ring (20 points, r from 28 to 36)' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'1.b',
+  title:'TRIAL III · THE PROXIMITY MATRIX',
+  text:`Hierarchical clustering starts from the <strong>proximity matrix</strong> : the N × N table of
+  the distances between every pair of observations. Use the Euclidean distance
+  <br><span class="kbd">d(i, j) = √( (x<sub>i1</sub> − x<sub>j1</sub>)² + (x<sub>i2</sub> − x<sub>j2</sub>)² )</span><br>
+  <strong>What is the distance between the first observation and the second one ? And the largest
+  distance of the matrix ?</strong>`,
+  q:'Compute the proximity matrix.',
+  fields:[
+    {id:'d', label:'Distance between observations 1 and 2', value:2.4029750605364346,
+     alt:[{value:0.6582736702052726, msg:'That is the distance between the second and the third observations. Either pandas swallowed the first row as column names (use header=None), or you counted from 1: in Python, the first observation is row 0, so read prox_mat[0, 1].'},
+          {value:5.774289141560081, msg:'That is the squared distance. Take the square root of the sum of the squares.'},
+          {value:3.28663189959567, msg:'That is the sum of the absolute differences (the Manhattan distance). The Euclidean distance is the square root of the sum of the squared differences.'},
+          {value:2.0753544433607134, msg:'That is the largest absolute difference. The Euclidean distance is the square root of the sum of the squared differences.'}],
+     msg:'Read prox_mat[0, 1]: Python counts from 0.'},
+    {id:'dmax', label:'Largest distance in the matrix', value:68.22871127683014,
+     alt:[{value:4655.157042497049, msg:'That is a squared distance. Take the square root.'},
+          {value:94.68759978383974, msg:'That is the largest Manhattan distance. Use the Euclidean distance.'}],
+     msg:'Use np.max(prox_mat).'}],
+  hint:`Two loops, as in class : for every pair (i, j), the square root of the sum of the squared
+  differences between the rows <b>y[i, :]</b> and <b>y[j, :]</b>. The first observation is row 0, the
+  second is row 1.`,
+  code:`N = len(y)
+prox_mat = np.zeros([N, N])
+for i in range(N):
+    for j in range(N):
+        prox_mat[i, j] = np.sqrt(np.sum((y[i, :] - y[j, :])**2))
+print(prox_mat[???, ???], np.max(prox_mat))`,
+  say:'The distance between observations 1 and 2 is 2.40, and the largest distance is 68.23.',
+  right:`<strong>2.40</strong> between the first two observations : both are in the core. And
+  <strong>68.23</strong> at most, between observations 37 and 40 (rows 36 and 39) : two points on opposite
+  sides of the ring.
+  <span class="fx">The Master underlines 68.23.</span>
+  Remember that number. A ring is wide : its diameter is the largest distance of the whole sample.`,
+  hud:{dist:'2.40'}, note:'Euclidean proximity matrix: d(1,2) = 2.40; largest distance 68.23 (across the ring)' },
+
+{ id:'t3', type:'numeric', bg:'lab', who:'master', qn:'1.c',
+  title:'TRIAL IV · THE SINGLE LINKAGE',
+  text:`Now the tree. The <strong>single linkage</strong> measures the distance between two clusters by
+  their two closest points. At each step, the two closest clusters merge.
+  <span class="kbd">sc.linkage</span> returns one row per merge : the two clusters merged, the
+  <strong>height</strong> of the merge (their distance), and the size of the new cluster.
+  <strong>How many rows does the linkage matrix have, and at what height does the last merge
+  happen ?</strong>`,
+  q:'Run the single linkage on the data.',
+  fields:[
+    {id:'rows', label:'Number of rows of the linkage matrix', value:39, exact:true,
+     alt:[{value:40, msg:'Count the merges: 40 clusters of one observation each become one cluster after N − 1 merges.'},
+          {value:4, msg:'4 is the number of columns: [cluster, cluster, height, size]. Count the rows.'}],
+     msg:'Use out_link.shape: (rows, columns).'},
+    {id:'h', label:'Height of the last merge', value:25.337910556754544,
+     alt:[{value:68.22871127683014, msg:'That is the last merge of the complete linkage: the largest distance of the matrix. Use method=\'single\'.'},
+          {value:41.09799009427822, msg:'That is the average linkage. Use method=\'single\'.'},
+          {value:120.22800037310431, msg:'That is the Ward method. Use method=\'single\'.'},
+          {value:137.98572560189564, msg:'You gave the proximity matrix to sc.linkage: it then treats each of its rows as an observation with 40 variables (scipy warns you). Give it the data: sc.linkage(y, method=\'single\').'},
+          {value:25.02356618690215, msg:'That is the next-to-last merge. The last one is the last row: out_link[-1, 2].'}],
+     msg:'The height is the third column of the last row: out_link[-1, 2].'}],
+  hint:`<b>sc.linkage(y, method='single')</b> takes the data themselves, not the proximity matrix. Its
+  output has one row per merge; the columns are [cluster, cluster, height, size]. Python counts from 0,
+  so the height is column 2, and <b>-1</b> means the last row.`,
+  code:`import scipy.cluster.hierarchy as sc
+out_link = sc.linkage(y, method='single')
+print(out_link.shape)
+print(out_link[-1, ???])`,
+  say:'The linkage matrix has 39 rows, one per merge, and the last merge happens at a height of 25.34.',
+  right:`<strong>39</strong> merges : 40 single points become one cluster in N − 1 steps. The last one
+  happens at <strong>25.34</strong>.
+  <span class="fx">The Master taps the number.</span>
+  With the single linkage, the height of a merge is the distance between the two closest points of the
+  clusters it joins. So 25.34 is the smallest gap between the two clusters merged last. Who are they ?
+  The dendrogram will tell.`,
+  note:'single linkage: 39 merges; last merge at height 25.34' },
+
+{ id:'t4', type:'choice', bg:'lab', who:'master', qn:'1.c',
+  title:'TRIAL IV · THE DENDROGRAM',
+  text:`<strong>Draw the dendrogram of the single linkage.</strong> The leaves at the bottom are the
+  observations; a horizontal bar joins two clusters at the height of their merge.
+  What does your dendrogram show ?`,
+  q:'Which description fits your dendrogram?',
+  options:[
+    {id:'b', label:'Two blocks of 20 observations each, both merged at heights below 2, and joined together by the last merge.'},
+    {id:'c', label:'The observations merge two by two at regularly increasing heights: no group stands out.'},
+    {id:'d', label:'One observation stays alone until the very last merge: it is an outlier, and the 39 others form one group.'},
+    {id:'a', label:'One block of 20 observations merged at very small heights (below 1.8). The 20 others first merge in small groups, at heights from about 2 to 12, and these groups join each other only between 19 and 25. The last merge joins them to the compact block.'}
+  ], correct:'a',
+  hint:`Read the heights on the vertical axis. Where do many observations merge at almost zero height ?
+  How do the other observations join : all at once, or one group after another ?`,
+  code:`dendro = sc.dendrogram(out_link)
+plt.show()`,
+  right:`Exactly. A <strong>compact block</strong> of 20 points, all merged below 1.8 : the core. And a
+  <strong>chain</strong> : the ring points merge with their neighbours on the ring, a few at a time, at
+  heights between 2 and 25. The single linkage walks along the ring from neighbour to neighbour : that
+  is <strong>chaining</strong>. The last merge, at 25.34, joins the core to the ring.`,
+  wrong:{b:`Look at the heights. Only one block merges below 2; the other observations join at much
+  larger heights, a few at a time.`,
+  c:`Some merges happen at almost zero height, others at 20 or 25. Look for a block that merges very
+  low.`,
+  d:`Look at the last merge : how many leaves hang under each of its two branches ?`},
+  widgetAfter:'dendro', note:'dendrogram: compact block of 20 (merged < 1.8) + a chain of 20 (merges from 2 to 25)' },
+
+{ id:'t5', type:'choice', bg:'lab', who:'master', qn:'1.c',
+  title:'TRIAL IV · TWO CLUSTERS',
+  text:`Cut the tree just below its last merge : <strong>two clusters</strong>.
+  <strong>Plot the observations with one colour per cluster.</strong> Which partition do you get ?`,
+  q:'What are the two clusters of the single linkage?',
+  options:[
+    {id:'b', label:'The left half of the plot and the right half.'},
+    {id:'c', label:'A large cluster of 33 points, with the core and part of the ring, and a small cluster of 7 ring points.'},
+    {id:'a', label:'The 20 points of the core in one cluster, the 20 points of the ring in the other.'},
+    {id:'d', label:'39 points in one cluster, and one isolated point in the other.'}
+  ], correct:'a',
+  hint:`<b>sc.cut_tree(out_link, n_clusters=2)</b> gives each observation a label, 0 or 1;
+  <b>np.bincount</b> counts the labels. Then plot cluster 0 in red and cluster 1 in green.`,
+  code:`idx = sc.cut_tree(out_link, n_clusters=???).flatten()
+print(np.bincount(idx))
+plt.plot(y[idx==0, 0], y[idx==0, 1], 'or')
+plt.plot(y[idx==1, 0], y[idx==1, 1], 'og')
+plt.axis('equal')
+plt.show()`,
+  right:`Exactly : <strong>the core and the ring</strong>, 20 and 20. The single linkage follows the ring
+  around, link by link, and never jumps the empty band of 25 that separates it from the core.
+  <span class="fx">The Master waves the plot away.</span>
+  Your eye and the single linkage agree. Touching. Now ask the silhouette, which is never wrong.`,
+  wrong:{b:`Left and right ? Look at your colours : one cluster sits in the middle, the other all around it.`,
+  c:`That is what another linkage gives. With method='single' and two clusters, count again with
+  np.bincount(idx).`,
+  d:`Count with np.bincount(idx) : the two clusters have the same size.`},
+  widgetAfter:'single2', hud:{split:'single 20/20'}, note:'single linkage, K = 2: core (20) vs ring (20)' },
+
+{ id:'t6', type:'numeric', bg:'lab', who:'master', mood:'amused', qn:'1.d',
+  title:'TRIAL V · THE SILHOUETTE',
+  text:`My turn. The <strong>silhouette</strong> of an observation compares a, its average distance to
+  the members of its own cluster, with b, its average distance to the members of the nearest other
+  cluster :
+  <br><span class="kbd">s = (b − a) / max(a, b)</span><br>
+  Close to 1 : well placed. Negative : it would be better off elsewhere. The silhouette score is the
+  average over the observations.
+  <strong>Compute it for 1 to 10 clusters of the single linkage. Give the score for 2 clusters, the
+  number of clusters with the highest score, and that score.</strong>`,
+  q:'Compute the silhouette scores of the single linkage.',
+  fields:[
+    {id:'s2', label:'Silhouette score with 2 clusters', value:0.35531255848424836,
+     alt:[{value:0.5055389867713069, msg:'That is the score of the complete linkage. Cut the single-linkage tree, out_link.'},
+          {value:0.6061838072272753, msg:'You gave the proximity matrix to silhouette_score as if it were the data. Give it y: silhouette_score(y, idx).'}],
+     msg:'Use silhouette_score(y, idx), with idx the labels of the 2 clusters of the single linkage.'},
+    {id:'k', label:'Number of clusters with the highest score', value:8, exact:true,
+     alt:[{value:7, msg:'Check the position: np.argmax counts from 0, and position 0 holds K = 1. Add 1. If you did, check that you cut the single-linkage tree.'}],
+     msg:'Take the number of clusters with the largest silhouette score: np.argmax(sil_score) + 1.'},
+    {id:'smax', label:'Highest silhouette score', value:0.8065800474122684,
+     msg:'Use np.max(sil_score).'}],
+  hint:`Loop over the number of clusters, cut the tree each time, and compute the score. With a single
+  cluster the silhouette is not defined, so leave that score at 0, as in class. Careful :
+  <b>np.argmax</b> returns a position counted from 0, and position 0 is K = 1.`,
+  code:`from sklearn.metrics import silhouette_score
+nb_max_cluster = 10
+sil_score = np.zeros([nb_max_cluster])
+for i in range(nb_max_cluster):
+    idx = sc.cut_tree(out_link, n_clusters=(i+1)).flatten()
+    if(i>0):
+        sil_score[i] = silhouette_score(y, idx)
+print(sil_score)
+print(np.argmax(sil_score) + ???, np.max(sil_score))`,
+  say:'With 2 clusters the score is only 0.36. The highest score, 0.81, is reached with 8 clusters.',
+  right:`<strong>0.36</strong> for the core and the ring. The maximum, <strong>0.81</strong>, is reached
+  with <strong>8 clusters</strong>.
+  <span class="fx">The Master folds his arms, triumphant.</span>
+  Eight. Not two. Your eye saw two groups; the silhouette, which does not care about your eye, sees
+  eight. I rest my case.`,
+  widgetAfter:'silcurve', hud:{kbest:'8 (0.81)'}, note:'silhouette, single linkage: s(2) = 0.36; max 0.81 at K = 8 (K = 7: 0.80)' },
+
+{ id:'t7', type:'choice', bg:'court', who:'master', mood:'raised', qn:'1.d',
+  title:'TRIAL V · WHAT THE SILHOUETTE SEES',
+  text:`<strong>Plot the 8 clusters of the single linkage, one colour per cluster</strong>, as below.
+  Then comment. Why does the silhouette prefer 8 clusters to the core and the ring ?`,
+  q:'Choose the comment.',
+  options:[
+    {id:'b', label:'Because the simulation really created 8 groups: the ring is made of 7 separate clusters, and the silhouette found them.'},
+    {id:'c', label:'Because the silhouette always increases with the number of clusters: the largest number tested always wins.'},
+    {id:'a', label:'Because the silhouette rewards compact, well-separated clusters. The ring is wide and hollow: a ring point is closer, on average, to the core than to the rest of the ring, so its silhouette is negative when the ring forms one cluster. Cutting the ring into small arcs raises the score.'},
+    {id:'d', label:'Because the single linkage made a mistake: with 8 clusters it mixes core points and ring points in the same clusters.'}
+  ], correct:'a',
+  hint:`Take a point on the ring. Is it, on average, closer to the other points of the ring, some of which
+  are up to 68 away on the other side, or to the core, about 30 away ? What does that make a and b in its
+  silhouette ?`,
+  code:`K_best = np.argmax(sil_score) + 1
+idx_best = sc.cut_tree(out_link, n_clusters=K_best).flatten()
+for k in range(K_best):
+    plt.plot(y[idx_best==k, 0], y[idx_best==k, 1], 'o')
+plt.axis('equal')
+plt.show()`,
+  widget:'single8',
+  right:`Exactly. A ring point is on average <strong>41</strong> away from the other ring points, but only
+  <strong>32</strong> from the core. With the core and the ring as clusters, a &gt; b for
+  <strong>all 20</strong> ring points : their silhouettes are negative, −0.23 on average, while the core
+  points score 0.94. Hence the poor 0.36. Cut the ring into 7 short arcs, and every arc is compact.
+  <span class="fx">The Master unfolds his arms, slowly.</span>
+  The silhouette measures compactness. It does not know the number of clusters : it knows which
+  partition looks most like round, separated blobs.`,
+  wrong:{b:`Look at the 8 clusters : one is the core, the 7 others are arcs of 2 to 6 points of the same
+  ring. Nothing separates them but the gaps between neighbours.`,
+  c:`Look at your scores : they rise up to 8 clusters, then fall at 9 and 10.`,
+  d:`Look at the colours : the core is one cluster, untouched. The 7 others are pieces of the ring.`},
+  note:'silhouette prefers 8: ring points have s < 0 when the ring is one cluster (a = 41 > b = 32)' },
+
+{ id:'t8', type:'numeric', bg:'lab', who:'master', qn:'extra',
+  title:'TRIAL VI · THE COMPLETE LINKAGE',
+  text:`Let us change the linkage. The <strong>complete linkage</strong> measures the distance between
+  two clusters by their two <strong>farthest</strong> points.
+  <strong>Run it on the data, cut the tree into 2 clusters, and give the size of each cluster and the
+  silhouette score.</strong>`,
+  q:'Run the complete linkage and cut it into 2 clusters.',
+  fields:[
+    {id:'big', label:'Size of the larger cluster', value:33, exact:true,
+     alt:[{value:20, msg:'20 and 20 is the partition of the single linkage. Use method=\'complete\'.'}],
+     msg:'Count the labels with np.bincount(idx_c).'},
+    {id:'small', label:'Size of the smaller cluster', value:7, exact:true,
+     alt:[{value:20, msg:'20 and 20 is the partition of the single linkage. Use method=\'complete\'.'}],
+     msg:'Count the labels with np.bincount(idx_c).'},
+    {id:'s', label:'Silhouette score of this partition', value:0.5055389867713069,
+     alt:[{value:0.35531255848424836, msg:'That is the score of the single linkage. Use the labels of the complete linkage.'},
+          {value:0.44958710205535934, msg:'You gave the proximity matrix to silhouette_score as if it were the data. Give it y.'}],
+     msg:'Use silhouette_score(y, idx_c).'}],
+  hint:`The same three lines as for the single linkage, with <b>method='complete'</b>. Keep the new labels
+  in a new variable, so that you do not overwrite the previous ones.`,
+  code:`out_link_c = sc.linkage(y, method='complete')
+idx_c = sc.cut_tree(out_link_c, n_clusters=2).flatten()
+print(np.bincount(idx_c), silhouette_score(y, ???))`,
+  say:'The complete linkage gives clusters of 33 and 7 observations, with a silhouette score of 0.51.',
+  right:`<strong>33</strong> and <strong>7</strong>, with a silhouette score of <strong>0.51</strong> :
+  higher than the 0.36 of the core and the ring.
+  <span class="fx">The Master brightens.</span>
+  A better score. The complete linkage must have found the better partition. Show me.`,
+  hud:{split:'single 20/20 · complete 33/7'}, note:'complete linkage, K = 2: 33 / 7, silhouette 0.51 (> 0.36)' },
+
+{ id:'t9', type:'choice', bg:'lab', who:'master', qn:'extra',
+  title:'TRIAL VI · WHERE DOES THE COMPLETE LINKAGE CUT ?',
+  text:`<strong>Plot the two clusters of the complete linkage.</strong> Where is the cut ?`,
+  q:'What are the two clusters of the complete linkage?',
+  options:[
+    {id:'b', label:'The core and the ring, as with the single linkage.'},
+    {id:'c', label:'The core is split into two halves; the ring stays in the larger cluster.'},
+    {id:'d', label:'The small cluster gathers 7 isolated points spread all over the plot.'},
+    {id:'a', label:'The small cluster is an arc of 7 neighbouring points in the lower part of the ring. The large one holds the core and the rest of the ring.'}
+  ], correct:'a',
+  hint:`Plot cluster 0 in red and cluster 1 in green, as before, with the labels <b>idx_c</b>. Where are the
+  7 points of the small cluster ?`,
+  code:`plt.plot(y[idx_c==0, 0], y[idx_c==0, 1], 'or')
+plt.plot(y[idx_c==1, 0], y[idx_c==1, 1], 'og')
+plt.axis('equal')
+plt.show()`,
+  right:`Exactly : the complete linkage <strong>cuts an arc off the ring</strong>, and leaves the rest of
+  the ring with the core. It joins two clusters at the distance of their farthest points, so it builds
+  clusters of small diameter. The whole ring is 68 wide : the complete linkage never keeps it in one
+  piece. The average linkage and Ward give the same 33 / 7.
+  <span class="fx">The Master looks at the score again, then at the plot.</span>
+  0.51 for a partition that cuts a ring in pieces, 0.36 for the core and the ring. Hmm.`,
+  wrong:{b:`Count again : 33 and 7, not 20 and 20. Look where the 7 points of the small cluster are.`,
+  c:`The core is untouched : all its 20 points are in the large cluster. Look at the outer points.`,
+  d:`Look closer : the 7 points sit next to each other, on the same part of the ring.`},
+  widgetAfter:'complete2', note:'complete linkage cuts an arc of 7 off the ring (small diameter); average and Ward too' },
+
+{ id:'t10', type:'numeric', bg:'lab', who:'master', qn:'extra',
+  title:'TRIAL VII · THE RADIUS',
+  text:`One last trick. What separates the core from the ring is not the direction of a
+  point : it is its <strong>distance to the origin</strong>
+  <br><span class="kbd">r = √( x<sub>1</sub>² + x<sub>2</sub>² )</span><br>
+  <strong>Compute r for every observation, and give it for the first one. Then run the complete linkage
+  on r alone, cut it into 2 clusters, and give the size of the smaller cluster, the silhouette score of
+  this partition computed on r, and the number of clusters (1 to 10) with the highest silhouette on r.</strong>`,
+  q:'Cluster the observations on their radius r.',
+  fields:[
+    {id:'r0', label:'r of the first observation', value:1.5839271936127504,
+     alt:[{value:2.508825354665963, msg:'That is r². Take the square root.'},
+          {value:2.2348591726656633, msg:'That is |x₁| + |x₂|. Take the square root of the sum of the squares.'}],
+     msg:'r = np.sqrt(np.sum(y**2, axis=1)); the first observation is r[0].'},
+    {id:'small', label:'Size of the smaller cluster (complete linkage on r, K = 2)', value:20, exact:true,
+     alt:[{value:7, msg:'That is the complete linkage on the two original variables. Run it on r alone.'},
+          {value:13, msg:'You clustered the pair (first variable, r), as in the plot made in class. Cluster r alone: r.reshape(-1, 1).'}],
+     msg:'Use sc.linkage(r.reshape(-1, 1), method=\'complete\'), then cut_tree and np.bincount.'},
+    {id:'s', label:'Silhouette score on r, K = 2', value:0.9497998500178809,
+     alt:[{value:0.35531255848424836, msg:'That score is computed on y, the two original variables. Compute it on the data you clustered: r.reshape(-1, 1).'}],
+     msg:'Use silhouette_score(r_col, idx_r), with r_col = r.reshape(-1, 1).'},
+    {id:'k', label:'Number of clusters with the highest silhouette on r', value:2, exact:true,
+     alt:[{value:8, msg:'That is the answer on the two original variables. Compute the scores on r, with the tree of r.'}],
+     msg:'Loop over 1 to 10 clusters of the tree of r, as in Trial V, with silhouette_score(r_col, ...).'}],
+  hint:`<b>np.sum(y**2, axis=1)</b> adds the squares across the two columns, one value per observation.
+  <b>sc.linkage</b> wants a matrix with one row per observation : turn the vector r into one column with
+  <b>r.reshape(-1, 1)</b>. A plain vector would be read as a list of distances, and scipy would
+  complain. Then reuse your silhouette loop, on r.`,
+  code:`r = np.sqrt(np.sum(y**2, axis=1))
+print(r[0])
+r_col = r.reshape(-1, 1)
+out_link_r = sc.linkage(r_col, method='complete')
+idx_r = sc.cut_tree(out_link_r, n_clusters=2).flatten()
+print(np.bincount(idx_r), silhouette_score(???, idx_r))
+sil_r = np.zeros([nb_max_cluster])
+for i in range(1, nb_max_cluster):
+    sil_r[i] = silhouette_score(r_col, sc.cut_tree(out_link_r, n_clusters=i+1).flatten())
+print(np.argmax(sil_r) + 1)`,
+  say:'r = 1.58 for the first observation. On r, the complete linkage gives 20 and 20, with a silhouette of 0.95, and the silhouette picks 2 clusters.',
+  right:`r = <strong>1.58</strong> for the first observation. On r, the complete linkage finds
+  <strong>20 and 20</strong> : the core and the ring, exactly the partition of the single linkage. Its
+  silhouette is <strong>0.95</strong>, and the silhouette now picks <strong>2</strong> clusters.
+  <span class="fx">The Master stares at the plot for a long time.</span>
+  The same partition scores 0.36 on the two variables and 0.95 on the radius. On r, the ring is no longer
+  hollow : it is a compact band between 28 and 36, far from the core, below 2.8.`,
+  widgetAfter:'radius', hud:{split:'single 20/20 · complete 33/7 · on r 20/20'}, note:'radius r: complete on r gives 20/20 (core/ring), silhouette 0.95, best K = 2' },
+
+{ id:'t11', type:'choice', bg:'court', who:'master', mood:'sad', qn:'extra',
+  title:'TRIAL VII · THE VERDICT',
+  text:`So. Does the silhouette know the number of clusters ?`,
+  q:'Choose the conclusion.',
+  options:[
+    {id:'b', label:'Yes: whatever the linkage and the data, take the number of clusters with the highest silhouette, here 8.'},
+    {id:'c', label:'The single linkage is always the best linkage: always use it, and ignore the silhouette.'},
+    {id:'d', label:'The complete linkage is the best here, because its partition into 2 clusters has the higher silhouette (0.51 against 0.36).'},
+    {id:'a', label:'No. The silhouette rewards compact, separated clusters: on the raw data it prefers 8 arcs, and rates the core-and-ring partition below a partition that cuts the ring. The answer depends on the linkage, on how the data are represented, and on the criterion: plot the data and look at the clusters.'}
+  ], correct:'a',
+  hint:`Recall the scores : 0.36 for the core and the ring on the raw data, 0.51 for the complete linkage that
+  cuts the ring, 0.81 for 8 arcs, and 0.95 for the core and the ring on r.`,
+  right:`Exactly. The silhouette is a useful guide, not an oracle : it measures how compact and separated
+  the clusters are, in the space where it is computed. The single linkage found the ring because it
+  follows chains of neighbours; it would also chain two groups joined by a bridge of points. The complete
+  linkage prefers compact groups of small diameter and cuts the ring. And the right transformation makes
+  the two groups compact, so that every tool agrees.`,
+  wrong:{b:`Eight arcs of one ring are not eight groups. The silhouette measures compactness, and a ring is
+  not compact.`,
+  c:`The single linkage chains neighbours : a few points forming a bridge between two groups are enough
+  to merge them. No linkage is always the best.`,
+  d:`The complete linkage cut an arc off the ring and left the rest with the core. A higher silhouette is
+  not a better partition when the clusters are not compact.`},
+  note:'the silhouette measures compactness; linkage and representation decide what a cluster is' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`The silhouette does not know the number of clusters. It knows which partition looks most like
+  round, separated blobs. Four rules leave with you.
+  <strong>One.</strong> Plot first. Check how the file is read : a missing header row costs you an
+  observation without any error.
+  <strong>Two.</strong> The single linkage follows chains of close neighbours : it finds curved or
+  elongated groups such as a ring, and it merges two groups joined by a bridge of points.
+  <strong>Three.</strong> The complete linkage builds compact clusters of small diameter : it cuts a wide
+  group in pieces.
+  <strong>Four.</strong> The silhouette rewards compact, separated clusters, in the space where you compute
+  it. Choose the number of clusters with it, and with your eyes, and with the right representation of the
+  data.`,
+  banner:'PLOT. CHOOSE THE LINKAGE. DOUBT THE SCORE.', cont:'Finish', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {dist:'—', kbest:'—', split:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the first rows of the file, the scatter plot of the
+   40 observations (same scale on both axes) coloured by a partition,
+   the single-linkage dendrogram (scipy's own coordinates), the
+   silhouette scores, and the radius. Points are never connected;
+   hovering a point shows its row and its coordinates.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+/* one colour per cluster when there are many: the core keeps the ink */
+const CLUSTER_COLS = ['#23233f','#a8420f','#b3122b','#2e7d32','#1f5fa8','#7b3fa0','#00838f','#b8860b'];
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series (one colour per point if colorAt is given),
+   straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="7 6"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.rAt?s.rAt(i):(s.r||4)}"
+        fill="${s.colorAt?s.colorAt(i):(s.color||PLOT.ink)}" fill-opacity="${s.alpha||0.8}" stroke="${PLOT.paper}" stroke-width="1">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{
+    if(p.box){ const w=p.text.length*7.6+10, x0=px(p.x)-(p.anchor==='end'?w-5:5);
+      labels += `<rect x="${x0.toFixed(1)}" y="${(py(p.y)-14).toFixed(1)}" width="${w.toFixed(1)}" height="19" fill="${PLOT.paper}" fill-opacity=".92"/>`; }
+    labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* ---- helpers on the embedded data ---- */
+const ROWS = DATA.X.map((v,i)=>i);
+const count = (lab, k) => lab.filter(v=>v===k).length;
+const tipXY = i=>`row ${i}: (${DATA.X[i].toFixed(2)}, ${DATA.Y[i].toFixed(2)})`;
+
+/* ---- the cold open: the first rows of the file, as pandas prints them ---- */
+function playTable(host){
+  let rows='';
+  for(let i=0;i<5;i++){
+    const y=104+i*25;
+    rows += TXT(230,y,i,{sz:20,anchor:'end'})
+          + TXT(380,y,DATA.HEAD[i][0].toFixed(6),{sz:20,anchor:'end'})
+          + TXT(520,y,DATA.HEAD[i][1].toFixed(6),{sz:20,anchor:'end'});
+  }
+  const svg=`<svg viewBox="0 0 700 270" style="width:100%;height:auto;display:block">
+    <rect width="700" height="270" fill="${PLOT.paper}"/>
+    ${TXT(30,30,'RING_SIMULATION.XLSX · data.head()',{sz:18,anchor:'start'})}
+    ${TXT(380,72,'0',{sz:20,col:PLOT.ink,anchor:'end'})}
+    ${TXT(520,72,'1',{sz:20,col:PLOT.ink,anchor:'end'})}
+    <line x1="190" y1="82" x2="540" y2="82" stroke="${PLOT.axis}"/>
+    ${rows}
+    ${TXT(350,252,'40 rows, two columns, no header row: with header=None, pandas names the columns 0 and 1.',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE SHEET', svg, 'Simulated data: two variables, 40 observations.');
+  return 600;
+}
+
+/* ---- the 40 observations, same scale on both axes, coloured by a partition ---- */
+function playRing(host, lab, cols, title, frameTitle, foot, legend){
+  const o = {
+    H:520, B:460,
+    series:[{x:DATA.X, y:DATA.Y, tip:i=>tipXY(i)+(lab?`, cluster ${lab[i]}`:''), r:5,
+             colorAt:i=>lab?cols[lab[i]]:PLOT.ink}],
+    labels:legend||[],
+    /* 614 px wide for 420 px high: x spans 614/420 times the range of y */
+    xmin:-58.48, xmax:58.48, ymin:-40, ymax:40,
+    xticks:[-50,-25,0,25,50], yticks:[-40,-20,0,20,40],
+    title, xlab:'first variable', ylab:'second variable'
+  };
+  host.innerHTML = plotFrame(frameTitle, panelSVG(o), foot);
+  return 900;
+}
+function playScatter(host){
+  return playRing(host, null, null, 'The 40 observations (same scale on both axes)', 'EVIDENCE · THE SCATTER PLOT',
+    'A compact core of 20 points around the origin, and a ring of 20 points, 28 to 36 away from it.',
+    [{x:4, y:-9, text:'core: 20 points', col:PLOT.ink},
+     {x:-56, y:36, text:'ring: 20 points', col:PLOT.ink}]);
+}
+function playSingle2(host){
+  const lab = DATA.SINGLE2, core = lab[0], cols = [];
+  cols[core] = PLOT.ink; cols[1-core] = PLOT.second;
+  return playRing(host, lab, cols, 'Single linkage, 2 clusters', 'EVIDENCE · THE SINGLE LINKAGE, K = 2',
+    `The core (${count(lab,core)} points) and the ring (${count(lab,1-core)} points).`,
+    [{x:4, y:-9, text:`cluster ${core}: the core`, col:PLOT.ink},
+     {x:-56, y:36, text:`cluster ${1-core}: the ring`, col:PLOT.second}]);
+}
+function playSingle8(host){
+  return playRing(host, DATA.SINGLE8, CLUSTER_COLS, 'Single linkage, 8 clusters (best silhouette)', 'EVIDENCE · EIGHT CLUSTERS',
+    'One colour per cluster: the core, and the ring cut into 7 arcs of 2 to 6 points.',
+    [{x:4, y:-9, text:'the core', col:PLOT.ink},
+     {x:-56, y:36, text:'7 arcs of the ring', col:PLOT.label}]);
+}
+function playComplete2(host){
+  const lab = DATA.COMPLETE2, small = count(lab,0) < count(lab,1) ? 0 : 1, cols = [];
+  cols[small] = PLOT.fit; cols[1-small] = PLOT.ink;
+  return playRing(host, lab, cols, 'Complete linkage, 2 clusters', 'EVIDENCE · THE COMPLETE LINKAGE, K = 2',
+    `The small cluster (${count(lab,small)} points, in red) is an arc of the ring; the large one (${count(lab,1-small)} points) holds the core and the rest of the ring.`,
+    [{x:-56, y:36, text:`cluster ${1-small}: ${count(lab,1-small)} points`, col:PLOT.ink},
+     {x:20, y:-37, text:`cluster ${small}: ${count(lab,small)} points`, col:PLOT.fit}]);
+}
+
+/* ---- the single-linkage dendrogram, from scipy's coordinates ---- */
+function playDendro(host){
+  const W=700, H=360, L=70, R=684, T=46, B=300, ymax=27;
+  const D = DATA.DENDRO, n = D.leaves.length;
+  const px = v => L + v/(10*n)*(R-L);
+  const py = v => B - v/ymax*(B-T);
+  const top = Math.max(...D.dcoord.map(d=>Math.max(...d)));
+  let links='';
+  D.icoord.forEach((ic,k)=>{
+    const dc = D.dcoord[k], isTop = Math.max(...dc)===top;
+    const pts = ic.map((x,j)=>`${px(x).toFixed(1)},${py(dc[j]).toFixed(1)}`).join(' ');
+    links += `<polyline points="${pts}" fill="none" stroke="${isTop?PLOT.fit:PLOT.ink}" stroke-width="${isTop?2.5:1.6}">
+      <title>merge at height ${Math.max(...dc).toFixed(2)}</title></polyline>`;
+  });
+  let leaves='';
+  D.leaves.forEach((obs,i)=>{ leaves += TXT(px(10*i+5).toFixed(1), B+16, obs, {sz:12}); });
+  let ticks='';
+  [0,5,10,15,20,25].forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'});
+  });
+  const svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, 'Dendrogram of the single linkage', {sz:17, anchor:'start'})}
+    ${links}
+    ${TXT((L+R)/2, py(top)-8, 'last merge: '+top.toFixed(2), {sz:16, col:PLOT.fit})}
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}${leaves}
+    ${TXT((L+R)/2, H-12, 'observations (row numbers)', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">height</text>
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE DENDROGRAM', svg,
+    'A compact block merged at almost zero height, and a chain of merges up to 25. The red bar is the last merge.');
+  return 900;
+}
+
+/* ---- the silhouette scores of the single linkage, K = 2..10 ---- */
+function playSilCurve(host){
+  const K = [2,3,4,5,6,7,8,9,10], S = K.map(k=>DATA.SIL[k-1]);
+  const best = K[S.indexOf(Math.max(...S))];
+  const o = {
+    series:[{x:K, y:S, r:5, rAt:i=>K[i]===best?7:5, colorAt:i=>K[i]===best?PLOT.fit:PLOT.ink,
+             tip:i=>`K = ${K[i]}: ${S[i].toFixed(3)}`}],
+    labels:[{x:best, y:Math.max(...S)+0.08, text:`best: K = ${best}`, col:PLOT.fit, anchor:'middle'},
+            {x:2.25, y:DATA.SIL[1]-0.02, text:'K = 2: the core and the ring', col:PLOT.ink}],
+    xmin:0.5, xmax:10.5, ymin:0, ymax:1,
+    xticks:[1,2,3,4,5,6,7,8,9,10], yticks:[0,0.2,0.4,0.6,0.8,1], yfmt:v=>v.toFixed(1),
+    title:'Silhouette score of the single linkage', xlab:'number of clusters K', ylab:'silhouette score'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE SILHOUETTE', panelSVG(o),
+    'K = 1 has no silhouette. The score rises up to 8 clusters, then falls.');
+  return 900;
+}
+
+/* ---- the radius r against the first variable, as plotted in class ---- */
+function playRadius(host){
+  const lab = DATA.RADIUS2, core = lab[0], cols = [];
+  cols[core] = PLOT.ink; cols[1-core] = PLOT.second;
+  const o = {
+    series:[{x:DATA.X, y:DATA.R, r:5, colorAt:i=>cols[lab[i]],
+             tip:i=>`row ${i}: r = ${DATA.R[i].toFixed(2)}, cluster ${lab[i]}`}],
+    labels:[{x:-34, y:24, text:`cluster ${1-core}: the ring, r from 28 to 36`, col:PLOT.second},
+            {x:-34, y:6, text:`cluster ${core}: the core, r below 2.8`, col:PLOT.ink}],
+    xmin:-35, xmax:35, ymin:0, ymax:40,
+    xticks:[-30,-20,-10,0,10,20,30], yticks:[0,10,20,30,40],
+    title:'Complete linkage on r, 2 clusters', xlab:'first variable', ylab:'r = distance to the origin'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE RADIUS', panelSVG(o),
+    'On r, the core and the ring are two compact bands, far apart.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')     return playTable(host);
+  if(name==='scatter')   return playScatter(host);
+  if(name==='single2')   return playSingle2(host);
+  if(name==='single8')   return playSingle8(host);
+  if(name==='complete2') return playComplete2(host);
+  if(name==='dendro')    return playDendro(host);
+  if(name==='silcurve')  return playSilCurve(host);
+  if(name==='radius')    return playRadius(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your code step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example of Python code ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE PYTHON · RUN IT IN YOUR NOTEBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Python, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim()
+    .replace(/^(?:np|numpy)\.(?:float|int)\d*\(\s*(.*?)\s*\)$/i,'$1')
+    .replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+/* the course margin rule: exact integers; ±0.01 when 0.1 ≤ |value| < 1e6;
+   ±1% of the value otherwise. The tiny extra absorbs floating-point error. */
+function marginOf(value, exact){
+  if(exact) return 0;
+  const a = Math.abs(value);
+  return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
+}
+function tolerance(f){ return (f.tol !== undefined) ? f.tol : marginOf(f.value, f.exact); }
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){
+    const at = (a.tol !== undefined) ? a.tol : marginOf(a.value, f.exact);
+    if(Math.abs(v-a.value) <= at) return a.msg;
+  }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Python.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   PYTHON HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openPythonHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelperE2',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Empirical Exercise II</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference syntax only. Compute in Python; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-python-helper]').forEach(b=>b.onclick=openPythonHelper);
+/* the data file: the button names it in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — the completion record and the final password
+   ================================================================ */
+function finish(){
+  if(!finalPw) finalPw = makeFinalPassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = finalPw.time;
+  $('#pw-code').textContent = finalPw.code;
+  $('#endblurb').innerHTML =
+    `You looked at the data before clustering them, and saw a core inside a ring. The single linkage
+     followed the ring link by link and found the two groups; the complete linkage cut an arc off the
+     ring. The silhouette preferred eight arcs and rated the right partition below a wrong one, until the
+     radius made the two groups compact. A score measures compactness; it does not know the clusters.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: THE SILHOUETTE KNOWS THE NUMBER OF CLUSTERS';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  copyText($('#pw-code').textContent,
+    ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); },
+    ()=>{ $('#copymsg').textContent='select and copy manually'; });
+};
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v1.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE II ........ THE RING",
+  "DATA ........................ 40 POINTS, 2 VARIABLES",
+  "HEADER ROW .................. NONE",
+  "LINKAGES .................... SINGLE, COMPLETE",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "PASSWORD .................... AT THE END, FOR BLACKBOARD",
+  "",
+  "> KEEP PYTHON AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
