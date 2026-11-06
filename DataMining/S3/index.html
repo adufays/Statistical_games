@@ -1,1 +1,1996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 3: Sugar, Lamb and the First Component</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 3
+  "Sugar, Lamb and the First Component"  (Topic 2: principal component
+  analysis, exercise 3: building an environmental index)
+  EDHEC · Data Mining · Exo 3 in class
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  No checkpoints, no SHOW THE ANSWER button. Every question has a HINT
+  button. Students compute everything in Python. One final password.
+
+  QUESTIONS (Topic2_PCA_only.tex, exercise 3)
+  ---------
+  setup  N, average and std (ddof=1) of emissions_kg               -> numbers
+  1      average of the standardized emissions_kg (0)              -> MCQ
+  2      dimension of the covariance matrix, Sigma[0, 4]           -> numbers
+         covariance of standardized data = correlation of raw data -> MCQ
+  3      lambda1 and share of variance                             -> numbers
+         why we may multiply v1 by -1                              -> MCQ
+         first observation of PC1 (v1 with positive entries)       -> number
+  4      Score of the first food                                   -> number
+         three highest scores                                      -> tick all
+  5      ranks of Sugar, Lettuce, Lamb chops                       -> numbers
+         why sugar and lettuce rank high                           -> MCQ
+         conclusion on the choice of the variables                 -> MCQ
+  6      log of the two per-kg variables: rho, lambda1, v1[0]      -> numbers
+         proof: v1 = (1/sqrt2, 1/sqrt2), lambda1 = 1 + rho         -> MCQ
+  7      min and max of Score_kg                                   -> numbers
+         ranks of Sugar, Lettuce, Lamb chops by Score_kg           -> numbers
+         conclusion                                                -> MCQ
+
+  DATA
+  ----
+  HW_eco_impact.xlsx: one sheet, header row, 148 rows, 9 columns:
+  entity (name of the food) and eight measures: emissions_kg,
+  emissions_1000kcal, emissions_100g_protein, emissions_100g_fat,
+  land_use_kg, land_use_1000kcal, 'Land use per 100 grams of protein',
+  'Land use per 100 grams of fat'. Source: Our World in Data.
+
+  FINAL PASSWORD (one, at the end; no checkpoints)
+  --------------
+  DM3-hhmmss-cccccc, hhmmss = time of completion on the student's clock.
+  m = h*3600 + min*60 + sec
+  a = (m*m + 457*m + 71233) mod 999979
+  b = (a*(m + 277) + 6*m*m + 7) mod 999979
+  code = (52919*b + 31307*a + 89021*m + 314159) mod 1e6
+  Checked by check_passwords_DM3.py.
+
+  TARGET VALUES (computed with Python on the Excel file)
+  -------------
+  N                     148        (header=None: 149; columns: 9)
+  mean emissions_kg     7.098922045743244   (median 1.87311787)
+  std emissions_kg      15.703081318312515  (ddof=0: 15.649940450789417)
+  mean standardized     -1.2e-17 (zero)
+  dim Sigma             8          (np.cov without .T: 148)
+  Sigma[0, 4]           0.9554742810421807  (ddof=0 standardization:
+                        0.9619741060832847, absorbed by the margin;
+                        raw covariance 704.740797751596)
+  max |Sigma - corr|    1.3e-15
+  lambda1               5.396398433671176   (raw data: 7119.670990838412;
+                        unsorted last: 0.035534491439605055; min 0.0024926)
+  share PC1             67.45498042088964 %
+  v1 (numpy)            all negative; v1 used: all positive, 0.19 to 0.41
+  PC1[0] (Ale)          -1.1113348133858167 (numpy sign: +1.1113; raw X:
+                        3.320178765044945; row of V: 0.714960149045683;
+                        V[:, -1] unsorted: 0.10309973313632789; ddof=0:
+                        -1.115108456888017, absorbed by the margin)
+  Score[0]              24.762212184288614  (numpy sign: 75.23778781571139)
+  top 3                 Beef steak, Beef mince, Beef meatballs
+  ranks                 Sugar 4, Lettuce 7, Lamb chops 13
+                        (ascending: 145, 142, 136; from 0: 3, 6, 12)
+  rho (log, per kg)     0.8047581873934785  (no log: 0.9554742810421811;
+                        unstandardized cov: 1.3812444829509563)
+  lambda1 (log, per kg) 1.8047581873934782  (no log: 1.9554742810421812;
+                        unstandardized: 3.0977608896091624)
+  v1 (log, per kg)      (0.7071067811865476, 0.7071067811865475)
+  Score_kg              min 8.878866354265222, max 99.01696603634873
+                        (sign: 0.98/91.12; no log: 37.45/99.9992;
+                        unstandardized: 4.51/99.76)
+  ranks Score_kg        Sugar 91, Lettuce 38, Lamb chops 5
+                        (ascending: 58, 111, 144; from 0: 90, 37, 4)
+  =====================================================================
+-->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; line-height:1.7; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example of Python code ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; line-height:1.6; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Python helper ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#1e3f66,#306998);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:38%}
+.xlguide td:nth-child(2){width:34%}
+.xlguide td:nth-child(3){width:28%}
+.xlguide pre{margin:8px 0; padding:8px 10px; background:#06110a; color:var(--green);
+  font:17px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+/* the setup block must scroll inside the card, not widen the page on a phone */
+#wrap{min-width:0}
+.pwline{flex-wrap:wrap; gap:4px 12px}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'PYTHON'}
+  .xlguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE III</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="eco">DATA (XLSX)</button>
+      <button class="toolbtn" data-python-helper>PYTHON HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>SUGAR, LAMB AND<br>THE FIRST COMPONENT</h1>
+      <h2>Empirical Exercise III &nbsp;·&nbsp; Data Mining</h2>
+      <p>Master Scepticus wants a green label for the Academy canteen, and he is sure that sugar harms the
+      planet more than lamb. 148 food products and eight environmental measures will test him. You will
+      standardize the data, compute the first principal component, turn it into an index between 0 and 100,
+      rank the foods, and then rebuild the index from the two measures per kilogram.</p>
+      <p><strong style="color:var(--amber)">A password waits for you at the end.</strong> When you complete
+      the exercise, the game gives you a personal password. <strong>Copy it and submit it on
+      Blackboard</strong>: it is the proof that you finished. Copy it before you close this page, because
+      it is not kept.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · PYTHON</b>Download <code>HW_eco_impact.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and save it in the folder of your notebook. Load it
+        with pandas, compute every number and draw every plot in Python, and keep your notebook: each
+        question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your results, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example of Python code, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers as Python prints them, e.g., <code>36.18</code> or <code>-8.544e-05</code>
+      (a comma is also accepted as the decimal separator). Give two decimals: your answer is accepted
+      within 0.01 of the exact value. Very small or very large numbers are accepted within 1%, so three
+      significant digits are enough. Counts and ranks must be exact. Use <code>print(...)</code> to see a
+      full number.</p>
+      <div class="xlguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <div class="guideintro">The file has 148 rows, one per food product, and 9 columns:
+        <code>entity</code> (the name of the food) and eight measures, as pandas reads them:
+        <code>emissions_kg</code>, <code>emissions_1000kcal</code>, <code>emissions_100g_protein</code>,
+        <code>emissions_100g_fat</code> (greenhouse gas emissions, in kg of CO<sub>2</sub> equivalents),
+        <code>land_use_kg</code>, <code>land_use_1000kcal</code>, <code>Land use per 100 grams of
+        protein</code>, <code>Land use per 100 grams of fat</code> (land use, in m²), each per kilogram of
+        food, per 1000 kilocalories, per 100 grams of protein or per 100 grams of fat. Start your notebook
+        with:
+<pre>import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+df = pd.read_excel('HW_eco_impact.xlsx')
+X = df[df.columns[1:]].to_numpy()</pre>
+        If Python cannot find the file, put it in the same folder as your notebook, or give its full
+        path.</div>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>PYTHON</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>pd.read_excel(file)</code>, <code>df.head()</code>, <code>len(df)</code></td><td>Loads the sheet (the first row gives the column names); first rows; number of rows.</td><td><code>len(df)</code></td></tr>
+            <tr><td><code>df[df.columns[1:]].to_numpy()</code></td><td>NumPy array of the eight measures, without the <code>entity</code> column.</td><td><code>X[:, 0]</code>: emissions_kg</td></tr>
+            <tr><td><code>np.mean(X, axis=0)</code>, <code>np.std(X, axis=0, ddof=1)</code></td><td>Average and standard deviation of each column. <code>np.std</code> divides by N unless <code>ddof=1</code>.</td><td><code>np.std(df['emissions_kg'], ddof=1)</code></td></tr>
+            <tr><td><code>(X - np.mean(X, axis=0)) / np.std(X, axis=0, ddof=1)</code></td><td>Standardizes every column: average 0, standard deviation 1.</td><td><code>X_std[:, 0]</code></td></tr>
+            <tr><td><code>np.cov(X_std.T)</code>, <code>np.corrcoef(X.T)</code></td><td>Covariance and correlation matrices. Both expect one variable per row: transpose with <code>.T</code>.</td><td><code>Sigma.shape</code>, <code>Sigma[0, 4]</code></td></tr>
+            <tr><td><code>Lamb, V = np.linalg.eig(Sigma)</code></td><td>Eigenvalues, and a matrix whose <strong>columns</strong> are the eigenvectors. They are not sorted.</td><td><code>V[:, 0]</code>: first column</td></tr>
+            <tr><td><code>idx_sort = np.argsort(-Lamb)</code></td><td>Positions from the largest eigenvalue to the smallest; reorder <code>Lamb</code> and the columns of <code>V</code> with it.</td><td><code>V = V[:, idx_sort]</code></td></tr>
+            <tr><td><code>np.matmul(X_std, v1)</code></td><td>Matrix product: one value of the principal component per food.</td><td><code>PC1[0]</code></td></tr>
+            <tr><td><code>np.exp</code>, <code>np.log</code>, <code>np.sum</code>, <code>np.min</code>, <code>np.max</code></td><td>Exponential, natural logarithm, sum, smallest and largest value, element by element or over an array.</td><td><code>100 * np.exp(PC1) / (np.exp(PC1) + 1)</code></td></tr>
+            <tr><td><code>pd.DataFrame({'entity': df['entity'], 'Score': Score})</code></td><td>A table of the names and the scores.</td><td><code>.sort_values('Score', ascending=False)</code></td></tr>
+            <tr><td><code>np.arange(1, len(df) + 1)</code></td><td>The numbers 1, 2, …, 148: ranks of the sorted table.</td><td><code>Index_food['Rank'] = …</code></td></tr>
+            <tr><td><code>Index_food[Index_food['entity'].isin([...])]</code></td><td>Keeps the rows of some food products.</td><td><code>.isin(['Sugar', 'Lettuce'])</code></td></tr>
+            <tr><td><code>df[['emissions_kg', 'land_use_kg']]</code></td><td>Two columns (double brackets).</td><td><code>np.log(df[['emissions_kg', 'land_use_kg']].to_numpy())</code></td></tr>
+            <tr><td><code>plt.plot(Score, 'o')</code>, <code>plt.show()</code></td><td>Plots the scores, one point per food.</td><td><code>plt.ylabel('Score')</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>λ1 · share</span><b id="hud-lam">—</b></div>
+            <div class="hudrow"><span>highest score</span><b id="hud-top">—</b></div>
+            <div class="hudrow"><span>rank sugar · lamb</span><b id="hud-ranks">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise III &nbsp;·&nbsp; Sugar, Lamb and the First Component</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">COMPLETED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, dashes included. It is not kept: copy it before you close this page.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button: paste its Dropbox link (…&raw=1) here */
+  DATA_FILES: {
+    eco: "https://www.dropbox.com/scl/fi/5s05fztknjmehgbfxni0x/HW_eco_impact.xlsx?rlkey=c6mibreboyaaa2yxz7n5bh3yy&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   FINAL PASSWORD — one per student, created the first time the
+   exercise is completed, never regenerated (REPLAY keeps it). It
+   contains the time of completion, on the student's clock:
+       DM3-hhmmss-cccccc
+     m    = h*3600 + min*60 + sec
+     a    = (m*m + 457*m + 71233) mod 999979
+     b    = (a*(m + 277) + 6*m*m + 7) mod 999979
+     code = (52919*b + 31307*a + 89021*m + 314159) mod 1e6
+   The code depends on the time, so the time cannot be edited.
+   Every intermediate value stays below 2^53, so the arithmetic is exact.
+   Checked by check_passwords_DM3.py.
+   ================================================================ */
+function makeFinalPassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const a = (m*m + 457*m + 71233) % 999979;
+  const b = (a*(m + 277) + 6*m*m + 7) % 999979;
+  const code = (52919*b + 31307*a + 89021*m + 314159) % 1000000;
+  return { time:`${hh}:${mm}:${ss}`,
+           code:`DM3-${hh}${mm}${ss}-${String(code).padStart(6,'0')}` };
+}
+let finalPw = null;
+
+/* ================================================================
+   DATA — the names, the two indexes (rounded), the weights of the
+   first eigenvector and a few rows of HW_eco_impact.xlsx, embedded
+   for the pictures only. The student computes everything in Python.
+   ================================================================ */
+const DATA = {"N": 148, "NAMES": ["Ale", "Almond butter", "Almond milk", "Almonds", "Apple juice", "Apples", "Asparagus", "Avocados", "Bacon", "Baguette", "Banana loaf", "Bananas", "Beans", "Beef burger", "Beef meatballs", "Beef mince", "Beef steak", "Beer", "Beetroot", "Biscuits", "Blue cheese", "Brazil nuts", "Bread", "Breakfast cereal", "Brie", "Broccoli", "Butter", "Cabbage", "Caesar salad", "Camembert", "Carrots", "Cashew nuts", "Cauliflower", "Cereal bars", "Cheddar cheese", "Cheesecake", "Cherry tomatoes", "Chia seeds", "Chicken breast", "Chicken burger", "Chicken sausages", "Chicken thighs", "Chicken wings", "Chickpeas", "Chocolate biscuits", "Chocolate cake", "Chocolate cheesecake", "Chocolate spread", "Coconut milk", "Coconut oil", "Cod", "Cod fish fingers", "Cod fishcakes", "Cottage cheese", "Courgettes", "Couscous", "Cracker biscuits", "Crisps", "Croissants", "Cucumber", "Dark chocolate", "Doughnuts", "Egg noodles", "Eggs", "Falafels", "Feta cheese", "Frozen chips (french fries)", "Frozen onion rings", "Frozen potato wedges", "Frozen roast potatoes", "Frozen sweet potato fries", "Garden peas", "Granola", "Grapes", "Halloumi cheese", "Ice cream", "Ice lollies", "Kale", "Kiwis", "Lamb (leg)", "Lamb burgers", "Lamb chops", "Lemons", "Lentils", "Lettuce", "Limes", "Macaroni cheese", "Mackerel", "Marmalade", "Meat-free burger", "Meat-free mince", "Meat-free sausages", "Melon", "Milk chocolate", "Mozzarella cheese", "Muesli", "Mushrooms", "Naan", "Nut loaf", "Oat milk", "Onions", "Orange juice", "Oranges", "Parmesan cheese", "Parsnips", "Pasta shells", "Peanut butter", "Peanuts", "Pears", "Pecan nuts", "Penne pasta", "Peppers", "Pineapple", "Pitta bread", "Popcorn", "Poppadoms", "Pork chops", "Pork sausages", "Porridge (oatmeal)", "Potatoes", "Prawns", "Protein bar", "Protein shake", "Pumpkin seeds", "Quinoa", "Rapeseed oil", "Raspberries", "Rice", "Rice noodles", "Ricotta cheese", "Salmon", "Sourdough bread", "Soy milk", "Spaghetti", "Spinach", "Sponge cake", "Strawberries", "Sugar", "Sunflower seeds", "Sweetcorn", "Tofu", "Tomato ketchup", "Tomatoes", "Tortilla wraps", "Tuna", "Walnuts", "Watermelon", "Yoghurt"], "COLS": ["emissions_kg", "emissions_1000kcal", "emissions_100g_protein", "emissions_100g_fat", "land_use_kg", "land_use_1000kcal", "Land use per 100 grams of protein", "Land use per 100 grams of fat"], "SCORE": [24.76, 25.85, 32.56, 26.31, 47.27, 38.84, 33.7, 31.36, 66.81, 27.52, 29.72, 44.12, 53.75, 99.35, 99.98, 100.0, 100.0, 25.73, 72.45, 34.15, 57.43, 29.9, 26.48, 28.31, 53.78, 32.99, 50.48, 33.96, 29.92, 50.01, 42.57, 29.08, 32.12, 29.35, 54.18, 27.66, 61.21, 25.29, 46.39, 32.31, 37.85, 40.91, 39.65, 38.19, 38.18, 35.6, 33.75, 36.3, 86.58, 29.53, 55.12, 38.33, 37.06, 99.35, 35.28, 32.38, 28.56, 31.52, 27.32, 39.25, 74.44, 27.55, 32.25, 33.3, 29.11, 47.55, 29.02, 25.86, 28.13, 29.93, 28.04, 43.48, 27.25, 86.85, 48.73, 39.29, 42.84, 30.78, 37.84, 84.98, 75.84, 80.18, 31.63, 77.77, 92.84, 32.56, 51.57, 42.14, 69.24, 27.2, 43.52, 27.41, 39.32, 46.06, 52.84, 27.76, 52.29, 25.74, 26.6, 28.29, 28.31, 36.04, 33.16, 58.4, 33.43, 28.32, 28.32, 31.06, 45.94, 30.82, 31.1, 35.72, 43.67, 27.39, 26.84, 27.55, 45.77, 41.35, 27.64, 30.07, 91.2, 36.73, 36.47, 25.15, 26.93, 31.2, 86.63, 40.52, 42.56, 49.31, 39.45, 27.29, 28.7, 30.81, 32.45, 27.48, 61.14, 99.58, 28.18, 29.76, 26.11, 51.62, 62.75, 25.85, 62.54, 29.53, 39.17, 42.17], "SKG": [14.42, 33.19, 20.75, 39.59, 12.72, 13.42, 24.22, 23.05, 91.19, 29.75, 42.45, 30.32, 60.25, 97.12, 98.04, 98.59, 99.02, 17.0, 50.18, 64.08, 88.61, 64.32, 28.56, 37.95, 87.99, 20.8, 51.56, 18.83, 41.59, 86.01, 25.66, 60.85, 18.69, 55.23, 88.91, 42.51, 29.41, 37.51, 75.41, 64.68, 73.05, 76.79, 76.04, 58.78, 73.15, 67.25, 64.29, 69.73, 27.78, 14.29, 71.26, 69.79, 63.49, 90.86, 22.39, 34.99, 50.21, 60.0, 42.56, 20.94, 92.05, 43.64, 37.4, 63.63, 44.56, 84.8, 26.24, 26.47, 22.79, 33.18, 19.78, 43.44, 47.81, 52.42, 85.98, 57.89, 31.53, 19.03, 27.15, 93.11, 92.14, 93.14, 12.41, 73.19, 64.86, 12.46, 86.75, 74.65, 32.11, 36.5, 39.97, 35.55, 22.15, 82.36, 85.99, 47.58, 43.8, 30.42, 25.2, 11.37, 8.88, 13.52, 12.88, 90.36, 27.54, 35.59, 63.43, 61.75, 21.16, 63.25, 42.34, 22.96, 21.24, 21.85, 41.69, 45.01, 83.29, 79.51, 45.57, 9.53, 59.33, 66.23, 48.77, 38.21, 35.9, 60.51, 52.64, 51.0, 46.87, 85.98, 69.57, 28.83, 19.56, 42.78, 21.76, 38.48, 50.56, 36.96, 59.02, 28.86, 33.79, 38.1, 28.93, 29.49, 73.72, 62.89, 21.55, 49.05], "V1": [0.393, 0.397, 0.191, 0.223, 0.397, 0.406, 0.379, 0.368], "HEAD": [["Ale", 0.48868987, 0.31733796, 0.87852461, 2.42420853, 0.81148518, 0.60115237, 1.57768746, 3.06576569], ["Almond butter", 0.38701131, 0.06726478, 0.20759935, 0.07910323, 7.68304515, 1.29686985, 3.60843329, 1.49529674], ["Almond milk", 0.65588754, 2.22223, 13.595512, 4.05747018, 1.37010586, 2.6750626, 12.6878393, 4.60053028]], "THREE": {"Sugar": [1.85, 0.46, 159.73, 239.24, 2.15, 0.54, 198.89, 293.64], "Lettuce": [4.93, 25.32, 39.95, 64.42, 6.78, 34.68, 54.33, 87.02], "Lamb chops": [30.9, 11.83, 17.19, 14.54, 43.66, 16.71, 24.28, 20.54]}};
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Python, or
+              drop-down choices ({kind:'select'})
+
+   The course margin rule decides what is accepted, for every number:
+   exact integers (exact:true) only exactly; 0.1 <= |value| < 1e6 within
+   ±0.01; otherwise within ±1% of the value.
+   'alt' lists common wrong values, each with its own feedback; an alt
+   uses the same margin around its own value unless it has its own 'tol'.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE III',
+  text:`The Academy canteen will print a green label on every food it serves. I am in charge of the label.
+  <span class="fx">The Master drops a spreadsheet on the desk.</span>
+  148 food products, and eight measures of the damage done by producing them : greenhouse gas emissions
+  and land use, per kilogram, per 1000 kilocalories, per 100 grams of protein and per 100 grams of fat.
+  Eight numbers are too many for a label. The <strong>principal component analysis</strong> will squeeze
+  them into one index, and I already know what it will say : <strong>sugar harms the planet more than
+  lamb</strong>. Sugar leaves the canteen. Lamb stays.
+  <span class="fx">At the end, the Academy hands you a password. Copy it and submit it on Blackboard.</span>`,
+  widget:'table', banner:'CLAIM: SUGAR HARMS THE PLANET MORE THAN LAMB', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE FILE',
+  text:`Download <span class="kbd">HW_eco_impact.xlsx</span> with the DATA (XLSX) button, save it in the
+  folder of your notebook, and load it with pandas. The first column, <span class="kbd">entity</span>, holds
+  the names of the food products; the eight others are the measures.
+  <strong>How many food products are there ? And what are the average and the standard deviation of
+  <span class="kbd">emissions_kg</span>, in kg of CO<sub>2</sub> equivalents per kilogram of food ?</strong>`,
+  q:'Report what Python prints.',
+  fields:[
+    {id:'n', label:'Number of food products', value:148, exact:true,
+     alt:[{value:149, msg:'One row too many: with header=None, pandas reads the row of column names as a food product. The file has a header row: use pd.read_excel(...) without header=None.'},
+          {value:9, msg:'That is the number of columns. Count the rows: len(df).'}],
+     msg:'Use len(df).'},
+    {id:'m', label:'Average of emissions_kg', value:7.098922045743244,
+     alt:[{value:1.87311787, msg:'That is the median. Compute the average: np.mean(df[\'emissions_kg\']).'}],
+     msg:'Use np.mean(df[\'emissions_kg\']).'},
+    {id:'s', label:'Standard deviation of emissions_kg', value:15.703081318312515,
+     alt:[{value:15.649940450789417, msg:'np.std divides by N by default. The empirical standard deviation divides by N − 1: add ddof=1.'},
+          {value:246.58676287620614, msg:'That is the variance. Take its square root, or use np.std(..., ddof=1).'}],
+     msg:'Use np.std(df[\'emissions_kg\'], ddof=1).'}],
+  hint:`<b>pd.read_excel</b> reads the first row as the column names, which is what you want here.
+  <b>len(df)</b> counts the rows. For the standard deviation, remember the course convention : divide by
+  N − 1, that is <b>ddof=1</b>.`,
+  code:`import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+df = pd.read_excel('HW_eco_impact.xlsx')
+print(df.head())
+print(len(df))
+print(np.mean(df['emissions_kg']), np.std(df['emissions_kg'], ddof=???))`,
+  say:'148 food products. emissions_kg has an average of 7.10 and a standard deviation of 15.70.',
+  right:`<strong>148</strong> food products. An average of <strong>7.10</strong> kg of CO<sub>2</sub> per
+  kilogram, and a standard deviation of <strong>15.70</strong>, more than twice the average.
+  <span class="fx">The Master raises an eyebrow.</span>
+  The median food emits 1.87 kg; beef steak emits 129.75. A few heavy foods pull the average up. And
+  look at land use : it is in square metres, not in kilograms of CO<sub>2</sub>. Before mixing apples
+  and square metres, we put every measure on the same scale.`,
+  note:'N = 148 foods; emissions_kg: average 7.10, std 15.70 (ddof=1)' },
+
+{ id:'t1', type:'choice', bg:'lab', who:'master', qn:'1',
+  title:'TRIAL II · STANDARDIZATION',
+  text:`<strong>Standardize the eight measures</strong> : for each variable, subtract its average and divide
+  by its standard deviation. <span class="kbd">z<sub>i</sub> = (x<sub>i</sub> − x̄) / σ̂</span>.
+  Then tell me : <strong>what is the average of the standardized variable
+  <span class="kbd">emissions_kg</span> ?</strong>`,
+  q:'What does Python give for the average of the standardized emissions_kg?',
+  options:[
+    {id:'b', label:'1, because the standardized variable is divided by its standard deviation.'},
+    {id:'c', label:'7.10, because standardizing changes the scale but not the average.'},
+    {id:'a', label:'0. Python prints a tiny number such as -1.2e-17: it is zero, up to the rounding errors of the computer.'},
+    {id:'d', label:'It cannot be computed, because the variables have different units.'}
+  ], correct:'a',
+  hint:`Take the eight measures without the <b>entity</b> column, then apply the formula column by column
+  with <b>axis=0</b>. If Python prints a number with <b>e-17</b>, multiply it by 10<sup>−17</sup> before
+  you decide what it is.`,
+  code:`X = df[df.columns[1:]].to_numpy()
+X_std = (X - np.mean(X, axis=0)) / np.std(X, axis=0, ddof=1)
+print(np.mean(X_std[:, 0]))`,
+  right:`Zero. We removed the average from every observation, so what is left averages to zero :
+  <span class="kbd">z̄ = (x̄ − x̄) / σ̂ = 0</span>. The <strong>-1.2e-17</strong> is the computer's
+  rounding, not a result. And every standardized variable now has a standard deviation of one.`,
+  wrong:{b:`One is the <em>standard deviation</em> of a standardized variable. Its average is something else.`,
+  c:`We subtracted the average from every observation. What is left cannot still average 7.10.`,
+  d:`Standardizing removes the units : that is the whole point. Compute the average.`},
+  note:'standardized variables: average 0 (Python: -1.2e-17), std 1' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'2',
+  title:'TRIAL III · THE COVARIANCE MATRIX',
+  text:`<strong>Compute the covariance matrix of the standardized data.</strong>
+  <span class="kbd">np.cov</span> expects one variable per <em>row</em> : mind the orientation of your array.
+  <strong>What is the dimension of the matrix ? And what is the covariance between the standardized
+  <span class="kbd">emissions_kg</span> and the standardized <span class="kbd">land_use_kg</span> ?</strong>`,
+  q:'Compute the covariance matrix of the standardized data.',
+  fields:[
+    {id:'dim', label:'Number of rows (and of columns) of the matrix', value:8, exact:true,
+     alt:[{value:148, msg:'A 148 × 148 matrix compares the food products, not the variables: np.cov takes one variable per row. Transpose the data: np.cov(X_std.T).'},
+          {value:9, msg:'The entity column holds names, not measures. Keep the eight measures only: df.columns[1:].'}],
+     msg:'Use Sigma.shape.'},
+    {id:'c', label:'Covariance between standardized emissions_kg and land_use_kg', value:0.9554742810421807,
+     alt:[{value:704.740797751596, msg:'That is the covariance of the raw data. Use the standardized data X_std.'},
+          {value:1, msg:'That is a diagonal element: the variance of a standardized variable. emissions_kg is column 0 and land_use_kg is column 4: read Sigma[0, 4].'}],
+     msg:'emissions_kg is column 0 and land_use_kg is column 4 (Python counts from 0): read Sigma[0, 4].'}],
+  hint:`<b>np.cov(X_std.T)</b> : the <b>.T</b> transposes the array, so that every row is a variable.
+  <b>land_use_kg</b> is the fifth measure, hence column <b>4</b>.`,
+  code:`Sigma = np.cov(X_std.T)
+print(Sigma.shape)
+print(Sigma[0, ???])`,
+  say:'An 8 × 8 matrix, and a covariance of 0.96 between the standardized emissions and land use per kilogram.',
+  right:`<strong>8 × 8</strong> : one row and one column per measure. And <strong>0.96</strong> between
+  emissions and land use per kilogram.
+  <span class="fx">The Master taps the 0.96.</span>
+  A covariance, between standardized variables, that lies between −1 and 1. Does that remind you of
+  something ?`,
+  note:'Sigma = cov of standardized data: 8 x 8; Sigma[0,4] = 0.96' },
+
+{ id:'t3', type:'choice', bg:'lab', who:'master', qn:'2',
+  title:'TRIAL III · COVARIANCE AND CORRELATION',
+  text:`<strong>Compute the correlation matrix of the raw data</strong>, before standardization, and
+  <strong>compare it with the covariance matrix of the standardized data.</strong> Look at the largest
+  absolute difference between the two matrices.`,
+  q:'What do you conclude?',
+  options:[
+    {id:'b', label:'The two matrices differ: standardizing changes the relationships between the variables.'},
+    {id:'c', label:'The diagonals are equal (all ones), but the other elements differ.'},
+    {id:'a', label:'The two matrices are equal (the largest difference is about 1e-15, i.e., zero). The covariance of two standardized variables is their correlation: the principal component analysis of standardized data is the analysis of the correlation matrix.'},
+    {id:'d', label:'They are equal only because the variables are strongly correlated.'}
+  ], correct:'a',
+  hint:`<b>np.corrcoef</b> also wants one variable per row. Then compute the largest absolute difference
+  between the two matrices. Recall : Corr(x, y) = Cov(x, y) / (σ<sub>x</sub> σ<sub>y</sub>).`,
+  code:`Corr_mat = np.corrcoef(X.T)
+print(np.max(np.abs(Sigma - Corr_mat)))`,
+  right:`Equal. The covariance of two variables divided by their standard deviations is their correlation,
+  and that is exactly what standardizing does. So the PCA of standardized data is the PCA of the
+  <strong>correlation matrix</strong>. And these correlations are high : 0.96 between emissions and land
+  use per kilogram, 0.88 between emissions per kilogram and per 1000 kcal. One component may well carry
+  most of the information.`,
+  wrong:{b:`Standardizing shifts and rescales each variable : a correlation does not care about either.
+  Look at the size of the largest difference.`,
+  c:`Look at the largest difference over the whole matrix, not only on the diagonal.`,
+  d:`The equality holds for any data. Write the covariance of two standardized variables.`},
+  note:'cov(standardized) = corr(raw): max difference 1e-15' },
+
+{ id:'t4', type:'numeric', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL IV · THE EIGENVALUES',
+  text:`Now the principal components. <strong>Compute the eigenvalues and the eigenvectors of the
+  covariance matrix of the standardized data</strong>, and sort them from the largest eigenvalue to the
+  smallest. Careful : <span class="kbd">np.linalg.eig</span> does not promise any order.
+  <strong>What is the largest eigenvalue λ<sub>1</sub> ? And what share of the total variance does the
+  first principal component capture, in percent ?</strong>`,
+  q:'Compute and sort the eigenvalues.',
+  fields:[
+    {id:'l', label:'Largest eigenvalue λ<sub>1</sub>', value:5.396398433671176,
+     alt:[{value:7119.670990838412, msg:'That is the largest eigenvalue of the covariance matrix of the raw data. Use the standardized data.'},
+          {value:0.002492566366191194, msg:'That is the smallest eigenvalue. Sort in decreasing order: np.argsort(-Lamb).'},
+          {value:0.035534491439605055, msg:'That is the last eigenvalue returned by np.linalg.eig, which does not sort them. Sort them first: idx_sort = np.argsort(-Lamb).'},
+          {value:1.3018316971786137, msg:'That is the second largest eigenvalue. Take the largest.'}],
+     msg:'Use np.max(Lamb), or sort with np.argsort(-Lamb) and take the first one.'},
+    {id:'p', label:'Share of the variance captured by the first PC (%)', value:67.45498042088964,
+     alt:[{value:0.6745498042088964, msg:'That is a proportion. Report it in percent: multiply by 100.'}],
+     msg:'The share is λ<sub>1</sub> divided by the sum of all the eigenvalues, times 100.'}],
+  hint:`<b>np.linalg.eig</b> returns the eigenvalues and a matrix whose <b>columns</b> are the eigenvectors.
+  <b>np.argsort(-Lamb)</b> gives the positions from the largest eigenvalue to the smallest : reorder the
+  eigenvalues <em>and</em> the columns of V with it. The sum of the eigenvalues is the total variance.`,
+  code:`Lamb, V = np.linalg.eig(Sigma)
+idx_sort = np.argsort(-Lamb)
+Lamb = Lamb[idx_sort]
+V = V[:, idx_sort]
+print(Lamb[0], 100 * Lamb[0] / np.sum(Lamb))`,
+  say:'The largest eigenvalue is 5.40, so the first principal component captures 67.45% of the variance.',
+  right:`<strong>λ<sub>1</sub> = 5.40</strong>. With eight standardized variables, the total variance is
+  8, so the first component carries <strong>67.45%</strong> of it.
+  <span class="fx">The Master nods slowly.</span>
+  Two thirds of eight measures in one number. My label is coming.`,
+  hud:{lam:'5.40 · 67.45%'}, note:'lambda1 = 5.40; PC1 captures 67.45% of the variance (total = 8)' },
+
+{ id:'t5', type:'choice', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL IV · THE SIGN OF THE EIGENVECTOR',
+  text:`Take the eigenvector v<sub>1</sub> of the largest eigenvalue and print it.
+  <span class="fx">The Master frowns at the screen.</span>
+  Eight negative numbers. A food that harms the planet would get a <em>low</em> index. I order you to
+  multiply v<sub>1</sub> by −1, so that all its entries are positive. <strong>Why are we allowed to do
+  so ?</strong>`,
+  q:'Why may we multiply the eigenvector by −1?',
+  options:[
+    {id:'b', label:'Because the covariance matrix is symmetric, so its eigenvectors have positive entries in theory: the minus sign is a rounding error.'},
+    {id:'c', label:'Because multiplying by −1 does not change the principal component.'},
+    {id:'a', label:'Because if Σv<sub>1</sub> = λ<sub>1</sub>v<sub>1</sub>, then Σ(−v<sub>1</sub>) = λ<sub>1</sub>(−v<sub>1</sub>): −v<sub>1</sub> is an eigenvector of the same eigenvalue, with the same length. The sign is arbitrary, and it can differ from one software to another.'},
+    {id:'d', label:'We are not: the sign chosen by numpy is the right one, and changing it changes the variance captured.'}
+  ], correct:'a',
+  hint:`Multiply both sides of Σv<sub>1</sub> = λ<sub>1</sub>v<sub>1</sub> by −1. Then check it in Python :
+  the difference below should be zero.`,
+  code:`v1 = V[:, 0]
+print(v1)
+print(np.matmul(Sigma, -v1) - Lamb[0] * (-v1))`,
+  right:`Right. Σ(−v<sub>1</sub>) = λ<sub>1</sub>(−v<sub>1</sub>) : the opposite vector is an eigenvector too,
+  of the same eigenvalue and the same length. Numpy picks one of the two; R or another version of numpy may
+  pick the other. So we fix the sign <strong>ourselves</strong>, by a rule : here, all the entries
+  positive, so that a high component means a high impact.`,
+  wrong:{b:`Symmetry gives real eigenvalues and orthogonal eigenvectors, nothing about their sign. Numpy
+  printed the negative vector on purpose : it is as valid as the positive one.`,
+  c:`It changes the sign of every observation of the component. It does not change its variance : that is
+  the point.`,
+  d:`Compute the variance of −PC1 : it is the variance of PC1. The variance captured does not move.`},
+  note:'eigenvector sign is arbitrary: fix it (all entries of v1 positive)' },
+
+{ id:'t6', type:'numeric', bg:'lab', who:'master', qn:'3',
+  title:'TRIAL IV · THE FIRST PRINCIPAL COMPONENT',
+  text:`<strong>Compute the first principal component</strong> with the eigenvector whose entries are all
+  positive :
+  <br><span class="kbd">PC1<sub>i</sub> = v<sub>1,1</sub> z<sub>i,1</sub> + v<sub>1,2</sub> z<sub>i,2</sub> + … + v<sub>1,8</sub> z<sub>i,8</sub></span><br>
+  in which z<sub>i,j</sub> is observation i of the standardized variable j.
+  <strong>What is the first observation of the first principal component ?</strong>`,
+  q:'Report the first observation of PC1.',
+  fields:[
+    {id:'pc', label:'First observation of PC1', value:-1.1113348133858167,
+     alt:[{value:1.1113348133858167, msg:'That is the value with numpy\'s eigenvector. Multiply v1 by −1 so that all its entries are positive, then recompute.'},
+          {value:3.320178765044945, msg:'You multiplied the raw data by v1. The principal component uses the standardized data X_std.'},
+          {value:0.714960149045683, msg:'You took a row of V. The eigenvectors are the columns: V[:, 0].'},
+          {value:0.10309973313632789, msg:'You took the last column of V without sorting: np.linalg.eig does not sort the eigenvalues. Sort them, then take V[:, 0].'}],
+     msg:'Use PC1 = np.matmul(X_std, v1), with v1 positive, and read PC1[0].'}],
+  hint:`One matrix product gives all 148 observations at once : <b>np.matmul(X_std, v1)</b>. Make sure
+  <b>v1</b> is the first column of the <em>sorted</em> V, and that its entries are positive.`,
+  code:`if np.sum(v1) < 0:
+    v1 = -v1
+PC1 = np.matmul(X_std, v1)
+print(v1)
+print(PC1[0])`,
+  say:'The first observation of the first principal component is -1.11.',
+  right:`<strong>−1.11</strong>, for the first food of the file : <strong>ale</strong>.
+  <span class="fx">The Master leans over the eigenvector.</span>
+  Look at the weights : all positive, between 0.19 and 0.41. The first component is close to a weighted
+  average of the eight measures. Ale sits below the average on almost all of them, hence the negative
+  value.`,
+  widgetAfter:'loadings', note:'PC1 of ale (row 0) = -1.11; weights of v1 all positive, 0.19 to 0.41' },
+
+{ id:'t7', type:'numeric', bg:'lab', who:'master', qn:'4',
+  title:'TRIAL V · THE ENVIRONMENTAL INDEX',
+  text:`A label needs a scale. <strong>Create a new variable called Score</strong> :
+  <br><span class="kbd">Score<sub>i</sub> = 100 × exp(PC1<sub>i</sub>) / (exp(PC1<sub>i</sub>) + 1)</span><br>
+  It is increasing in PC1, and it always lies between 0 and 100 : a high score, a high environmental
+  impact. <strong>What is the score of the first food product ?</strong>`,
+  q:'Report the score of the first food product.',
+  fields:[
+    {id:'sc', label:'Score of the first food product', value:24.762212184288614,
+     alt:[{value:75.23778781571139, msg:'That is the score with numpy\'s eigenvector, whose entries are negative. Multiply v1 by −1 before computing PC1.'}],
+     msg:'Use Score = 100 * np.exp(PC1) / (np.exp(PC1) + 1) and read Score[0].'}],
+  hint:`Apply the formula to the whole array <b>PC1</b> at once : numpy works element by element.`,
+  code:`Score = 100 * np.exp(PC1) / (np.exp(PC1) + 1)
+print(Score[0])`,
+  say:'The first food product has a score of 24.76.',
+  right:`<strong>24.76</strong> for ale. Low impact, low score.
+  <span class="fx">The Master rubs his hands.</span>
+  Now the ranking. Show me the worst offenders.`,
+  note:'Score = 100 exp(PC1)/(exp(PC1)+1); ale: 24.76' },
+
+{ id:'t8', type:'multi', bg:'lab', who:'master', qn:'4',
+  title:'TRIAL V · THE WORST OFFENDERS',
+  text:`<strong>Sort the food products from the highest score to the lowest.</strong>
+  <strong>Which three food products exhibit the highest scores ?</strong> Tick all three.`,
+  q:'Tick the three food products with the highest scores.',
+  options:[
+    {id:'a', label:'Beef steak'},
+    {id:'e', label:'Sugar'},
+    {id:'b', label:'Beef mince'},
+    {id:'f', label:'Ale'},
+    {id:'g', label:'Lamb chops'},
+    {id:'c', label:'Beef meatballs'},
+    {id:'h', label:'Cottage cheese'}
+  ], correct:['a','b','c'],
+  wrongHint:`Sort with ascending=False, so that the highest score comes first, and read the first three
+  rows.`,
+  hint:`Put the names and the scores in one table, then sort it. <b>ascending=False</b> puts the highest
+  score first.`,
+  code:`Index_food = pd.DataFrame({'entity': df['entity'], 'Score': Score})
+Index_food = Index_food.sort_values('Score', ascending=???)
+print(Index_food.head(3))`,
+  right:`Beef steak, beef mince, beef meatballs. Red meat, as expected.
+  <span class="fx">The Master points at the fourth line.</span>
+  And look who comes fourth.`,
+  hud:{top:'beef steak'}, note:'highest scores: beef steak, beef mince, beef meatballs' },
+
+{ id:'t9', type:'numeric', bg:'lab', who:'master', qn:'5',
+  title:'TRIAL VI · THE RANKING',
+  text:`<strong>Rank the food products from the highest to the lowest score</strong> : rank 1 is the highest
+  score. <strong>What are the ranks of Sugar, Lettuce and Lamb chops ?</strong>`,
+  q:'Report the three ranks (rank 1 = highest score).',
+  fields:[
+    {id:'su', label:'Rank of Sugar', value:4, exact:true,
+     alt:[{value:145, msg:'You ranked from the lowest score to the highest. Rank 1 must be the highest score.'},
+          {value:3, msg:'Python counts positions from 0. Ranks start at 1: np.arange(1, len(df) + 1).'}],
+     msg:'Sort from the highest score to the lowest, then number the rows from 1.'},
+    {id:'le', label:'Rank of Lettuce', value:7, exact:true,
+     alt:[{value:142, msg:'You ranked from the lowest score to the highest. Rank 1 must be the highest score.'},
+          {value:6, msg:'Python counts positions from 0. Ranks start at 1: np.arange(1, len(df) + 1).'}],
+     msg:'Sort from the highest score to the lowest, then number the rows from 1.'},
+    {id:'la', label:'Rank of Lamb chops', value:13, exact:true,
+     alt:[{value:136, msg:'You ranked from the lowest score to the highest. Rank 1 must be the highest score.'},
+          {value:12, msg:'Python counts positions from 0. Ranks start at 1: np.arange(1, len(df) + 1).'}],
+     msg:'Sort from the highest score to the lowest, then number the rows from 1.'}],
+  hint:`Once the table is sorted, number its rows from 1 to 148, then keep the three food products with
+  <b>isin</b>.`,
+  code:`Index_food['Rank'] = np.arange(1, len(df) + 1)
+print(Index_food[Index_food['entity'].isin(['Sugar', 'Lettuce', 'Lamb chops'])])`,
+  say:'Sugar is ranked 4th, lettuce 7th and lamb chops 13th.',
+  wow:true,
+  right:`Sugar <strong>4th</strong>, lettuce <strong>7th</strong>, lamb chops only <strong>13th</strong>.
+  <span class="fx">The Master spreads his arms.</span>
+  The data have spoken. Sugar is worse than lamb, and even lettuce is. Print the labels.`,
+  widgetAfter:'scores', hud:{ranks:'4 · 13'}, note:'8-variable index: Sugar 4th, Lettuce 7th, Lamb chops 13th' },
+
+{ id:'t10', type:'choice', bg:'lab', who:'master', qn:'5',
+  title:'TRIAL VI · WHY SUGAR ?',
+  text:`Before the printer starts, <strong>compare the eight environmental measures of Sugar, Lettuce and
+  Lamb chops.</strong> <strong>Why do sugar and lettuce exhibit a higher score than lamb chops ?</strong>`,
+  q:'Which explanation fits the data?',
+  options:[
+    {id:'b', label:'Sugar and lettuce emit more greenhouse gas per kilogram than lamb chops.'},
+    {id:'c', label:'Sugar and lettuce use more land per kilogram than lamb chops.'},
+    {id:'d', label:'The principal component puts its largest weights on the measures per 100 grams of protein and of fat.'},
+    {id:'a', label:'Sugar contains almost no protein and no fat, so its impact per 100 grams of protein or of fat is huge (2nd or 3rd of the 148 foods on these four measures). Lettuce has few calories, so its measures per 1000 kcal are high too. Half of the eight variables are per protein or per fat, and the index weighs them all.'}
+  ], correct:'a',
+  hint:`Print the eight measures of the three food products side by side, and compare them column by column.
+  Then look at the weights in <b>v1</b> : which measures matter for the index ?`,
+  code:`three = df[df['entity'].isin(['Sugar', 'Lettuce', 'Lamb chops'])]
+print(three.set_index('entity').T)
+print(v1)`,
+  right:`Exactly. Per kilogram, lamb chops emit <strong>30.90</strong> kg of CO<sub>2</sub>, against 1.85 for
+  sugar and 4.93 for lettuce. But one kilogram of sugar holds almost no protein : its emissions per 100 g of
+  protein reach <strong>159.73</strong>, against 17.19 for lamb. Divide by almost nothing, and you get
+  almost anything. Lettuce has so few calories that it reaches 25.32 kg per 1000 kcal.`,
+  wrong:{b:`Read the column emissions_kg : lamb chops emit 30.90 kg per kilogram, sugar 1.85, lettuce 4.93.`,
+  c:`Read land_use_kg : 43.66 m² for lamb chops, 2.15 for sugar, 6.78 for lettuce.`,
+  d:`Print v1 : the two emissions per protein and per fat have the <em>smallest</em> weights, 0.19 and 0.22.
+  The weights are all of the same order. Look at the values of sugar instead.`},
+  widgetAfter:'three', note:'sugar: 159.73 kg CO2 per 100 g protein (lamb: 17.19), but 1.85 per kg (lamb: 30.90)' },
+
+{ id:'t11', type:'choice', bg:'court', who:'master', mood:'surprised', qn:'5',
+  title:'TRIAL VI · THE CHOICE OF THE VARIABLES',
+  text:`So the index punishes sugar for lacking protein.
+  <span class="fx">The Master lowers his arms.</span>
+  <strong>What do you conclude about the choice of the variables ?</strong>`,
+  q:'Choose the conclusion.',
+  options:[
+    {id:'b', label:'The principal component analysis is the wrong method: it should give a larger weight to the emissions per kilogram.'},
+    {id:'c', label:'Sugar and lettuce are outliers: drop them and the index becomes right.'},
+    {id:'a', label:'The index depends on the variables we give to the PCA. Its weights come from the correlations, not from a judgement on what matters. A measure per 100 grams of protein is meaningful to compare protein sources (beef versus tofu), not sugar with lamb.'},
+    {id:'d', label:'The index is right: per 100 grams of protein, sugar truly harms the planet more than lamb, so sugar must leave the canteen.'}
+  ], correct:'a',
+  hint:`Ask what the PCA knows about the meaning of the variables. Then ask whether anyone eats sugar to get
+  protein.`,
+  right:`Right. The PCA summarizes the variables we give it, with weights drawn from their correlations. It
+  never asks whether a variable makes sense for a given food. Nobody eats sugar for its protein. Like a
+  Nutri-Score, such an index compares <strong>similar</strong> products.
+  <span class="fx">The Master sighs.</span>
+  Then let us keep only the measures that make sense for every food.`,
+  wrong:{b:`The PCA did its job : it summarized the eight variables. The problem lies in what we gave it.`,
+  c:`Dropping the foods that embarrass the index hides the problem. Other foods with little protein or fat
+  (grapes, raspberries, coconut milk) sit in the top 11 too.`,
+  d:`Per 100 grams of protein, yes. But nobody replaces lamb by sugar to get protein : the unit does not fit
+  the comparison.`},
+  note:'the index depends on the variables; PCA weights = correlations, not importance' },
+
+{ id:'t12', type:'numeric', bg:'lab', who:'master', qn:'6',
+  title:'TRIAL VII · TWO VARIABLES',
+  text:`We now keep only the two measures <strong>per kilogram of food</strong> :
+  <span class="kbd">emissions_kg</span> and <span class="kbd">land_use_kg</span>.
+  <strong>Take the logarithm of the two variables, standardize them, and compute their covariance matrix,
+  its eigenvalues and its eigenvectors.</strong>
+  <strong>What is the correlation ρ between the two variables, the largest eigenvalue, and the first entry
+  of its eigenvector ?</strong>`,
+  q:'Work on the logarithm of the two measures per kilogram.',
+  fields:[
+    {id:'r', label:'Correlation ρ (off-diagonal element of the covariance matrix)', value:0.8047581873934785,
+     alt:[{value:0.9554742810421811, msg:'That is the correlation of the raw variables. Take the logarithm first: np.log.'},
+          {value:1.3812444829509563, msg:'That is the covariance of the logarithms before standardization. Standardize them first.'}],
+     msg:'Read Sigma_kg[0, 1].'},
+    {id:'l', label:'Largest eigenvalue', value:1.8047581873934782,
+     alt:[{value:1.9554742810421812, msg:'That is the eigenvalue without the logarithm. Take np.log of the two variables first.'},
+          {value:3.0977608896091624, msg:'You did not standardize the logarithms. Standardize them, as in question 1.'},
+          {value:0.19524181260652124, msg:'That is the smallest eigenvalue. Sort them in decreasing order.'}],
+     msg:'Sort the eigenvalues with np.argsort(-Lamb_kg) and take the first.'},
+    {id:'v', label:'First entry of its eigenvector', value:0.7071067811865476,
+     alt:[{value:-0.7071067811865476, msg:'The sign is arbitrary: multiply the eigenvector by −1, as in question 3.'}],
+     msg:'Read V_kg[0, 0] once the columns are sorted.'}],
+  hint:`Select the two columns with double brackets, take <b>np.log</b> (the natural logarithm), standardize
+  as in question 1, then repeat the steps of question 3.`,
+  code:`X_kg = np.log(df[['emissions_kg', 'land_use_kg']].to_numpy())
+X_kg_std = (X_kg - np.mean(X_kg, axis=0)) / np.std(X_kg, axis=0, ddof=1)
+Sigma_kg = np.cov(X_kg_std.T)
+Lamb_kg, V_kg = np.linalg.eig(Sigma_kg)
+idx_sort = np.argsort(-Lamb_kg)
+Lamb_kg = Lamb_kg[idx_sort]
+V_kg = V_kg[:, idx_sort]
+print(Sigma_kg[0, 1], Lamb_kg[0], V_kg[:, 0])`,
+  say:'ρ = 0.80, the largest eigenvalue is 1.80, and its eigenvector is (0.71, 0.71).',
+  right:`ρ = <strong>0.80</strong>, λ<sub>1</sub> = <strong>1.80</strong>, and the eigenvector
+  (<strong>0.71</strong>, 0.71).
+  <span class="fx">The Master squints at the numbers.</span>
+  1.80 is one plus 0.80. And 0.71 is 1/√2. A coincidence ?`,
+  note:'log, per kg: rho = 0.80; lambda1 = 1.80 = 1 + rho; v1 = (0.71, 0.71)' },
+
+{ id:'t13', type:'choice', bg:'court', who:'master', qn:'6',
+  title:'TRIAL VII · NO COINCIDENCE',
+  text:`<strong>Show that, with two standardized variables, the eigenvector of the largest eigenvalue is always
+  (1/√2, 1/√2) and that the largest eigenvalue is 1 + ρ</strong>, in which ρ > 0 is the correlation between
+  the two variables. Write the covariance matrix first.`,
+  q:'Which argument proves it?',
+  options:[
+    {id:'b', label:'Because the two standardized variables have the same average, 0, and the same standard deviation, 1.'},
+    {id:'c', label:'Because ρ = 0.80 is close to 1: with a weak correlation, the weights would differ.'},
+    {id:'d', label:'Because we took the logarithm, which makes the two variables symmetric.'},
+    {id:'a', label:'Σ = [[1, ρ], [ρ, 1]]. With u = (1/√2, 1/√2), Σu = ((1+ρ)/√2, (ρ+1)/√2) = (1+ρ)u. With w = (1/√2, −1/√2), Σw = (1−ρ)w. Both have length 1, and since ρ > 0, 1 + ρ is the largest eigenvalue.'}
+  ], correct:'a',
+  hint:`The covariance matrix of two standardized variables is their correlation matrix (question 2) : ones on
+  the diagonal, ρ elsewhere. Multiply it by (1, 1)/√2 and look at the result.`,
+  code:`rho = Sigma_kg[0, 1]
+u = np.array([1, 1]) / np.sqrt(2)
+print(np.matmul(Sigma_kg, u))
+print((1 + rho) * u)`,
+  right:`Exactly. Σu = (1 + ρ)u : u is an eigenvector of eigenvalue 1 + ρ, whatever the data, as long as
+  ρ > 0. With two standardized variables, the first principal component <strong>always</strong> gives
+  them the same weight. The PCA had nothing left to decide.`,
+  wrong:{b:`The same average and spread make the diagonal equal to one. The proof needs the whole matrix :
+  multiply it by (1, 1)/√2.`,
+  c:`Try ρ = 0.3 : Σ(1, 1)/√2 = 1.3 × (1, 1)/√2. The weights stay equal for any positive ρ.`,
+  d:`The result holds for any two standardized variables, logarithms or not. Multiply Σ by (1, 1)/√2.`},
+  note:'2 standardized variables: v1 = (1/sqrt2, 1/sqrt2), lambda1 = 1 + rho, always' },
+
+{ id:'t14', type:'numeric', bg:'lab', who:'master', qn:'7',
+  title:'TRIAL VIII · THE INDEX PER KILOGRAM',
+  text:`<strong>Compute the first principal component of the two standardized variables</strong>, with an
+  eigenvector of positive entries, and <strong>create a new variable called Score_kg</strong> with the same
+  transformation as in question 4.
+  <strong>What are the smallest and the largest values of Score_kg ?</strong>`,
+  q:'Report the range of Score_kg.',
+  fields:[
+    {id:'mn', label:'Smallest Score_kg', value:8.878866354265222,
+     alt:[{value:0.9830339636512662, msg:'Your eigenvector has negative entries: multiply it by −1, then recompute PC1_kg.'},
+          {value:37.452616289484666, msg:'You used the raw variables. Take the logarithm of the two variables before standardizing.'},
+          {value:4.506209791768223, msg:'You did not standardize the logarithms. Standardize them before computing the eigenvectors.'}],
+     msg:'Use np.min(Score_kg).'},
+    {id:'mx', label:'Largest Score_kg', value:99.01696603634873,
+     alt:[{value:91.12113364573477, msg:'Your eigenvector has negative entries: multiply it by −1, then recompute PC1_kg.'},
+          {value:99.9992042422308, msg:'You used the raw variables. Take the logarithm of the two variables before standardizing.'},
+          {value:99.76420984331159, msg:'You did not standardize the logarithms. Standardize them before computing the eigenvectors.'}],
+     msg:'Use np.max(Score_kg).'}],
+  hint:`Same steps as questions 3 and 4, with <b>X_kg_std</b> and the first column of <b>V_kg</b>.`,
+  code:`v1_kg = V_kg[:, 0]
+if np.sum(v1_kg) < 0:
+    v1_kg = -v1_kg
+PC1_kg = np.matmul(X_kg_std, v1_kg)
+Score_kg = 100 * np.exp(PC1_kg) / (np.exp(PC1_kg) + 1)
+print(np.min(Score_kg), np.max(Score_kg))`,
+  say:'Score_kg goes from 8.88 to 99.02.',
+  right:`From <strong>8.88</strong> to <strong>99.02</strong>, and the median food sits at 43.54.
+  <span class="fx">The Master compares with the first index.</span>
+  The first index squeezed half the foods below 35.44 and pushed beef to 100. The logarithm tames the
+  extreme values : beef steak emits 129.75 kg per kilogram, the median food 1.87. Without the logarithm,
+  the scores would only go from 37.45 to 100.`,
+  note:'Score_kg (log, per kg): from 8.88 to 99.02, median 43.54' },
+
+{ id:'t15', type:'numeric', bg:'lab', who:'master', qn:'7',
+  title:'TRIAL VIII · THE NEW RANKING',
+  text:`<strong>Rank the food products by Score_kg</strong>, from the highest to the lowest, as in question 5.
+  <strong>What are the ranks of Sugar, Lettuce and Lamb chops now ?</strong>`,
+  q:'Report the three ranks (rank 1 = highest Score_kg).',
+  fields:[
+    {id:'su', label:'Rank of Sugar', value:91, exact:true,
+     alt:[{value:58, msg:'You ranked from the lowest score to the highest. Rank 1 must be the highest score.'},
+          {value:90, msg:'Python counts positions from 0. Ranks start at 1: np.arange(1, len(df) + 1).'},
+          {value:4, msg:'That is the rank in the first index. Rank the foods by Score_kg.'}],
+     msg:'Sort by Score_kg from the highest to the lowest, then number the rows from 1.'},
+    {id:'le', label:'Rank of Lettuce', value:38, exact:true,
+     alt:[{value:111, msg:'You ranked from the lowest score to the highest. Rank 1 must be the highest score.'},
+          {value:37, msg:'Python counts positions from 0. Ranks start at 1: np.arange(1, len(df) + 1).'},
+          {value:7, msg:'That is the rank in the first index. Rank the foods by Score_kg.'}],
+     msg:'Sort by Score_kg from the highest to the lowest, then number the rows from 1.'},
+    {id:'la', label:'Rank of Lamb chops', value:5, exact:true,
+     alt:[{value:144, msg:'You ranked from the lowest score to the highest. Rank 1 must be the highest score.'},
+          {value:4, msg:'Python counts positions from 0. Ranks start at 1: np.arange(1, len(df) + 1).'},
+          {value:13, msg:'That is the rank in the first index. Rank the foods by Score_kg.'}],
+     msg:'Sort by Score_kg from the highest to the lowest, then number the rows from 1.'}],
+  hint:`Same code as in question 5, with <b>Score_kg</b>.`,
+  code:`Index_kg = pd.DataFrame({'entity': df['entity'], 'Score_kg': Score_kg})
+Index_kg = Index_kg.sort_values('Score_kg', ascending=False)
+Index_kg['Rank_kg'] = np.arange(1, len(df) + 1)
+print(Index_kg[Index_kg['entity'].isin(['Sugar', 'Lettuce', 'Lamb chops'])])`,
+  say:'Now sugar is ranked 91st, lettuce 38th and lamb chops 5th.',
+  wow:true,
+  right:`Sugar falls to <strong>91st</strong>, lettuce to <strong>38th</strong>, and lamb chops climb to
+  <strong>5th</strong>, right after the four beef products.
+  <span class="fx">The Master stares at the printer, then unplugs it.</span>`,
+  widgetAfter:'compare', hud:{ranks:'91 · 5'}, note:'per-kg index: Sugar 91st, Lettuce 38th, Lamb chops 5th' },
+
+{ id:'t16', type:'choice', bg:'court', who:'master', mood:'sad', qn:'7',
+  title:'TRIAL VIII · THE VERDICT',
+  text:`Two indexes, two rankings. Sugar 4th or 91st. <strong>What do you conclude ?</strong>`,
+  q:'Choose the conclusion.',
+  options:[
+    {id:'b', label:'The per-kilogram index is the true environmental impact; the first index was simply wrong.'},
+    {id:'c', label:'The principal component analysis is useless for building an index, since two runs give two rankings.'},
+    {id:'d', label:'The first index is right, because it uses eight variables instead of two: more information gives a better index.'},
+    {id:'a', label:'The choice of the variables and of their transformation matters as much as the PCA. Each index reflects a choice of reference unit (per kilogram, per kcal, per gram of protein or of fat), and, like a Nutri-Score, it should only compare similar food products, e.g., beef versus lamb, or lentils versus tofu.'}
+  ], correct:'a',
+  hint:`Ask what each index measures : the impact of what ? Then ask which foods it is fair to compare.`,
+  right:`Exactly. Each index answers its own question. Per kilogram, sugar is light; per gram of protein, it is
+  heavy, because nobody eats it for protein. The PCA weighs whatever it receives, with weights drawn from the
+  correlations. Choose the unit that fits the comparison, and compare like with like.`,
+  wrong:{b:`One kilogram of sugar and one kilogram of lamb do not feed you the same way. The per-kilogram index
+  has its own blind spot.`,
+  c:`The PCA summarized faithfully what it received each time. The difference comes from the variables.`,
+  d:`Four of the eight variables divide by protein or fat, which sugar and lettuce barely contain. More
+  variables can mean more noise.`},
+  note:'each index = one reference unit; compare similar products only' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`Sugar stays in the canteen. The label waits. Four rules leave with you.
+  <strong>One.</strong> Standardize before a PCA when the units differ : the PCA of standardized data is the
+  PCA of the correlation matrix.
+  <strong>Two.</strong> The sign of an eigenvector is arbitrary. Fix it yourself, by a stated rule, before you
+  read an index.
+  <strong>Three.</strong> The weights of a principal component come from the correlations, not from what
+  matters. With two standardized variables, they are always equal.
+  <strong>Four.</strong> An index is only as good as its variables. Choose the reference unit, take the
+  logarithm of skewed measures, and compare only similar products.`,
+  banner:'CHOOSE THE VARIABLES. FIX THE SIGN. COMPARE LIKE WITH LIKE.', cont:'Finish', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {lam:'—', top:'—', ranks:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the first rows of the file, the weights of the first
+   eigenvector, the 148 scores sorted from the highest to the lowest,
+   the eight measures of three food products, and the two indexes
+   against each other. Points are never connected; hovering a point
+   shows the food product and its values.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series (one colour per point if colorAt is given),
+   straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="7 6"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.rAt?s.rAt(i):(s.r||4)}"
+        fill="${s.colorAt?s.colorAt(i):(s.color||PLOT.ink)}" fill-opacity="${s.alpha||0.8}" stroke="${PLOT.paper}" stroke-width="1">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{
+    if(p.box){ const w=p.text.length*7.6+10, x0=px(p.x)-(p.anchor==='end'?w-5:5);
+      labels += `<rect x="${x0.toFixed(1)}" y="${(py(p.y)-14).toFixed(1)}" width="${w.toFixed(1)}" height="19" fill="${PLOT.paper}" fill-opacity=".92"/>`; }
+    labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* ---- helpers on the embedded data ---- */
+const FOCUS = ['Sugar','Lettuce','Lamb chops'];
+const posOf = name => DATA.NAMES.indexOf(name);
+
+/* ---- the cold open: the first rows of the file, transposed (df.head(3).T) ---- */
+function playTable(host){
+  const rows = ['entity'].concat(DATA.COLS);
+  let body='';
+  rows.forEach((r,k)=>{
+    const y = 92 + k*25;
+    body += TXT(330, y, r, {sz:18, anchor:'end', col:k===0?PLOT.ink:PLOT.label});
+    for(let j=0;j<3;j++){
+      const v = k===0 ? DATA.HEAD[j][0] : DATA.HEAD[j][k].toFixed(4);
+      body += TXT(450 + j*115, y, v, {sz:18, anchor:'end', col:k===0?PLOT.ink:PLOT.label});
+    }
+  });
+  const svg=`<svg viewBox="0 0 700 360" style="width:100%;height:auto;display:block">
+    <rect width="700" height="360" fill="${PLOT.paper}"/>
+    ${TXT(24,30,'HW_ECO_IMPACT.XLSX · print(df.head(3).T)',{sz:18,anchor:'start'})}
+    ${TXT(450,62,'0',{sz:18,col:PLOT.ink,anchor:'end'})}
+    ${TXT(565,62,'1',{sz:18,col:PLOT.ink,anchor:'end'})}
+    ${TXT(680,62,'2',{sz:18,col:PLOT.ink,anchor:'end'})}
+    <line x1="20" y1="72" x2="684" y2="72" stroke="${PLOT.axis}"/>
+    ${body}
+    ${TXT(350,344,'148 rows: one food product per row, the name in entity and eight measures.',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE SHEET', svg,
+    'Emissions in kg of CO<sub>2</sub> equivalents, land use in m², per kilogram, per 1000 kcal, per 100 g of protein and per 100 g of fat. Source: Our World in Data.');
+  return 600;
+}
+
+/* ---- the weights of the first eigenvector (all positive once the sign is fixed) ---- */
+function playLoadings(host){
+  const W=700, H=380, L=300, R=640, T=50;
+  const n = DATA.V1.length, step = 34, vmax = 0.5;
+  const px = v => L + v/vmax*(R-L);
+  let bars='';
+  DATA.V1.forEach((v,k)=>{
+    const y = T + k*step, low = v < 0.3;
+    bars += `<rect x="${L}" y="${y}" width="${(px(v)-L).toFixed(1)}" height="22" fill="${low?PLOT.second:PLOT.ink}" fill-opacity=".85">
+      <title>${escapeAttr(DATA.COLS[k])}: ${v.toFixed(3)}</title></rect>`
+      + TXT(L-10, y+17, DATA.COLS[k], {sz:16, anchor:'end'})
+      + TXT(px(v)+8, y+17, v.toFixed(2), {sz:16, anchor:'start', col:low?PLOT.second:PLOT.ink});
+  });
+  let ticks='';
+  [0,0.1,0.2,0.3,0.4,0.5].forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${T+n*step}" x2="${px(v).toFixed(1)}" y2="${T+n*step+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), T+n*step+21, v.toFixed(1), {sz:15});
+  });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(24, 28, 'Weights of the first eigenvector v1 (sign fixed: all positive)', {sz:17, anchor:'start'})}
+    <line x1="${L}" y1="${T-6}" x2="${L}" y2="${T+n*step}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T+n*step}" x2="${R}" y2="${T+n*step}" stroke="${PLOT.axis}"/>
+    ${bars}${ticks}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE FIRST EIGENVECTOR', svg,
+    'All eight weights are positive. The two emissions per protein and per fat (in brown) weigh less (0.19 and 0.22); the six others weigh between 0.37 and 0.41.');
+  return 900;
+}
+
+/* ---- the 148 scores, from the highest to the lowest ---- */
+function playScores(host){
+  const order = DATA.SCORE.map((v,i)=>i).sort((a,b)=>DATA.SCORE[b]-DATA.SCORE[a]);
+  const rank = []; order.forEach((i,k)=>{ rank[i]=k+1; });
+  const isF = i => FOCUS.indexOf(DATA.NAMES[i])>=0;
+  const lab = name => { const i=posOf(name); return {i, r:rank[i], s:DATA.SCORE[i]}; };
+  const su=lab('Sugar'), le=lab('Lettuce'), la=lab('Lamb chops');
+  const o = {
+    H:360, B:300,
+    series:[{x:DATA.SCORE.map((v,i)=>rank[i]), y:DATA.SCORE, r:4, rAt:i=>isF(i)?7:4,
+             colorAt:i=>isF(i)?PLOT.fit:PLOT.ink, alpha:0.75,
+             tip:i=>`${DATA.NAMES[i]}: rank ${rank[i]}, score ${DATA.SCORE[i].toFixed(2)}`}],
+    labels:[{x:su.r+5, y:su.s+1, text:`Sugar: rank ${su.r}`, col:PLOT.fit},
+            {x:le.r+9, y:le.s-1, text:`Lettuce: rank ${le.r}`, col:PLOT.fit},
+            {x:la.r+7, y:la.s-6, text:`Lamb chops: rank ${la.r}`, col:PLOT.fit}],
+    xmin:0, xmax:150, ymin:0, ymax:105,
+    xticks:[1,25,50,75,100,125,148], yticks:[0,25,50,75,100],
+    title:'Score of the 8-variable index, sorted', xlab:'rank (1 = highest score)', ylab:'Score'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · THE RANKING', panelSVG(o),
+    'A few foods near 100, a long tail between 25 and 50: half of the foods score below 35.44.');
+  return 900;
+}
+
+/* ---- the eight measures of the three food products ---- */
+function playThree(host){
+  const rows = DATA.COLS;
+  const hot = k => /protein|fat/.test(rows[k]);
+  let body='';
+  rows.forEach((r,k)=>{
+    const y = 92 + k*27;
+    body += TXT(330, y, r, {sz:18, anchor:'end', col:hot(k)?PLOT.second:PLOT.label});
+    FOCUS.forEach((f,j)=>{
+      const v = DATA.THREE[f][k];
+      const big = j===0 && hot(k);
+      body += TXT(455 + j*112, y, v.toFixed(2), {sz:18, anchor:'end', col:big?PLOT.fit:(hot(k)?PLOT.second:PLOT.label)});
+    });
+  });
+  const svg=`<svg viewBox="0 0 700 340" style="width:100%;height:auto;display:block">
+    <rect width="700" height="340" fill="${PLOT.paper}"/>
+    ${TXT(24,30,'The eight measures of three food products',{sz:18,anchor:'start'})}
+    ${FOCUS.map((f,j)=>TXT(455 + j*112, 62, f, {sz:18, col:PLOT.ink, anchor:'end'})).join('')}
+    <line x1="20" y1="72" x2="684" y2="72" stroke="${PLOT.axis}"/>
+    ${body}
+    ${TXT(350,324,'Per kilogram, lamb chops are heavy. Per 100 g of protein or of fat, sugar is.',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · SUGAR, LETTUCE, LAMB', svg,
+    'Sugar ranks 2nd or 3rd of the 148 foods on the four measures per protein and per fat.');
+  return 900;
+}
+
+/* ---- the two indexes against each other ---- */
+function playCompare(host){
+  const named = ['Sugar','Lettuce','Lamb chops','Beef steak'];
+  const isN = i => named.indexOf(DATA.NAMES[i])>=0;
+  const at = n => { const i=posOf(n); return {x:DATA.SCORE[i], y:DATA.SKG[i]}; };
+  const su=at('Sugar'), le=at('Lettuce'), la=at('Lamb chops'), bs=at('Beef steak');
+  const o = {
+    H:440, B:380,
+    series:[{x:DATA.SCORE, y:DATA.SKG, r:4, rAt:i=>isN(i)?7:4,
+             colorAt:i=>isN(i)?PLOT.fit:PLOT.ink, alpha:0.7,
+             tip:i=>`${DATA.NAMES[i]}: Score ${DATA.SCORE[i].toFixed(2)}, Score_kg ${DATA.SKG[i].toFixed(2)}`}],
+    labels:[{x:su.x-2, y:su.y-1, text:'Sugar', col:PLOT.fit, anchor:'end', box:true},
+            {x:le.x-2, y:le.y-1, text:'Lettuce', col:PLOT.fit, anchor:'end', box:true},
+            {x:la.x-2, y:la.y+3, text:'Lamb chops', col:PLOT.fit, anchor:'end', box:true},
+            {x:bs.x-2, y:bs.y+5, text:'Beef steak', col:PLOT.fit, anchor:'end', box:true}],
+    xmin:20, xmax:102, ymin:0, ymax:105,
+    xticks:[20,40,60,80,100], yticks:[0,25,50,75,100],
+    title:'Each food: the 8-variable index against the per-kilogram index', xlab:'Score (8 variables)', ylab:'Score_kg (log, per kilogram)'
+  };
+  host.innerHTML = plotFrame('EVIDENCE · TWO INDEXES', panelSVG(o),
+    'Sugar is near the top of the first index and in the middle of the second; lamb chops climb near the top.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')    return playTable(host);
+  if(name==='loadings') return playLoadings(host);
+  if(name==='scores')   return playScores(host);
+  if(name==='three')    return playThree(host);
+  if(name==='compare')  return playCompare(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your code step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example of Python code ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE PYTHON · RUN IT IN YOUR NOTEBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Python, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim()
+    .replace(/^(?:np|numpy)\.(?:float|int)\d*\(\s*(.*?)\s*\)$/i,'$1')
+    .replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+/* the course margin rule: exact integers; ±0.01 when 0.1 ≤ |value| < 1e6;
+   ±1% of the value otherwise. The tiny extra absorbs floating-point error. */
+function marginOf(value, exact){
+  if(exact) return 0;
+  const a = Math.abs(value);
+  return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
+}
+function tolerance(f){ return (f.tol !== undefined) ? f.tol : marginOf(f.value, f.exact); }
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){
+    const at = (a.tol !== undefined) ? a.tol : marginOf(a.value, f.exact);
+    if(Math.abs(v-a.value) <= at) return a.msg;
+  }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Python.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   PYTHON HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openPythonHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelperE3',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Empirical Exercise III</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference syntax only. Compute in Python; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-python-helper]').forEach(b=>b.onclick=openPythonHelper);
+/* the data file: the button names it in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — the completion record and the final password
+   ================================================================ */
+function finish(){
+  if(!finalPw) finalPw = makeFinalPassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = finalPw.time;
+  $('#pw-code').textContent = finalPw.code;
+  $('#endblurb').innerHTML =
+    `You standardized eight measures, fixed the sign of the first eigenvector, and turned the first
+     principal component into an index. It ranked sugar 4th and lamb chops 13th, because half of its
+     variables divide by protein or fat. With the logarithm of the two measures per kilogram, sugar fell
+     to 91st and lamb chops climbed to 5th. The PCA summarizes the variables it receives: choose them, and
+     compare like with like.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: SUGAR HARMS THE PLANET MORE THAN LAMB';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  copyText($('#pw-code').textContent,
+    ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); },
+    ()=>{ $('#copymsg').textContent='select and copy manually'; });
+};
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v1.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE III ....... THE CANTEEN LABEL",
+  "DATA ........................ 148 FOODS, 8 MEASURES",
+  "METHOD ...................... PRINCIPAL COMPONENTS",
+  "EIGENVECTOR SIGN ............ ARBITRARY",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "PASSWORD .................... AT THE END, FOR BLACKBOARD",
+  "",
+  "> KEEP PYTHON AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
