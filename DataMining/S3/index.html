@@ -44,49 +44,6 @@
   emissions_1000kcal, emissions_100g_protein, emissions_100g_fat,
   land_use_kg, land_use_1000kcal, 'Land use per 100 grams of protein',
   'Land use per 100 grams of fat'. Source: Our World in Data.
-
-  FINAL PASSWORD (one, at the end; no checkpoints)
-  --------------
-  DM3-hhmmss-cccccc, hhmmss = time of completion on the student's clock.
-  m = h*3600 + min*60 + sec
-  a = (m*m + 457*m + 71233) mod 999979
-  b = (a*(m + 277) + 6*m*m + 7) mod 999979
-  code = (52919*b + 31307*a + 89021*m + 314159) mod 1e6
-  Checked by check_passwords_DM3.py.
-
-  TARGET VALUES (computed with Python on the Excel file)
-  -------------
-  N                     148        (header=None: 149; columns: 9)
-  mean emissions_kg     7.098922045743244   (median 1.87311787)
-  std emissions_kg      15.703081318312515  (ddof=0: 15.649940450789417)
-  mean standardized     -1.2e-17 (zero)
-  dim Sigma             8          (np.cov without .T: 148)
-  Sigma[0, 4]           0.9554742810421807  (ddof=0 standardization:
-                        0.9619741060832847, absorbed by the margin;
-                        raw covariance 704.740797751596)
-  max |Sigma - corr|    1.3e-15
-  lambda1               5.396398433671176   (raw data: 7119.670990838412;
-                        unsorted last: 0.035534491439605055; min 0.0024926)
-  share PC1             67.45498042088964 %
-  v1 (numpy)            all negative; v1 used: all positive, 0.19 to 0.41
-  PC1[0] (Ale)          -1.1113348133858167 (numpy sign: +1.1113; raw X:
-                        3.320178765044945; row of V: 0.714960149045683;
-                        V[:, -1] unsorted: 0.10309973313632789; ddof=0:
-                        -1.115108456888017, absorbed by the margin)
-  Score[0]              24.762212184288614  (numpy sign: 75.23778781571139)
-  top 3                 Beef steak, Beef mince, Beef meatballs
-  ranks                 Sugar 4, Lettuce 7, Lamb chops 13
-                        (ascending: 145, 142, 136; from 0: 3, 6, 12)
-  rho (log, per kg)     0.8047581873934785  (no log: 0.9554742810421811;
-                        unstandardized cov: 1.3812444829509563)
-  lambda1 (log, per kg) 1.8047581873934782  (no log: 1.9554742810421812;
-                        unstandardized: 3.0977608896091624)
-  v1 (log, per kg)      (0.7071067811865476, 0.7071067811865475)
-  Score_kg              min 8.878866354265222, max 99.01696603634873
-                        (sign: 0.98/91.12; no log: 37.45/99.9992;
-                        unstandardized: 4.51/99.76)
-  ranks Score_kg        Sugar 91, Lettuce 38, Lamb chops 5
-                        (ascending: 58, 111, 144; from 0: 90, 37, 4)
   =====================================================================
 -->
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
