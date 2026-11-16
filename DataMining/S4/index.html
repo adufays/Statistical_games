@@ -1,1 +1,2004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Academy of Doubt — Empirical Exercise 4: The Price of a Used Mercedes</title>
 
+<!--
+  =====================================================================
+  THE ACADEMY OF DOUBT — EMPIRICAL EXERCISE 4
+  "The Price of a Used Mercedes"  (Topic 3: prediction of a continuous
+  variable, exercise 1: cross-validation for cross-sectional data,
+  extended with a third model on the logarithm of the price)
+  EDHEC · Data Mining · Exo 4 in class
+  (c) Arnaud Dufays
+
+  Standalone. Open the file, or put it on Blackboard / GitHub Pages.
+  No checkpoints, no SHOW THE ANSWER button. Every question has a HINT
+  button. Students compute everything in Python. One final password.
+
+  QUESTIONS (Topic3.tex, exercise 1, then the log model)
+  ---------
+  setup  N, average price                                         -> numbers
+  a      M1: beta0, beta1                                          -> numbers
+         M2: beta0, beta1, beta2                                   -> numbers
+  b      t value of beta2                                          -> number
+         significance and expected predictive performance         -> MCQ
+  c      (info: leave-one-out, k-fold, RMSE, MAE)
+         LOO: RMSE and MAE of M1 and M2 (thousands of GBP), ranking -> numbers + select
+  d      10-fold (shuffle=True, random_state=100): the four errors -> numbers
+         same conclusion? cost                                     -> MCQ
+  e      histograms of price and log(price)                        -> MCQ
+         (info: share outside the 99% interval, price vs log(price))
+  f      M3: log(price) on mileage and mpg: beta1, beta2           -> numbers
+         R2 of M3 vs M2: not comparable                            -> MCQ
+         10-fold of M3, predictions np.exp(): RMSE, MAE, best model -> numbers + select
+         why the log model predicts better                         -> MCQ
+         (info: np.exp(prediction) predicts the median; bias, not corrected)
+  =====================================================================
+-->
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#0d0d14; --panel:#c3c3c3; --panel-lt:#ffffff; --panel-dk:#7b7b7b;
+  --navy:#000080; --navy-lt:#1084d0; --amber:#ffb000; --green:#2fe07a;
+  --red:#e0453a; --cream:#f4ecd8; --deep:#12122a;
+  --mono:'VT323',ui-monospace,Consolas,monospace;
+  --pixel:'Press Start 2P',monospace;
+  --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:#05050c;
+  background-image:radial-gradient(ellipse at 50% 0%,#1b1b3a 0%,#05050c 70%);
+  color:var(--cream); font-family:var(--body); min-height:100vh;
+  display:flex; align-items:flex-start; justify-content:center; padding:14px;
+}
+button,input,select{font-family:inherit}
+
+/* ---------- win95 chrome ---------- */
+.win95{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt); box-shadow:2px 2px 0 #000; color:#111}
+.titlebar{background:linear-gradient(90deg,var(--navy),var(--navy-lt)); color:#fff;
+  font:700 11px/1.6 Tahoma,'MS Sans Serif',sans-serif; padding:3px 6px; display:flex; justify-content:space-between; letter-spacing:.4px}
+.titlebar .boxes{letter-spacing:2px; opacity:.9}
+.inset{border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); background:#fff}
+.btn{background:var(--panel); border:2px solid; border-color:var(--panel-lt) var(--panel-dk) var(--panel-dk) var(--panel-lt);
+  color:#111; padding:9px 16px; font:700 12px/1 Tahoma,sans-serif; cursor:pointer; box-shadow:1px 1px 0 #000}
+.btn:hover{background:#d6d6d6}
+.btn:active{border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk); transform:translate(1px,1px)}
+.btn:disabled{color:#888; cursor:not-allowed}
+.btn.primary{background:#0a6b3d; color:#fff; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.btn.primary:hover{background:#0c7f48}
+.btn.amber{background:#a56a00; color:#fff; border-color:#ffcf6b #4d3100 #4d3100 #ffcf6b}
+.btn.amber:hover{background:#c07d00}
+
+/* ---------- CRT ---------- */
+#crt{position:fixed; inset:0; pointer-events:none; z-index:9999;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.20) 0 1px,transparent 1px 3px);
+  box-shadow:inset 0 0 160px rgba(0,0,0,.85); animation:flick 6s infinite}
+@keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.82}98.5%{opacity:.94}}
+body.nocrt #crt{display:none}
+
+/* ---------- layout ---------- */
+#wrap{width:100%; max-width:1180px}
+#topbar{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap}
+#brand{font-family:var(--pixel); font-size:11px; line-height:1.7; color:var(--amber); text-shadow:2px 2px 0 #6b2d00}
+.toolbtn{background:#20203c; border:2px solid; border-color:#4a4a7a #000 #000 #4a4a7a; color:var(--cream);
+  font:700 10px Tahoma,sans-serif; padding:6px 10px; cursor:pointer}
+.toolbtn:hover{background:#2c2c52}
+.toolbtn:disabled{cursor:default}
+
+/* HUD */
+#hud{width:250px; font-family:var(--mono)}
+#hud .hudrow{display:flex; justify-content:space-between; align-items:baseline; padding:3px 8px; font-size:19px; line-height:1.25}
+#hud .hudrow span{color:#333}
+#hud .hudrow b{color:#000}
+#hud .hudbody{padding:5px 2px; background:#e9e9e9}
+#doom{margin-top:6px; font-family:var(--mono); font-size:16px; color:var(--amber);
+  border:1px dashed #6b4a00; padding:3px 8px; background:rgba(60,35,0,.5); text-align:center}
+#doom.struck{text-decoration:line-through; opacity:.55}
+
+/* ============ CODEC — the portraits flank the dialogue box ============ */
+#codec{position:relative; display:flex; gap:8px; align-items:flex-start; padding:8px;
+  border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; background:#12122a; overflow:hidden}
+#bg{position:absolute; inset:0; background-size:cover; background-position:center;
+  filter:saturate(.7) contrast(1.05) brightness(.5)}
+#bg::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,10,25,.35),rgba(10,10,25,.8))}
+#codec > .port, #codec > .codeccenter{position:relative; z-index:1}
+
+.port{flex:0 0 138px; display:flex; flex-direction:column; gap:5px}
+.portframe{position:relative; flex:none; height:232px; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 120%,#16264a 0%,#070714 75%);
+  border:2px solid; border-color:var(--panel-dk) var(--panel-lt) var(--panel-lt) var(--panel-dk);
+  display:flex; align-items:flex-end; justify-content:center}
+.portframe::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.34) 0 1px,transparent 1px 3px)}
+/* both characters stay on screen; the one who is not speaking is dimmed */
+.avatar{position:relative; height:100%; width:100%; display:flex; align-items:flex-end; justify-content:center;
+  filter:brightness(.42) saturate(.5); transform:scale(.94); transition:filter .25s ease, transform .25s ease}
+.port.talking .avatar{filter:none; transform:none}
+.avatar svg{height:100%; width:auto; display:block; filter:drop-shadow(0 4px 8px rgba(0,0,0,.7))}
+.avatar.bob svg{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.portframe.lit{box-shadow:inset 0 0 26px rgba(255,176,0,.22)}
+
+.portname{font-family:var(--pixel); font-size:8px; line-height:1.5; color:#8b8bb5; text-align:center;
+  background:rgba(0,0,20,.85); border:2px solid #3a3a66; padding:6px 4px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; transition:border-color .2s, color .2s}
+.port.talking .portname{border-color:var(--amber); color:var(--amber)}
+
+/* ---- faces: mouths, brows, eyes ---------------------------------------
+   The mood classes and the talk classes both sit on the .avatar wrapper.
+   The talk rules come last, so a flapping mouth always wins over a mood. */
+.mouth-b,.mouth-c,.mouth-smile,.mouth-frown{display:none}
+.mood-amused    .mouth-a{display:none} .mood-amused    .mouth-smile{display:block}
+.mood-sad       .mouth-a{display:none} .mood-sad       .mouth-frown{display:block}
+.mood-angry     .mouth-a{display:none} .mood-angry     .mouth-frown{display:block}
+.mood-surprised .mouth-a{display:none} .mood-surprised .mouth-c{display:block}
+.talk-1 .mouth-a,.talk-1 .mouth-c,.talk-1 .mouth-smile,.talk-1 .mouth-frown{display:none}
+.talk-1 .mouth-b{display:block}
+.talk-2 .mouth-a,.talk-2 .mouth-b,.talk-2 .mouth-smile,.talk-2 .mouth-frown{display:none}
+.talk-2 .mouth-c{display:block}
+
+.blinking .lid{transform:scaleY(1)}
+.lid{transform:scaleY(0); transform-origin:center; transition:transform .07s}
+.brows,.eyes{transform-box:fill-box; transform-origin:center; transition:transform .3s ease}
+.mood-angry     .brows{transform:translateY(5px)}
+.mood-sad       .brows{transform:translateY(3px) rotate(-3deg)}
+.mood-raised    .brows{transform:translateY(-6px)}
+.mood-amused    .brows{transform:translateY(-3px)}
+.mood-surprised .brows{transform:translateY(-10px)}
+.mood-surprised .eyes{transform:scale(1.16)}
+.mood-amused    .eyes{transform:scaleY(.86)}
+
+.codeccenter{flex:1 1 auto; min-width:0; align-self:stretch; display:flex; flex-direction:column}
+#dlgbox{flex:1 1 auto; display:flex; flex-direction:column}
+#dlg{background:var(--cream); color:#171712; padding:16px 18px; flex:1 1 auto; min-height:214px;
+  font-size:16px; line-height:1.62; cursor:pointer}
+#dlg .kbd{font-family:var(--mono); font-size:19px; background:#e6ddc4; padding:0 5px; border:1px solid #b3a684}
+#dlg em{color:#7a2f00; font-style:italic}
+#dlg strong{color:#101033}
+#dlg .fx{display:block; margin-top:9px; color:#5a5a4a; font-style:italic; font-size:14.5px}
+#caret{display:inline-block; width:9px; height:17px; background:#171712; vertical-align:-3px; animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+
+#zone{margin-top:10px}
+.qtext{font-weight:600; margin:0 0 10px; color:var(--cream); font-size:15.5px}
+.opt{display:block; width:100%; text-align:left; margin-bottom:7px; padding:11px 13px; font:500 14.5px/1.45 var(--body);
+  background:#23233f; color:var(--cream); border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e; cursor:pointer}
+.opt:hover{background:#2f2f56}
+.opt.right{background:#0d6b3c; border-color:#3fd88a #033a20 #033a20 #3fd88a}
+.opt.wrong{background:#7a1f18; border-color:#e07a70 #350a06 #350a06 #e07a70; animation:shake .4s}
+.opt:disabled{cursor:default}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-5px)}}
+.verdict{padding:10px 13px; margin:8px 0; border-left:5px solid; font-size:15px; line-height:1.55}
+.verdict.ok{background:#0d3222; border-color:var(--green)}
+.verdict.no{background:#3a1512; border-color:var(--red)}
+.verdict.give{background:#3a2a05; border-color:var(--amber)}
+.verdict ul{margin:4px 0 0; padding-left:20px}
+
+/* ---------- the answer form: numbers and drop-down choices ---------- */
+.numrow{display:flex; align-items:center; gap:12px; margin-bottom:7px; padding:9px 12px;
+  background:#23233f; border:2px solid; border-color:#50507e #0a0a18 #0a0a18 #50507e}
+.numrow label{flex:1 1 auto; font-size:14.5px; line-height:1.45; color:var(--cream)}
+.numrow input,.numrow select{flex:0 0 230px; min-width:0; background:#0c0c18; color:var(--cream);
+  border:2px solid #3a3a60; padding:7px 10px; outline:none}
+.numrow input{font:20px/1.1 var(--mono); letter-spacing:.5px}
+.numrow select{font:14px var(--body)}
+.numrow input:focus,.numrow select:focus{border-color:var(--amber)}
+.numrow.good input,.numrow.good select{border-color:var(--green)}
+.numrow.bad input,.numrow.bad select{border-color:var(--red)}
+.numrow select option{background:#0c0c18; color:var(--cream)}
+.numrow.sel{flex-wrap:wrap}
+.numrow.sel label{flex:1 1 100%}
+.numrow.sel select{flex:1 1 100%}
+.actbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px}
+
+/* ---------- hint: advice, then an example of Python code ---------- */
+.hintbox{margin-top:9px; background:#1a1a33; border:2px solid; border-color:#3d3d66 #0a0a18 #0a0a18 #3d3d66}
+.hintbox .hinttext{padding:10px 13px; color:var(--cream); font-size:14.5px; line-height:1.6}
+.hintbox .hinttext b{color:var(--amber)}
+.hintbox .codehead{display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 10px;
+  background:#15152a; color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px;
+  border-top:1px solid #343458}
+.hintbox pre{margin:0; padding:10px 12px; background:#06110a; color:var(--green);
+  font:18px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+
+/* ---------- screens ---------- */
+.screen{display:none} .screen.on{display:block}
+#boot{font-family:var(--mono); font-size:21px; color:var(--green); background:#000;
+  padding:26px; min-height:430px; line-height:1.45; border:2px solid #222; cursor:pointer}
+#boot .hi{color:var(--amber)}
+.card{background:#14142c; border:2px solid; border-color:#3d3d66 #000 #000 #3d3d66; padding:26px}
+.card h1{font-family:var(--pixel); font-size:23px; color:var(--amber); line-height:1.5; margin:0 0 6px; text-shadow:3px 3px 0 #6b2d00}
+.card h2{font-family:var(--pixel); font-size:13px; line-height:1.6; color:var(--cream); margin:0 0 18px}
+.card p{font-size:15.5px; line-height:1.65}
+.card code{font-family:var(--mono); font-size:18px; color:var(--green)}
+input.name{background:#0c0c18; color:var(--cream); border:2px solid #3a3a60; padding:9px 12px; font:15px var(--body); width:250px}
+.workflow{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:18px 0}
+.workflow > div{padding:13px 14px; background:#0c0c18; border:2px solid #3a3a60; font-size:14.5px; line-height:1.6}
+.workflow b{display:block; margin-bottom:4px; color:var(--amber); font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+
+/* end screen */
+#pwbox{font-family:var(--mono); font-size:15px}
+.pwline{display:flex; justify-content:space-between; padding:9px 12px; font-size:23px; border-bottom:1px solid #ccc; color:#000}
+.pwline b{letter-spacing:2px}
+.note{font-size:13.5px; color:#a9a9c8; line-height:1.6}
+
+/* ---------- the Python helper ---------- */
+.xlguide{margin:20px 0; background:#0c0c18; border:2px solid #3a3a60; color:var(--cream)}
+.xlguide h3{margin:0; padding:9px 12px; color:#fff; background:linear-gradient(90deg,#1e3f66,#306998);
+  font:700 11px/1.4 Tahoma,sans-serif; letter-spacing:.4px}
+.xlguide .guideintro{margin:0; padding:10px 12px; color:#c7c7df; font-size:14px; line-height:1.55}
+.xlguide table{width:100%; border-collapse:collapse; font-size:13.5px; line-height:1.45}
+.xlguide th,.xlguide td{padding:7px 10px; border-top:1px solid #343458; text-align:left; vertical-align:top}
+.xlguide th{color:var(--amber); font:700 10px/1.4 Tahoma,sans-serif; letter-spacing:.3px}
+.xlguide code{font-family:var(--mono); font-size:17px; color:var(--green); white-space:normal}
+.xlguide td:nth-child(1){width:38%}
+.xlguide td:nth-child(2){width:34%}
+.xlguide td:nth-child(3){width:28%}
+.xlguide pre{margin:8px 0; padding:8px 10px; background:#06110a; color:var(--green);
+  font:17px/1.35 var(--mono); overflow-x:auto; white-space:pre}
+/* the setup block must scroll inside the card, not widen the page on a phone */
+#wrap{min-width:0}
+.pwline{flex-wrap:wrap; gap:4px 12px}
+
+@media (max-width:980px){
+  .port{flex:0 0 118px} .portframe{height:198px} #dlg{min-height:180px}
+}
+@media (max-width:860px){
+  #codec{flex-wrap:wrap}
+  .port{flex:1 1 45%; order:1; flex-direction:row; gap:6px; align-items:stretch}
+  .portframe{height:104px; flex:0 0 82px}
+  .portname{display:flex; align-items:center; flex:1 1 auto; white-space:normal; font-size:7px}
+  .codeccenter{order:3; flex:1 1 100%}
+  #dlg{min-height:150px}
+  #hud{width:100%}
+  .card h1{font-size:17px}
+  .card{padding:18px}
+  .workflow{grid-template-columns:1fr}
+  .numrow{flex-wrap:wrap}
+  .numrow input,.numrow select{flex:1 1 100%}
+  .xlguide table,.xlguide tbody,.xlguide tr,.xlguide th,.xlguide td{display:block; width:auto !important}
+  .xlguide thead{display:none}
+  .xlguide td{border-top:0; padding:3px 10px}
+  .xlguide td::before{display:block; margin-bottom:2px; color:var(--amber); font:700 9px Tahoma,sans-serif}
+  .xlguide td:nth-child(1)::before{content:'PYTHON'}
+  .xlguide td:nth-child(2)::before{content:'WHAT IT DOES'}
+  .xlguide td:nth-child(3)::before{content:'EXAMPLE'}
+  .xlguide tr{padding:5px 0; border-top:1px solid #343458}
+}
+</style>
+</head>
+<body>
+<div id="crt"></div>
+
+<div id="wrap">
+
+  <div id="topbar">
+    <div id="brand">THE ACADEMY OF DOUBT &nbsp;·&nbsp; EMPIRICAL EXERCISE IV</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="toolbtn" id="btn-back" disabled>◀ PREVIOUS</button>
+      <button class="toolbtn" data-open-data="mercedes">DATA (XLSX)</button>
+      <button class="toolbtn" data-python-helper>PYTHON HELPER</button>
+      <button class="toolbtn" id="btn-crt">CRT: ON</button>
+    </div>
+  </div>
+
+  <!-- ============ BOOT ============ -->
+  <div class="screen on" id="scr-boot">
+    <div id="boot"></div>
+  </div>
+
+  <!-- ============ INTRO ============ -->
+  <div class="screen" id="scr-intro">
+    <div class="card">
+      <h1>THE PRICE OF A<br>USED MERCEDES</h1>
+      <h2>Empirical Exercise IV &nbsp;·&nbsp; Data Mining</h2>
+      <p>The Academy sells its old fleet, and Master Scepticus wants a machine that predicts the price of a
+      used Mercedes. He is sure that the simplest model predicts best: the price, explained by the mileage
+      alone. 13,119 cars will test him. You will estimate two linear regressions of the price, compare their
+      predictions out of sample with leave-one-out and 10-fold cross-validation, and then try a third model,
+      on the logarithm of the price.</p>
+      <p><strong style="color:var(--amber)">A password waits for you at the end.</strong> When you complete
+      the exercise, the game gives you a personal password. <strong>Copy it and submit it on
+      Blackboard</strong>: it is the proof that you finished. Copy it before you close this page, because
+      it is not kept.</p>
+      <div class="workflow">
+        <div><b>WINDOW 1 · PYTHON</b>Download <code>Data_Mercedes.xlsx</code> with the
+        <strong>DATA (XLSX)</strong> button at the top and save it in the folder of your notebook. Load it
+        with pandas, compute every number and draw every plot in Python, and keep your notebook: each
+        question builds on the previous one.</div>
+        <div><b>WINDOW 2 · THIS GAME</b>Master Scepticus asks the questions, one after the other.
+        Bring back the numbers, read your results, and defend your conclusions in front of him. The game
+        never computes anything for you.</div>
+      </div>
+      <p><strong style="color:var(--amber)">No answer is ever shown in this exercise.</strong> Every
+      question has a <strong>HINT</strong> button, with an example of Python code, sometimes with
+      <code>???</code> for you to fill in. Keep trying until the Master accepts your answer.</p>
+      <p>Type numbers as Python prints them, e.g., <code>36.18</code> or <code>-8.544e-05</code>
+      (a comma is also accepted as the decimal separator). Give two decimals: your answer is accepted
+      within 0.01 of the exact value. Very small or very large numbers are accepted within 1%, so three
+      significant digits are enough. Counts must be exact. Use <code>print(...)</code> to see a full
+      number: <code>summary()</code> rounds its values. <strong>Report the cross-validation errors (RMSE,
+      MAE) in thousands of pounds</strong>, e.g., <code>9.17</code> for £9,170.</p>
+      <div class="xlguide">
+        <h3>PYTHON QUICK REFERENCE</h3>
+        <div class="guideintro">The file has 13,119 rows, one per used Mercedes, and 9 columns, as pandas
+        reads them: <code>model</code>, <code>year</code> (year of registration), <code>price</code> (in
+        pounds, £), <code>transmission</code>, <code>mileage</code> (miles driven), <code>fuelType</code>,
+        <code>tax</code> (annual road tax, in £), <code>mpg</code> (miles per gallon, a measure of fuel
+        consumption) and <code>engineSize</code> (in litres). Start your notebook with:
+<pre>import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
+import statsmodels.api as sm
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import cross_val_score, cross_val_predict, KFold, LeaveOneOut
+df = pd.read_excel('Data_Mercedes.xlsx')</pre>
+        If Python cannot find the file, put it in the same folder as your notebook, or give its full
+        path.</div>
+        <table aria-label="Python functions used in this exercise">
+          <thead><tr><th>PYTHON</th><th>WHAT IT DOES</th><th>EXAMPLE</th></tr></thead>
+          <tbody>
+            <tr><td><code>pd.read_excel(file)</code>, <code>df.head()</code>, <code>len(df)</code></td><td>Loads the sheet (the first row gives the column names); first rows; number of rows.</td><td><code>len(df)</code></td></tr>
+            <tr><td><code>np.mean</code>, <code>np.median</code>, <code>np.sum</code>, <code>np.abs</code>, <code>np.sqrt</code></td><td>Average, median, sum, absolute value, square root.</td><td><code>np.mean(df['price'])</code></td></tr>
+            <tr><td><code>np.log(x)</code>, <code>np.exp(x)</code></td><td>Natural logarithm and exponential. <code>np.log10</code> is the base-10 logarithm: not the one we want.</td><td><code>np.log(df['price'])</code></td></tr>
+            <tr><td><code>X = sm.add_constant(df[['mileage', 'mpg']])</code></td><td>The explanatory variables with a column of ones, <code>const</code>, for the intercept. Double brackets for several columns.</td><td><code>X[['const', 'mileage']]</code></td></tr>
+            <tr><td><code>M = sm.OLS(y, X).fit()</code>, <code>print(M.summary())</code></td><td>OLS regression of y on X: <strong>y first</strong>. The summary rounds its values.</td><td><code>M1 = sm.OLS(y, X1).fit()</code></td></tr>
+            <tr><td><code>M.params</code>, <code>M.tvalues</code>, <code>M.pvalues</code>, <code>M.rsquared</code></td><td>Coefficients, t values (test of 0), p-values, R², with all their digits.</td><td><code>M2.tvalues['mpg']</code></td></tr>
+            <tr><td><code>lm = LinearRegression()</code></td><td>The linear model that scikit-learn re-estimates on every training set of a cross-validation.</td><td><code>cross_val_score(lm, X, y, …)</code></td></tr>
+            <tr><td><code>LeaveOneOut()</code>, <code>KFold(n_splits=10, shuffle=True, random_state=100)</code></td><td>How the cars are split: one car at a time, or ten folds after a shuffle fixed by the seed.</td><td><code>cv=LeaveOneOut()</code>, <code>cv=folds</code></td></tr>
+            <tr><td><code>cross_val_score(lm, X, y, scoring='neg_mean_squared_error', cv=…)</code></td><td>One score per fold: <strong>minus</strong> the mean squared error of the cars left out. Also <code>'neg_mean_absolute_error'</code>.</td><td><code>mse = -cross_val_score(…)</code></td></tr>
+            <tr><td><code>cross_val_predict(lm, X, y, cv=folds)</code></td><td>The out-of-sample prediction of every car, made by a model that never saw it.</td><td><code>np.exp(cross_val_predict(lm, X, np.log(y), cv=folds))</code></td></tr>
+            <tr><td><code>fig, ax = plt.subplots(1, 2)</code>, <code>ax[0].hist(x, bins=40)</code>, <code>plt.show()</code></td><td>Two panels side by side; a histogram in each.</td><td><code>ax[1].hist(np.log(y), bins=40)</code></td></tr>
+            <tr><td><code>stats.skew(x)</code></td><td>Skewness: 0 for a symmetric distribution, positive for a long right tail.</td><td><code>stats.skew(df['price'])</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:20px"><label>What shall the Academy call you ?<br>
+        <input class="name" id="playername" maxlength="24" placeholder="Apprentice" autocomplete="off"></label></p>
+      <p style="margin-top:20px"><button class="btn primary" id="btn-begin">BEGIN</button></p>
+    </div>
+  </div>
+
+  <!-- ============ GAME ============ -->
+  <div class="screen" id="scr-game">
+    <!-- wrap-reverse swaps the cross axis, so flex-end keeps both columns aligned at the top -->
+    <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap-reverse">
+      <div style="flex:1 1 700px; min-width:300px">
+
+        <div id="codec">
+          <div id="bg"></div>
+
+          <div class="port" id="port-left">
+            <div class="portframe" id="frame-left">
+              <div class="avatar bob" id="av-student"></div>
+            </div>
+            <div class="portname" id="name-left">APPRENTICE</div>
+          </div>
+
+          <div class="codeccenter">
+            <div class="win95" id="dlgbox">
+              <div class="titlebar"><span id="dlg-title">DIALOGUE</span><span class="boxes">▬ □ ✕</span></div>
+              <div id="dlg"></div>
+            </div>
+          </div>
+
+          <div class="port" id="port-right">
+            <div class="portframe" id="frame-right">
+              <div class="avatar bob" id="av-master"></div>
+            </div>
+            <div class="portname" id="name-right">MASTER SCEPTICUS</div>
+          </div>
+        </div>
+
+        <div id="zone"></div>
+      </div>
+
+      <div style="flex:0 0 250px">
+        <div class="win95" id="hud">
+          <div class="titlebar"><span>CASE FILE</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="hudbody">
+            <div class="hudrow"><span>question</span><b id="hud-q">—</b></div>
+            <div class="hudrow"><span>mpg: β2 · t</span><b id="hud-b2">—</b></div>
+            <div class="hudrow"><span>RMSE (k£)</span><b id="hud-rmse">—</b></div>
+            <div class="hudrow"><span>outliers</span><b id="hud-out">—</b></div>
+          </div>
+        </div>
+        <div id="doom">CASE OPEN</div>
+        <div class="win95" style="margin-top:8px">
+          <div class="titlebar"><span>NOTEBOOK</span><span class="boxes">▬ □ ✕</span></div>
+          <div class="inset" id="notebook" style="padding:7px 9px; font-family:var(--mono); font-size:16px; line-height:1.4; min-height:70px; max-height:430px; overflow-y:auto; color:#111">
+            <i style="color:#666">empty</i>
+          </div>
+        </div>
+        <div style="margin-top:8px; font:10px Tahoma,sans-serif; color:#6a6a92; text-align:right">© Arnaud Dufays</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ END ============ -->
+  <div class="screen" id="scr-end">
+    <div class="card">
+      <h1>MISSION COMPLETE</h1>
+      <h2>Empirical Exercise IV &nbsp;·&nbsp; The Price of a Used Mercedes</h2>
+      <p id="endblurb"></p>
+      <div class="win95" style="margin:20px 0" id="pwbox">
+        <div class="titlebar"><span>COMPLETION RECORD</span><span class="boxes">▬ □ ✕</span></div>
+        <div class="inset" style="padding:4px">
+          <div class="pwline"><span style="font-size:15px;color:#444">APPRENTICE</span><b id="pw-name" style="letter-spacing:0"></b></div>
+          <div class="pwline"><span style="font-size:15px;color:#444">COMPLETED AT</span><b id="pw-time"></b></div>
+          <div class="pwline" style="border:0"><span style="font-size:15px;color:#444">PASSWORD</span><b id="pw-code" style="color:#000080"></b></div>
+        </div>
+        <div style="padding:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <button class="btn" id="btn-copy">COPY THE PASSWORD</button>
+          <span style="font:11px Tahoma,sans-serif;color:#333" id="copymsg"></span>
+        </div>
+      </div>
+      <p class="note"><strong style="color:var(--amber)">Submit the password on Blackboard.</strong>
+      Copy it exactly as shown, dashes included. It is not kept: copy it before you close this page.</p>
+      <div id="sheet" style="margin-top:20px"></div>
+      <p style="margin-top:22px"><button class="btn" id="btn-again">REPLAY</button></p>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   CONFIG
+   ================================================================ */
+const CONFIG = {
+  /* the data file, downloaded by the DATA (XLSX) button: paste its Dropbox link (…&raw=1) here */
+  DATA_FILES: {
+    mercedes: "https://www.dropbox.com/scl/fi/rouu4z7fm8slbd373l82c/Data_Mercedes.xlsx?rlkey=6vn02muj9zb3pmbd9y6i96waf&raw=1"
+  },
+  /* optional background art for the codec; leave '' to use the gradients */
+  BACKGROUNDS: { world:'', lab:'', court:'' },
+  FALLBACK: {
+    world:"linear-gradient(180deg,#07121a,#163447 60%,#2a5d73)",
+    lab:  "linear-gradient(180deg,#0d0f1c,#252a45 60%,#414872)",
+    court:"linear-gradient(180deg,#0a0f14,#1c2a36 60%,#33495c)"
+  },
+  /* failed attempts on one question before the Master insists on the HINT */
+  FAILS_BEFORE_NUDGE: 2,
+  /* speed of the typewriter: TYPE_CHARS characters every TYPE_MS ms */
+  TYPE_MS: 21,
+  TYPE_CHARS: 2
+};
+
+/* ================================================================
+   FINAL PASSWORD — one per student, created the first time the
+   exercise is completed, never regenerated (REPLAY keeps it). It
+   contains the time of completion, on the student's clock:
+       DM4-hhmmss-cccccc
+     m    = h*3600 + min*60 + sec
+     a    = (m*m + 503*m + 83911) mod 999907
+     b    = (a*(m + 311) + 8*m*m + 7) mod 999907
+     code = (61331*b + 35617*a + 92387*m + 141421) mod 1e6
+   The code depends on the time, so the time cannot be edited.
+   Every intermediate value stays below 2^53, so the arithmetic is exact.
+   Checked by check_passwords_DM4.py.
+   ================================================================ */
+function makeFinalPassword(d){
+  const h=d.getHours(), mi=d.getMinutes(), se=d.getSeconds();
+  const hh = String(h).padStart(2,'0'),
+        mm = String(mi).padStart(2,'0'),
+        ss = String(se).padStart(2,'0');
+  const m = h*3600 + mi*60 + se;
+  const a = (m*m + 503*m + 83911) % 999907;
+  const b = (a*(m + 311) + 8*m*m + 7) % 999907;
+  const code = (61331*b + 35617*a + 92387*m + 141421) % 1000000;
+  return { time:`${hh}:${mm}:${ss}`,
+           code:`DM4-${hh}${mm}${ss}-${String(code).padStart(6,'0')}` };
+}
+let finalPw = null;
+
+/* ================================================================
+   DATA — the first rows of Data_Mercedes.xlsx, a random sample of 700
+   cars (mileage, price), the estimates of M1, M2 and M3, the counts of
+   the two histograms, the MAD bounds and the cross-validation errors,
+   embedded for the pictures only. The student computes everything in
+   Python.
+   ================================================================ */
+const DATA = {"N": 13119, "COLS": ["model", "year", "price", "transmission", "mileage", "fuelType", "tax", "mpg", "engineSize"], "HEAD": [[" SLK", 2005, 5200, "Automatic", 63000, "Petrol", 325, 32.1, 1.8], [" S Class", 2017, 34948, "Automatic", 27000, "Hybrid", 20, 61.4, 2.1], [" SL CLASS", 2016, 49948, "Automatic", 6200, "Petrol", 555, 28.0, 5.5], [" G Class", 2016, 61948, "Automatic", 16000, "Petrol", 325, 30.4, 4.0], [" G Class", 2016, 73948, "Automatic", 4000, "Petrol", 325, 30.1, 4.0]], "SX": [43955, 37000, 47000, 3908, 3710, 13000, 5211, 26999, 26100, 11300, 42129, 11301, 17167, 39920, 2878, 6265, 23791, 5800, 6198, 24756, 23349, 17624, 21929, 2195, 24388, 15009, 28192, 14466, 9699, 23690, 30035, 22349, 25782, 7006, 7036, 9444, 42879, 3439, 26065, 31775, 14077, 8728, 31705, 17314, 11700, 24377, 4843, 4615, 12057, 32859, 66796, 37610, 42882, 51176, 42177, 40217, 51933, 14244, 5298, 31711, 24290, 10432, 49066, 39656, 151, 13781, 10904, 14718, 28272, 64995, 23563, 55253, 4099, 26109, 14219, 19488, 2638, 18812, 3857, 23400, 25711, 9884, 28612, 32984, 26002, 63922, 12355, 27999, 14338, 49847, 4450, 29643, 8501, 4501, 17004, 25319, 29062, 32183, 33283, 19219, 23248, 18821, 21490, 12357, 13742, 5000, 18391, 46721, 25978, 22191, 36239, 38059, 7410, 6500, 9321, 50087, 36056, 10500, 22122, 8702, 45166, 4089, 22538, 18603, 30612, 67569, 21300, 6945, 11072, 25672, 19954, 26210, 7500, 500, 56386, 11622, 18607, 14288, 75829, 57530, 14221, 8928, 4065, 9485, 105, 4651, 10652, 8138, 57649, 16, 20960, 51150, 9179, 11638, 21112, 16, 41136, 16, 2844, 20425, 7494, 2000, 35879, 16, 37876, 10729, 5866, 10859, 11495, 11064, 3999, 942, 3295, 136, 10778, 10939, 10491, 3999, 3999, 14763, 61647, 14983, 12695, 9109, 27000, 4999, 11370, 4999, 999, 3160, 14125, 29900, 12725, 11354, 19692, 61954, 22264, 32232, 5132, 100, 2877, 11759, 4121, 43493, 43120, 58687, 34587, 150, 9675, 3010, 11096, 12298, 16389, 2638, 1200, 20, 8691, 58856, 12695, 50, 6651, 25951, 33964, 28629, 9400, 3500, 9481, 2750, 19573, 29169, 3299, 13503, 2553, 1005, 55877, 23114, 7721, 3635, 1499, 27107, 13299, 12605, 3900, 13037, 4493, 2501, 11016, 20349, 35, 2001, 29726, 10392, 13115, 35953, 20392, 11461, 12938, 8274, 7332, 513, 2317, 14499, 14159, 26057, 29909, 4396, 30148, 13924, 34, 41496, 13973, 3195, 41603, 49477, 31684, 4999, 7268, 2352, 11900, 40246, 169, 169, 20358, 29200, 14232, 8290, 1987, 10577, 9074, 4500, 39652, 4104, 40950, 30523, 35517, 36217, 5999, 76452, 10771, 2499, 9009, 12137, 17094, 25939, 9098, 3500, 13500, 31273, 19499, 19079, 3244, 8901, 10267, 23600, 16985, 69, 4335, 101, 35048, 6429, 8793, 12576, 1, 1, 29000, 22000, 24610, 27384, 13119, 10192, 8642, 8612, 14321, 6641, 7379, 41083, 2580, 9959, 7669, 2011, 8493, 500, 500, 500, 2078, 43232, 1000, 31995, 9888, 9272, 13741, 35782, 2000, 15242, 15189, 13828, 19906, 100, 10776, 40908, 12000, 9000, 3000, 2086, 1000, 35459, 1000, 1000, 1583, 1224, 5738, 13044, 49364, 5310, 1000, 12321, 2343, 6190, 19022, 9742, 6686, 7621, 4899, 10577, 4276, 5359, 935, 1000, 6604, 11347, 8420, 19339, 4000, 11793, 2192, 2162, 1000, 1000, 5559, 7411, 1000, 18234, 525, 2934, 6812, 2823, 4696, 2000, 2134, 3136, 2616, 540, 1835, 3816, 3310, 3070, 1000, 44998, 66500, 1690, 18557, 2982, 14012, 16019, 16122, 3665, 8897, 10689, 1000, 19572, 5237, 2228, 1000, 20000, 1000, 1000, 1000, 20457, 11267, 1000, 14022, 9551, 37034, 14619, 30895, 1724, 262, 1000, 4162, 1000, 23, 3413, 7800, 3376, 13276, 19097, 246, 24, 22985, 8482, 8982, 2563, 13676, 2748, 13925, 6498, 11000, 3105, 1308, 1000, 1059, 16053, 5112, 1701, 11357, 22437, 1000, 27663, 1000, 9235, 22040, 15238, 5000, 5359, 13467, 28180, 14019, 15000, 11785, 10315, 14000, 53676, 82685, 44900, 115000, 31654, 48500, 9, 3438, 3500, 682, 54695, 51936, 38000, 65000, 43413, 43461, 75000, 37000, 23000, 31000, 64000, 18000, 51081, 96000, 89000, 40000, 50000, 49000, 46808, 42332, 8074, 1000, 32726, 18061, 25827, 81423, 120000, 23117, 84521, 18345, 9756, 30339, 25285, 45000, 31000, 22007, 40130, 500, 17045, 2502, 18895, 47581, 12591, 9780, 55000, 80470, 71496, 34000, 3701, 8946, 19828, 20, 20, 54533, 245, 36999, 13489, 32681, 26955, 20000, 22369, 20000, 54500, 65792, 31555, 40297, 34414, 34075, 7325, 29679, 11534, 9488, 54965, 23974, 23888, 8213, 49309, 41239, 78058, 32412, 34278, 51558, 29631, 24810, 90000, 35000, 52000, 72700, 47020, 9385, 80268, 10707, 20952, 27636, 34032, 16872, 18828, 47360, 75626, 59000, 259000, 24963, 1000, 3500, 23196, 68184, 9500, 12194, 32293, 55345, 63878, 47288, 18584, 13000, 64765, 26000, 34132, 82752, 20000, 86000, 30848, 52852, 41013, 10857, 10547, 31091, 13118, 99300, 36998, 22585, 29109, 6000, 6000, 8100, 20841, 42151, 15720, 31942, 19825, 14161, 23431, 42844, 29689, 66160, 39119, 47380, 60036, 30914, 85275, 54276, 42476, 21388, 32555, 25414, 59256, 58848, 32245, 16347, 22526, 20182, 44387, 78772, 31784, 45277, 52251, 14436, 29905, 40566, 22000, 40005, 119000, 49397, 13538, 40000, 73000, 29456, 42609, 47850, 13500, 33367, 6000, 7125, 17980, 24602, 66000, 45000, 10104, 18398, 25108, 14715, 7712, 2690, 14289, 28250, 48500, 31112, 34665, 1000, 2426], "SY": [15990, 20880, 11240, 23280, 24616, 27995, 36998, 19498, 17998, 31995, 16998, 32498, 19498, 15698, 32998, 29498, 19498, 23498, 29498, 19498, 21500, 30498, 20998, 29498, 16798, 24998, 17595, 22498, 25990, 19998, 11998, 17998, 27990, 24950, 36490, 25498, 11791, 47484, 26320, 27490, 23690, 20991, 13298, 28991, 21591, 17990, 29999, 31990, 35499, 18990, 16998, 26998, 15491, 13970, 18798, 9498, 13527, 21499, 34790, 15770, 25495, 26499, 16328, 15220, 41880, 79999, 21840, 41995, 21697, 21295, 11450, 12450, 28995, 14995, 15065, 19995, 26499, 20391, 19810, 17000, 16990, 28495, 15250, 20498, 19696, 9480, 17490, 18012, 25146, 27482, 34420, 13991, 28980, 28220, 28482, 23102, 16495, 20472, 15480, 17770, 28240, 17320, 18990, 38995, 20495, 29995, 25260, 16880, 21490, 30995, 26998, 15181, 28372, 34990, 16770, 15998, 19751, 31850, 20737, 25298, 12362, 49980, 17950, 20750, 16299, 9480, 13980, 28480, 15896, 18500, 22470, 22498, 31000, 27000, 20175, 31946, 29991, 27786, 11972, 9691, 17498, 28652, 39981, 30481, 77890, 39290, 25991, 24220, 16190, 22980, 14500, 16850, 23991, 25500, 28980, 26980, 13490, 24980, 49980, 22980, 29480, 24780, 34480, 33980, 25980, 23480, 27500, 20480, 29480, 29480, 39980, 25980, 16480, 38480, 25980, 29500, 45980, 37980, 37980, 25480, 13990, 22980, 25480, 29980, 13995, 26999, 20799, 42999, 42995, 21750, 16995, 26995, 26995, 28850, 18290, 21449, 21386, 21832, 21250, 29999, 33750, 20562, 38661, 26124, 15990, 16442, 22290, 22390, 32390, 25490, 41480, 25990, 22490, 26396, 27590, 28990, 102502, 11040, 25316, 21990, 24132, 21991, 16860, 18700, 34900, 59995, 22400, 46390, 27995, 22495, 29480, 21456, 29799, 36299, 17443, 21700, 27000, 29980, 25890, 23890, 44990, 23254, 22498, 27725, 20490, 52555, 29755, 21550, 35400, 35250, 17480, 19970, 22980, 20480, 30980, 24775, 24628, 47980, 21980, 32500, 41500, 24480, 27980, 29780, 22980, 27500, 20500, 27980, 29480, 12000, 23980, 29987, 16991, 21980, 20449, 28450, 27280, 36000, 24640, 12233, 22990, 22990, 22000, 21182, 26176, 25810, 39991, 40796, 23963, 22900, 22450, 32690, 22372, 19981, 18171, 15491, 23490, 18990, 40850, 24995, 24994, 23995, 17090, 43990, 18995, 28995, 28950, 15999, 13490, 18790, 41890, 36920, 21492, 18192, 29449, 33932, 39190, 39838, 19019, 23995, 26395, 20500, 30995, 37995, 23990, 32990, 13980, 18979, 20890, 16489, 47979, 26395, 28950, 39950, 18890, 45895, 36249, 29799, 32849, 30049, 33499, 24945, 28945, 26995, 23299, 20999, 24889, 22699, 24599, 21099, 28749, 21449, 47789, 23499, 24349, 28899, 22399, 44500, 20849, 13449, 55500, 31500, 24000, 35199, 25879, 16499, 75099, 25879, 24699, 34299, 24999, 25699, 19199, 24399, 40999, 24299, 52700, 27588, 15999, 48745, 22000, 28589, 24000, 22949, 26799, 37199, 26599, 33599, 21299, 26299, 57999, 31994, 25600, 25699, 27750, 24599, 33599, 34579, 41799, 37899, 39309, 135124, 24495, 31991, 24199, 22599, 39900, 41500, 49499, 25799, 35499, 79799, 22899, 23399, 26099, 26589, 38289, 22449, 17299, 25399, 22299, 23979, 20349, 32849, 25399, 26299, 22999, 39699, 36809, 15789, 33149, 29699, 25879, 22999, 60899, 25879, 24409, 22049, 40099, 32069, 22099, 43199, 21799, 19749, 16899, 46599, 66899, 25879, 26799, 34269, 32068, 25299, 18999, 28999, 20549, 19799, 33699, 42699, 21899, 37899, 27199, 23199, 22299, 36399, 35049, 17699, 15299, 56399, 26899, 35099, 27099, 25099, 26099, 26799, 26149, 30124, 36429, 19999, 25559, 43299, 15499, 18949, 24495, 24299, 20999, 19499, 22399, 23389, 20149, 26899, 22124, 8995, 8595, 9995, 7495, 27495, 13995, 45395, 28399, 32950, 52995, 8750, 16500, 18999, 12000, 14000, 14800, 16500, 12490, 15490, 14990, 14490, 12490, 28975, 7490, 8990, 13990, 11990, 11490, 15395, 22806, 18249, 29498, 22248, 12499, 22498, 15970, 11493, 17399, 11479, 19499, 15993, 31991, 24495, 18900, 12900, 17991, 18391, 27900, 27400, 23900, 17691, 23895, 20995, 16299, 10000, 12795, 13499, 19395, 21495, 32998, 17900, 25298, 61995, 14999, 27798, 15400, 16300, 16300, 16500, 16200, 12900, 19900, 21400, 11000, 17999, 15100, 19600, 15700, 19200, 21000, 25500, 17699, 15599, 14999, 14499, 15999, 13299, 10999, 10354, 13776, 14999, 15197, 22499, 12500, 9995, 33995, 15995, 12995, 14000, 19439, 7449, 17399, 15921, 14799, 16499, 18499, 17149, 15199, 14999, 12950, 6949, 17799, 31990, 28490, 16250, 11019, 36790, 19549, 16999, 14489, 9499, 16469, 17889, 19995, 17695, 28999, 16299, 5495, 12990, 8995, 20750, 21750, 37500, 29750, 22444, 18990, 22615, 1990, 26995, 24500, 29000, 36995, 34495, 20990, 14180, 14680, 16290, 16500, 16600, 24280, 16500, 15600, 18500, 19500, 12100, 16200, 14200, 11500, 12300, 14500, 19000, 17100, 19000, 14500, 19900, 10800, 19900, 14300, 16800, 16850, 13999, 11900, 13100, 16600, 9700, 14000, 17000, 17800, 40990, 12000, 1495, 26059, 24944, 10995, 9995, 16890, 15480, 16890, 25744, 18314, 57995, 57890, 17300, 15800, 14400, 14000, 24999, 30999, 17999, 24990, 26350, 35490, 16500, 13850, 21999, 31723, 12995, 30999, 37990], "M1": [31292.8956737551, -0.30042966887347716], "M2": [45183.87753879692, -0.2614501623608368, -267.3617903443966], "M3": [10.697404160962344, -1.3231883640190982e-05, -0.0070127580811823985], "MPG_MED": 56.5, "HP": {"x0": 0, "w": 4000, "counts": [58, 116, 599, 1699, 2748, 2205, 2127, 1331, 686, 473, 278, 255, 169, 111, 88, 34, 38, 20, 15, 18, 4, 5, 7, 3, 3, 2, 4, 4, 2, 0, 1, 4, 1, 3, 4, 1, 0, 1, 1, 1]}, "HL": {"x0": 6.4, "w": 0.14, "counts": [1, 0, 0, 0, 0, 1, 3, 4, 4, 1, 5, 6, 11, 23, 14, 20, 23, 27, 61, 120, 269, 471, 878, 1299, 1760, 1791, 2041, 1549, 969, 697, 411, 315, 180, 73, 43, 14, 12, 6, 14, 3]}, "MADP": [1444.13, 43515.87], "MADL": [9.0522, 10.9886], "CV": {"M1": [9.9892, 6.5353], "M2": [9.1659, 5.8462], "M3": [8.9238, 5.4578]}};
+
+/* ================================================================
+   AVATARS — inline SVG, identical to the other Academy games.
+   ================================================================ */
+function eyeGroup(cxL,cxR,cy,rx,ry){
+  return `
+   <g class="eyes">
+     <ellipse cx="${cxL}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <ellipse cx="${cxR}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff" stroke="#20202e" stroke-width="2.5"/>
+     <circle class="pupil" cx="${cxL}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <circle class="pupil" cx="${cxR}" cy="${cy}" r="${ry*0.55}" fill="#1a1a28"/>
+     <rect class="lid" x="${cxL-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+     <rect class="lid" x="${cxR-rx-2}" y="${cy-ry-1}" width="${rx*2+4}" height="${ry*2+2}" fill="#e8c9a8"/>
+   </g>`;
+}
+
+const SVG_MASTER = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M34 250 L48 152 Q60 138 90 136 Q120 138 132 152 L146 250 Z" fill="#2b2b52" stroke="#12122a" stroke-width="3"/>
+  <path d="M90 136 L74 250 M90 136 L106 250" stroke="#1c1c3a" stroke-width="2.5" fill="none"/>
+  <path d="M62 145 L90 176 L118 145" fill="#3a3a68" stroke="#12122a" stroke-width="2.5"/>
+  <rect x="79" y="122" width="22" height="24" fill="#e0bd99" stroke="#b08d68" stroke-width="2"/>
+  <ellipse cx="90" cy="82" rx="41" ry="47" fill="#e8c9a8" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="49" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="131" cy="86" rx="7" ry="10" fill="#e8c9a8" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M50 62 Q56 26 90 30 Q124 26 130 62 Q120 44 90 46 Q60 44 50 62 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M48 60 Q40 84 46 104 Q52 88 52 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M132 60 Q140 84 134 104 Q128 88 128 68 Z" fill="#b9bcc9" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M56 96 Q52 148 90 178 Q128 148 124 96 Q112 128 90 128 Q68 128 56 96 Z" fill="#cdd0da" stroke="#20202e" stroke-width="3"/>
+  <g class="brows">
+    <path d="M62 64 Q74 57 86 63" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M94 63 Q106 57 118 64" stroke="#9a9db0" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(74,106,80,10,8)}
+  <path d="M90 84 L85 102 Q90 106 96 101" stroke="#b08d68" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M78 118 Q90 122 102 118" stroke="#6b3a2a" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="11" ry="5" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="13" ry="10" fill="#7a3226" stroke="#4d1f16" stroke-width="2"/>
+    <ellipse cx="90" cy="115" rx="9" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M73 113 Q90 130 107 113" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M76 123 Q90 111 104 123" stroke="#6b3a2a" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <circle cx="106" cy="80" r="17" fill="rgba(180,220,255,.20)" stroke="#d8a52a" stroke-width="3.5"/>
+  <path d="M118 92 Q128 116 120 140" stroke="#d8a52a" stroke-width="2.5" fill="none"/>
+</svg>`;
+
+const SVG_STUDENT = `
+<svg viewBox="0 0 180 250" xmlns="http://www.w3.org/2000/svg" shape-rendering="geometricPrecision">
+  <path d="M36 250 L50 156 Q62 142 90 140 Q118 142 130 156 L144 250 Z" fill="#7a4326" stroke="#3a1f10" stroke-width="3"/>
+  <path d="M66 148 L90 172 L114 148" fill="#9a5c36" stroke="#3a1f10" stroke-width="2.5"/>
+  <rect x="80" y="126" width="21" height="22" fill="#f0d3b4" stroke="#c19a74" stroke-width="2"/>
+  <ellipse cx="90" cy="86" rx="39" ry="44" fill="#f0d3b4" stroke="#20202e" stroke-width="3"/>
+  <ellipse cx="51" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <ellipse cx="129" cy="90" rx="6.5" ry="9" fill="#f0d3b4" stroke="#20202e" stroke-width="2.5"/>
+  <path d="M51 66 Q56 32 90 34 Q124 32 129 66 Q126 48 108 44 Q96 56 84 46 Q64 48 51 66 Z" fill="#5c3a1e" stroke="#20202e" stroke-width="2.5"/>
+  <g class="brows">
+    <path d="M64 68 Q75 62 86 67" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M94 67 Q105 62 116 68" stroke="#4a2e18" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+  </g>
+  ${eyeGroup(75,105,84,11,9)}
+  <path d="M90 88 L86 104 Q90 108 95 103" stroke="#c19a74" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g class="mouth-a"><path d="M79 118 Q90 124 101 118" stroke="#8a4636" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-b"><ellipse cx="90" cy="119" rx="10" ry="5" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/></g>
+  <g class="mouth-c"><ellipse cx="90" cy="120" rx="12" ry="9" fill="#8a4636" stroke="#5a2a1e" stroke-width="2"/>
+    <ellipse cx="90" cy="116" rx="8" ry="3" fill="#fff" opacity=".85"/></g>
+  <g class="mouth-smile"><path d="M74 113 Q90 131 106 113" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+  <g class="mouth-frown"><path d="M77 124 Q90 112 103 124" stroke="#8a4636" stroke-width="4.5" fill="none" stroke-linecap="round"/></g>
+</svg>`;
+
+/* ================================================================
+   CONTENT — the exercise, as data.
+
+   Step types
+     info     the Master speaks; a picture may be shown
+     choice   one correct option
+     multi    tick every correct statement
+     numeric  one or more fields: numbers typed from Python, or
+              drop-down choices ({kind:'select'})
+
+   The course margin rule decides what is accepted, for every number:
+   exact integers (exact:true) only exactly; 0.1 <= |value| < 1e6 within
+   ±0.01; otherwise within ±1% of the value.
+   'alt' lists common wrong values, each with its own feedback; an alt
+   uses the same margin around its own value unless it has its own 'tol'.
+
+   'widget' is shown with the question; 'widgetAfter' once it is solved.
+   No step ever shows its answer: the student must find it.
+   ================================================================ */
+const STEPS = [
+{ id:'open', type:'info', bg:'world', who:'master', mood:'raised', qn:'—',
+  title:'THE ACADEMY · EMPIRICAL CASE FILE IV',
+  text:`The Academy is selling its old fleet of Mercedes, and I refuse to be robbed. I need a machine that
+  predicts the price of a used Mercedes.
+  <span class="fx">The Master drops a spreadsheet of 13,119 cars on the desk.</span>
+  Every car loses value with every mile. So the machine is simple : <strong>the price, explained by the
+  mileage alone</strong>. Fuel consumption, logarithms, cross-validation : decorations. I already know the
+  result : <strong>the simplest model predicts best</strong>.
+  <span class="fx">At the end, the Academy hands you a password. Copy it and submit it on Blackboard.</span>`,
+  widget:'table', banner:'CLAIM: THE SIMPLEST PRICE MODEL PREDICTS BEST', cont:'Open the file' },
+
+{ id:'t0', type:'numeric', bg:'lab', who:'master', qn:'setup',
+  title:'TRIAL I · OPEN THE FILE',
+  text:`Download <span class="kbd">Data_Mercedes.xlsx</span> with the DATA (XLSX) button, save it in the
+  folder of your notebook, and load it with pandas.
+  <strong>How many cars are there ? And what is their average price, in pounds ?</strong>`,
+  q:'Report what Python prints.',
+  fields:[
+    {id:'n', label:'Number of cars', value:13119, exact:true,
+     alt:[{value:13120, msg:"One row too many: with header=None, pandas reads the row of column names as a car. The file has a header row: use pd.read_excel(...) without header=None."},
+          {value:9, msg:"That is the number of columns. Count the rows: len(df)."}],
+     msg:"Use len(df)."},
+    {id:'m', label:'Average price (in £)', value:24698.59692049699,
+     alt:[{value:22480, msg:"That is the median. Compute the average: np.mean(df['price'])."},
+          {value:24.69859692049699, tol:0.05, msg:"Here, report the average in pounds, as Python prints it. Only the cross-validation errors are in thousands of pounds."}],
+     msg:"Use np.mean(df['price'])."}],
+  hint:`<b>pd.read_excel</b> reads the first row as the column names, which is what you want here.
+  <b>len(df)</b> counts the rows. Run the imports of the Python helper once, at the top of your notebook.`,
+  code:`import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
+import statsmodels.api as sm
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import cross_val_score, cross_val_predict, KFold, LeaveOneOut
+df = pd.read_excel('Data_Mercedes.xlsx')
+print(df.head())
+print(len(df), np.mean(df['???']))`,
+  say:'13,119 cars, sold at £24,698.60 on average.',
+  right:`<strong>13,119</strong> cars, at <strong>£24,698.60</strong> on average.
+  <span class="fx">The Master scrolls through the file.</span>
+  From £650, for a 2003 A Class with 109,090 miles, to £159,999, for a 2020 G Class. Half of the cars
+  cost less than £22,480 : the average sits above the median. Keep that in mind.`,
+  note:'N = 13119 cars; average price 24698.60 GBP (median 22480)' },
+
+{ id:'t1', type:'numeric', bg:'lab', who:'master', qn:'a',
+  title:'TRIAL II · MY MODEL',
+  text:`First, my model. <strong>Estimate M1 on the full sample</strong> :
+  <br><span class="kbd">M1 : Price<sub>i</sub> = β<sub>0</sub> + β<sub>1</sub> mileage<sub>i</sub> + ε<sub>i</sub></span><br>
+  <strong>What are the estimates of β<sub>0</sub> and β<sub>1</sub> ?</strong>`,
+  q:'Estimate M1 by OLS on the 13,119 cars.',
+  fields:[
+    {id:'b0', label:'β<sub>0</sub> (intercept)', value:31292.8956737551,
+     alt:[{value:31290, msg:"summary() rounds the intercept to 3.129e+04. Print M1.params to see all its digits."},
+          {value:45675.547129705075, msg:"You regressed the mileage on the price. The price is the dependent variable: sm.OLS(y, X1), y first."}],
+     msg:"Read M1.params['const']."},
+    {id:'b1', label:'β<sub>1</sub> (mileage)', value:-0.30042966887347716,
+     alt:[{value:0.4379813868675557, msg:"That is the slope of a regression without intercept. Add the constant: sm.add_constant."},
+          {value:-0.9606208874765396, msg:"You regressed the mileage on the price. The price is the dependent variable: sm.OLS(y, X1), y first."},
+          {value:-0.2614501623608368, msg:"That is the slope of mileage in M2. M1 has the mileage only."}],
+     msg:"Read M1.params['mileage']."}],
+  hint:`Build <b>y</b> (the price) and <b>X</b> (a constant, the mileage and the mpg) once : M1 uses the
+  columns <b>const</b> and <b>mileage</b>, M2 all three. <b>sm.OLS</b> takes y first, then X.`,
+  code:`y = df['price']
+X = sm.add_constant(df[['mileage', 'mpg']])
+X1 = X[['const', 'mileage']]
+M1 = sm.OLS(y, X1).fit()
+print(M1.summary())
+print(M1.params)`,
+  say:'β0 = 31,292.90 and β1 = −0.30.',
+  right:`β<sub>0</sub> = <strong>31,292.90</strong> and β<sub>1</sub> = <strong>−0.30</strong> : every
+  1,000 miles take about £300 off the price.
+  <span class="fx">The Master smiles, then stops smiling.</span>
+  Wait. 31,292.90 / 0.3004 = 104,160. Beyond 104,160 miles, my model predicts a <em>negative</em>
+  price, and 89 cars of the file are past that point. Someone would pay me to take them away.`,
+  widgetAfter:'scatter', note:'M1: price = 31292.90 - 0.300 mileage; < 0 beyond 104160 miles (89 cars)' },
+
+{ id:'t2', type:'numeric', bg:'lab', who:'master', qn:'a',
+  title:'TRIAL II · THE RIVAL',
+  text:`Now the rival. <strong>Estimate M2</strong>, which adds the fuel consumption :
+  <br><span class="kbd">M2 : Price<sub>i</sub> = β<sub>0</sub> + β<sub>1</sub> mileage<sub>i</sub> + β<sub>2</sub> mpg<sub>i</sub> + ε<sub>i</sub></span><br>
+  in which <span class="kbd">mpg</span> is the number of miles per gallon.
+  <strong>What are the three estimates ?</strong>`,
+  q:'Estimate M2 by OLS on the 13,119 cars.',
+  fields:[
+    {id:'b0', label:'β<sub>0</sub> (intercept)', value:45183.87753879692,
+     alt:[{value:45180, msg:"summary() rounds the intercept to 4.518e+04. Print M2.params to see all its digits."},
+          {value:31292.8956737551, msg:"That is the intercept of M1. M2 has both the mileage and the mpg."}],
+     msg:"Read M2.params['const']."},
+    {id:'b1', label:'β<sub>1</sub> (mileage)', value:-0.2614501623608368,
+     alt:[{value:-0.30042966887347716, msg:"That is the slope of M1. In M2, the mpg is in the regression too."},
+          {value:-0.2143088405980104, msg:"That is the slope of a regression without intercept. Add the constant: sm.add_constant."}],
+     msg:"Read M2.params['mileage']."},
+    {id:'b2', label:'β<sub>2</sub> (mpg)', value:-267.3617903443966,
+     alt:[{value:475.50623177457555, msg:"That is the coefficient of a regression without intercept. Add the constant: sm.add_constant."}],
+     msg:"Read M2.params['mpg']."}],
+  hint:`Same code as for M1, with all the columns of <b>X</b>.`,
+  code:`M2 = sm.OLS(y, X).fit()
+print(M2.summary())
+print(M2.params)`,
+  say:'β0 = 45,183.88, β1 = −0.26 and β2 = −267.36.',
+  right:`β<sub>0</sub> = <strong>45,183.88</strong>, β<sub>1</sub> = <strong>−0.26</strong> and
+  β<sub>2</sub> = <strong>−267.36</strong> : at a given mileage, each extra mile per gallon takes £267 off
+  the price.
+  <span class="fx">The Master frowns.</span>
+  A car that burns less is worth less ? Small, frugal engines sit in small, cheaper cars : the mpg tells
+  us about the car, not only about its thirst. And the R² rises from 0.29 to 0.40. In sample.`,
+  hud:{b2:'−267.36'}, note:'M2: price = 45183.88 - 0.261 mileage - 267.36 mpg; R2 0.29 -> 0.40' },
+
+{ id:'t3', type:'numeric', bg:'lab', who:'master', qn:'b',
+  title:'TRIAL III · IS MPG SIGNIFICANT ?',
+  text:`<strong>Is β<sub>2</sub> significant ?</strong> Read the t value of <span class="kbd">mpg</span> in
+  M2 : it tests β<sub>2</sub> = 0.`,
+  q:'Report the t value of β2 in M2.',
+  fields:[
+    {id:'t', label:'t value of β<sub>2</sub> (mpg)', value:-49.82221654364568,
+     alt:[{value:-67.78756878002444, msg:"That is the t value of mileage. Read the row mpg."},
+          {value:-267.3617903443966, msg:"That is the coefficient. The t value is the coefficient divided by its standard error."},
+          {value:5.366316653338377, msg:"That is the standard error. The t value is the coefficient divided by its standard error."},
+          {value:149.78022663096584, msg:"That is the t value of the intercept. Read the row mpg."}],
+     msg:"Read M2.tvalues['mpg']."}],
+  hint:`<b>M2.tvalues</b> lists the t values, <b>M2.pvalues</b> the p-values. The t value is the coefficient
+  divided by its standard error, <b>M2.bse</b>.`,
+  code:`print(M2.tvalues['mpg'], M2.pvalues['mpg'])`,
+  say:'The t value of mpg is −49.82, and its p-value is 0.',
+  right:`<strong>−49.82</strong>. The critical value at 5% is 1.96 : we are twenty-five times past it.
+  The p-value is so small that Python prints 0.`,
+  hud:{b2:'−267.36 · t −49.8'}, note:'t(beta2) = -49.82, p-value = 0: mpg is significant' },
+
+{ id:'t4', type:'choice', bg:'court', who:'master', qn:'b',
+  title:'TRIAL III · WHAT DOES IT PROMISE ?',
+  text:`Fine. mpg is significant.
+  <strong>According to this result, which model will exhibit the better predictive performance ?</strong>`,
+  q:'What can you expect?',
+  options:[
+    {id:'b', label:'M2, for sure: a significant variable always improves the predictions. No need to check.'},
+    {id:'c', label:'M1: with fewer parameters, it cannot overfit, so it always predicts better.'},
+    {id:'a', label:'We expect M2 to predict better, since mpg carries information that the mileage does not. But significance is measured in sample: only an out-of-sample comparison, a cross-validation, can confirm it.'},
+    {id:'d', label:'Neither: a negative coefficient on mpg means that the variable harms the predictions.'}
+  ], correct:'a',
+  hint:`Separate two questions : is β<sub>2</sub> different from zero in this sample, and does mpg improve the
+  predictions of cars the model has <em>not</em> seen ?`,
+  right:`Right. The test speaks about this sample. My buyers will bring cars that are not in it. To judge a
+  prediction, hide the car from the model, predict it, and measure the error. That is cross-validation.`,
+  wrong:{b:`A t test says that β<sub>2</sub> is not zero in this sample. It promises nothing about cars the model
+  has never seen.`,
+  c:`Fewer parameters reduce the risk of overfitting; they do not guarantee better predictions. A model that
+  misses a useful variable predicts worse.`,
+  d:`The sign gives the direction of the effect, not its usefulness. A negative coefficient predicts as well as
+  a positive one.`},
+  note:'significance is in sample; predictions are judged out of sample' },
+
+{ id:'cv', type:'info', bg:'lab', who:'master', qn:'c',
+  title:'THE ACADEMY · HIDE AND PREDICT',
+  text:`Two ways to hide cars. <strong>Leave-one-out</strong> : remove one car, estimate the model on the
+  13,118 others, predict the car you removed, and repeat for each of the 13,119 cars.
+  <strong>k-fold</strong> : cut the cars into k groups, estimate on k − 1 groups, predict the group left
+  out, and repeat k times. Then score the out-of-sample errors
+  <span class="kbd">e<sub>i</sub> = y<sub>i</sub> − ŷ<sub>(−i)</sub></span> :
+  <br><span class="kbd">RMSE = √( (1/N) Σ e<sub>i</sub>² )</span> &nbsp; and &nbsp;
+  <span class="kbd">MAE = (1/N) Σ |e<sub>i</sub>|</span><br>
+  Careful : <span class="kbd">cross_val_score</span> returns <em>minus</em> the mean squared error, so that a
+  higher score is better. And report every RMSE and MAE <strong>in thousands of pounds</strong> : 9.17, not
+  9170.`,
+  widget:'folds', cont:'Run the leave-one-out',
+  note:'RMSE = sqrt(mean e^2), MAE = mean |e|; report them in thousands of GBP' },
+
+{ id:'t5', type:'numeric', bg:'lab', who:'master', qn:'c',
+  title:'TRIAL IV · LEAVE ONE OUT',
+  text:`<strong>Apply a leave-one-out cross-validation to M1 and to M2, and rank the models with the RMSE
+  and the MAE.</strong> Python estimates each model 13,119 times : give it about a minute.`,
+  q:'Report the four errors in thousands of pounds, then rank the models.',
+  fields:[
+    {id:'r1', label:'M1: RMSE (thousands of £)', value:9.99034189695639,
+     alt:[{value:9990.34189695639, tol:5, msg:"Report the RMSE in thousands of pounds: divide by 1000."},
+          {value:99.80693121808219, msg:"That is the mean squared error, in millions of squared pounds. Take its square root."},
+          {value:99806931.21808219, msg:"That is the mean squared error. Take its square root, then divide by 1000."},
+          {value:-99.80693121808219, msg:"cross_val_score returns minus the squared errors: change the sign, then take the square root of the average."},
+          {value:6.535641175183837, msg:"That is the MAE of M1. The RMSE squares the errors before averaging them."},
+          {value:9.166140562766825, msg:"That is the RMSE of M2. M1 uses the columns const and mileage only."}],
+     msg:"RMSE = np.sqrt(np.mean(se_M1)) / 1000, with se_M1 the squared errors (minus the scores)."},
+    {id:'a1', label:'M1: MAE (thousands of £)', value:6.535641175183837,
+     alt:[{value:6535.641175183837, tol:5, msg:"Report the MAE in thousands of pounds: divide by 1000."},
+          {value:9.99034189695639, msg:"That is the RMSE of M1. The MAE averages the absolute errors, the square roots of the squared errors."},
+          {value:5.8467888789597955, msg:"That is the MAE of M2. M1 uses the columns const and mileage only."}],
+     msg:"With leave-one-out, each absolute error is the square root of one squared error: np.mean(np.sqrt(se_M1)) / 1000."},
+    {id:'r2', label:'M2: RMSE (thousands of £)', value:9.166140562766825,
+     alt:[{value:9166.140562766825, tol:5, msg:"Report the RMSE in thousands of pounds: divide by 1000."},
+          {value:84.01813281639932, msg:"That is the mean squared error, in millions of squared pounds. Take its square root."},
+          {value:84018132.81639932, msg:"That is the mean squared error. Take its square root, then divide by 1000."},
+          {value:-84.01813281639932, msg:"cross_val_score returns minus the squared errors: change the sign, then take the square root of the average."},
+          {value:5.8467888789597955, msg:"That is the MAE of M2. The RMSE squares the errors before averaging them."},
+          {value:9.99034189695639, msg:"That is the RMSE of M1. M2 uses all the columns of X."}],
+     msg:"RMSE = np.sqrt(np.mean(se_M2)) / 1000."},
+    {id:'a2', label:'M2: MAE (thousands of £)', value:5.8467888789597955,
+     alt:[{value:5846.7888789597955, tol:5, msg:"Report the MAE in thousands of pounds: divide by 1000."},
+          {value:9.166140562766825, msg:"That is the RMSE of M2. The MAE averages the absolute errors."},
+          {value:6.535641175183837, msg:"That is the MAE of M1. M2 uses all the columns of X."}],
+     msg:"MAE = np.mean(np.sqrt(se_M2)) / 1000."},
+    {id:'rk', kind:'select', label:'Which model has the lower errors?',
+     options:[['m1','M1, by both the RMSE and the MAE'],['m2','M2, by both the RMSE and the MAE'],
+              ['s1','M1 by the RMSE, M2 by the MAE'],['s2','M2 by the RMSE, M1 by the MAE']],
+     correct:'m2', msg:"Compare the two RMSE, then the two MAE: the lower error wins."}],
+  hint:`<b>LinearRegression()</b> is the model that scikit-learn re-estimates on each training set. With
+  <b>LeaveOneOut()</b>, each score is minus the squared error of one car : change the sign, then take the
+  square root of the average for the RMSE, and the average of the square roots for the MAE.`,
+  code:`lm = LinearRegression()
+se_M1 = -cross_val_score(lm, X1, y, scoring='neg_mean_squared_error', cv=LeaveOneOut())
+se_M2 = -cross_val_score(lm, X, y, scoring='neg_mean_squared_error', cv=LeaveOneOut())
+print(np.sqrt(np.mean(se_M1)) / 1000, np.mean(np.sqrt(se_M1)) / 1000)
+print(np.sqrt(np.mean(se_M2)) / 1000, np.mean(np.sqrt(???)) / 1000)`,
+  say:'Leave-one-out: M1 has an RMSE of 9.99 and an MAE of 6.54; M2 has 9.17 and 5.85. M2 wins on both.',
+  right:`M2 wins on both criteria : an RMSE of <strong>9.17</strong> against 9.99, an MAE of
+  <strong>5.85</strong> against 6.54 thousand pounds.
+  <span class="fx">The Master sighs.</span>
+  Notice two things. The RMSE lies far above the MAE : a few huge errors, once squared, weigh heavily. And
+  these out-of-sample errors are almost the in-sample ones (9.99 for M1 either way) : with 13,119 cars and
+  two or three parameters, there is little room to overfit.`,
+  hud:{rmse:'M1 9.99 · M2 9.17'}, note:'LOO (kGBP): M1 RMSE 9.99, MAE 6.54; M2 RMSE 9.17, MAE 5.85 -> M2' },
+
+{ id:'t6', type:'numeric', bg:'lab', who:'master', qn:'d',
+  title:'TRIAL V · TEN FOLDS',
+  text:`Thirteen thousand estimations for one verdict. <strong>Apply a 10-fold cross-validation</strong> to
+  both models, and rank them again. To get the same folds as everybody else, shuffle the cars with the seed
+  100 : <span class="kbd">KFold(n_splits=10, shuffle=True, random_state=100)</span>. The RMSE is the square
+  root of the average of the ten fold MSEs.`,
+  q:'Report the four errors in thousands of pounds.',
+  fields:[
+    {id:'r1', label:'M1: RMSE (thousands of £)', value:9.989232101495096,
+     alt:[{value:9989.232101495096, tol:5, msg:"Report the RMSE in thousands of pounds: divide by 1000."},
+          {value:99.78475797754012, msg:"That is the mean squared error, in millions of squared pounds. Take its square root."},
+          {value:99784757.97754012, msg:"That is the mean squared error. Take its square root, then divide by 1000."},
+          {value:-99.78475797754012, msg:"cross_val_score returns minus the MSE of each fold: change the sign first."},
+          {value:10.036997695606704, msg:"Your folds are not shuffled. Use KFold(n_splits=10, shuffle=True, random_state=100)."},
+          {value:9.968465847478426, tol:0.005, msg:"You averaged the ten fold RMSEs. Average the ten MSEs first, then take the square root."},
+          {value:6.5352786126995525, msg:"That is the MAE of M1. The RMSE squares the errors first."}],
+     msg:"RMSE = np.sqrt(np.mean(mse_M1)) / 1000, with mse_M1 = minus the ten scores."},
+    {id:'a1', label:'M1: MAE (thousands of £)', value:6.5352786126995525,
+     alt:[{value:6535.2786126995525, tol:5, msg:"Report the MAE in thousands of pounds: divide by 1000."},
+          {value:6.55647631383307, tol:0.005, msg:"Your folds are not shuffled. Use KFold(n_splits=10, shuffle=True, random_state=100)."},
+          {value:9.989232101495096, msg:"That is the RMSE of M1. Use scoring='neg_mean_absolute_error' for the MAE."}],
+     msg:"MAE = np.mean(mae_M1) / 1000, with mae_M1 = minus the scores of 'neg_mean_absolute_error'."},
+    {id:'r2', label:'M2: RMSE (thousands of £)', value:9.165862039331578,
+     alt:[{value:9165.862039331578, tol:5, msg:"Report the RMSE in thousands of pounds: divide by 1000."},
+          {value:84.01302692405963, msg:"That is the mean squared error, in millions of squared pounds. Take its square root."},
+          {value:84013026.92405963, msg:"That is the mean squared error. Take its square root, then divide by 1000."},
+          {value:-84.01302692405963, msg:"cross_val_score returns minus the MSE of each fold: change the sign first."},
+          {value:9.208851966375234, msg:"Your folds are not shuffled. Use KFold(n_splits=10, shuffle=True, random_state=100)."},
+          {value:9.14777525630319, tol:0.005, msg:"You averaged the ten fold RMSEs. Average the ten MSEs first, then take the square root."},
+          {value:5.846227234315591, msg:"That is the MAE of M2. The RMSE squares the errors first."}],
+     msg:"RMSE = np.sqrt(np.mean(mse_M2)) / 1000."},
+    {id:'a2', label:'M2: MAE (thousands of £)', value:5.846227234315591,
+     alt:[{value:5846.227234315591, tol:5, msg:"Report the MAE in thousands of pounds: divide by 1000."},
+          {value:5.8699246501607095, tol:0.005, msg:"Your folds are not shuffled. Use KFold(n_splits=10, shuffle=True, random_state=100)."},
+          {value:9.165862039331578, msg:"That is the RMSE of M2. Use scoring='neg_mean_absolute_error' for the MAE."}],
+     msg:"MAE = np.mean(mae_M2) / 1000."}],
+  hint:`<b>KFold</b> only describes the folds; <b>cross_val_score</b> estimates and scores. With
+  <b>'neg_mean_absolute_error'</b>, each score is minus the MAE of one fold. Average the ten MSEs before the
+  square root.`,
+  code:`folds = KFold(n_splits=10, shuffle=True, random_state=100)
+mse_M1 = -cross_val_score(lm, X1, y, scoring='neg_mean_squared_error', cv=folds)
+mae_M1 = -cross_val_score(lm, X1, y, scoring='neg_mean_absolute_error', cv=folds)
+mse_M2 = -cross_val_score(lm, X, y, scoring='neg_mean_squared_error', cv=folds)
+mae_M2 = -cross_val_score(lm, X, y, scoring='neg_mean_absolute_error', cv=folds)
+print(np.sqrt(np.mean(mse_M1)) / 1000, np.mean(mae_M1) / 1000)
+print(np.sqrt(np.mean(???)) / 1000, np.mean(???) / 1000)`,
+  say:'10-fold: M1 has an RMSE of 9.99 and an MAE of 6.54; M2 has 9.17 and 5.85.',
+  right:`M1 <strong>9.99</strong> and <strong>6.54</strong>, M2 <strong>9.17</strong> and
+  <strong>5.85</strong> : the leave-one-out numbers, to the nearest ten pounds.`,
+  note:'10-fold (seed 100): M1 9.99 / 6.54; M2 9.17 / 5.85' },
+
+{ id:'t7', type:'choice', bg:'court', who:'master', qn:'d',
+  title:'TRIAL V · THE SAME VERDICT ?',
+  text:`<strong>Do you reach the same conclusion as with the leave-one-out ?</strong> And which method would you
+  run next time ?`,
+  q:'Compare the two cross-validations.',
+  options:[
+    {id:'b', label:'No: with the 10-fold, M1 beats M2 on the MAE.'},
+    {id:'c', label:'Yes, and the 10-fold is more accurate, because each model is trained on more cars than in the leave-one-out.'},
+    {id:'d', label:'Yes, but only because shuffle=True turns the 10-fold into a leave-one-out.'},
+    {id:'a', label:'Yes: M2 beats M1 on both criteria, and the errors barely move. The 10-fold needs 10 estimations instead of 13,119, so it reaches the same verdict much faster; the seed makes its folds reproducible.'}
+  ], correct:'a',
+  hint:`Compare the two rankings, then count how many times each method estimates a model.`,
+  right:`Same verdict, more than a thousand times cheaper. With a large sample, the 10-fold is the sensible
+  default.
+  <span class="fx">The Master straightens up.</span>
+  M2 beats M1. Fine. But look at those errors : nine thousand pounds, on cars that cost 22,480 at the
+  median. Something is wrong with the price itself.`,
+  wrong:{b:`Compare again : by the MAE, 6.54 for M1 against 5.85 for M2, with both methods.`,
+  c:`It is the other way round : the leave-one-out trains on 13,118 cars, the 10-fold on about 11,807. The
+  10-fold wins on speed.`,
+  d:`Shuffling only mixes the cars before cutting ten folds. There are still ten folds of about 1,312 cars.`},
+  note:'same ranking with LOO and 10-fold; 10-fold: 10 estimations instead of 13119' },
+
+{ id:'t8', type:'choice', bg:'lab', who:'master', qn:'e',
+  title:'TRIAL VI · THE SHAPE OF THE PRICE',
+  text:`Before a third model, look at what we predict.
+  <strong>Draw a histogram of the price, and a histogram of its logarithm</strong>,
+  <span class="kbd">np.log(price)</span>. <strong>Which one looks closer to a normal distribution ?</strong>`,
+  q:'Compare the two histograms.',
+  options:[
+    {id:'b', label:'The price: it is bell-shaped, while its logarithm is skewed to the left.'},
+    {id:'c', label:'Neither changes: the logarithm only relabels the axis, so the two histograms have the same shape.'},
+    {id:'d', label:'Both look normal: with 13,119 cars, every variable is normally distributed.'},
+    {id:'a', label:'The logarithm. The price is skewed to the right: most cars cost less than £40,000, and a long tail stretches up to £159,999. Its logarithm is close to a symmetric bell.'}
+  ], correct:'a',
+  hint:`<b>plt.subplots(1, 2)</b> draws two panels side by side. Use about 40 bins. <b>stats.skew</b> puts a
+  number on the asymmetry.`,
+  code:`fig, ax = plt.subplots(1, 2, figsize=(10, 4))
+ax[0].hist(y, bins=40)
+ax[0].set_title('price')
+ax[1].hist(np.log(y), bins=40)
+ax[1].set_title('log(price)')
+plt.show()
+print(stats.skew(y), stats.skew(np.log(y)))`,
+  right:`The logarithm. The skewness falls from <strong>2.65</strong> to <strong>−0.31</strong>. The log
+  compresses the expensive cars : £159,999 is seven times the median price, but its logarithm, 11.98, lies
+  only about 2 above the median logarithm, 10.02.`,
+  wrong:{b:`Look again at the right of the price histogram : a long tail of expensive cars, and nothing like it
+  on the left.`,
+  c:`The logarithm is not linear : it compresses large values much more than small ones, so the shape changes.`,
+  d:`A large sample makes the <em>average</em> close to normal, not the variable itself.`},
+  widgetAfter:'hist', note:'skewness: price 2.65, log(price) -0.31 -> the log is closer to normal' },
+
+{ id:'t9', type:'info', bg:'lab', who:'master', qn:'e',
+  title:'THE ACADEMY · COUNT THE OUTLIERS',
+  text:`A histogram is an impression. So I counted for you, with the 99% interval of the first exercise,
+  <span class="kbd">median ± 2.58 · σ̂</span>, applied to the price and then to its logarithm.
+  <strong>6.43%</strong> of the prices, 843 cars, fall outside the interval, against
+  <strong>3.09%</strong> of the logarithms, 405 cars : the log halves the outliers.
+  <span class="fx">The Master leans closer.</span>
+  And look where they sit. With the price, 841 of the 843 are on the right : the rule mistakes the honest
+  right tail for outliers. With the log, 203 below and 202 above : a symmetric distribution, symmetric
+  outliers. A normal distribution would leave 1% outside. We are not there, but much closer.`,
+  widget:'histmad', hud:{out:'6.43% → 3.09%'}, cont:'Model the logarithm',
+  note:'99% interval: price 6.43% outside (843, 841 high); log 3.09% (405: 203 low, 202 high)' },
+
+{ id:'t10', type:'numeric', bg:'lab', who:'master', qn:'f',
+  title:'TRIAL VII · THE THIRD MODEL',
+  text:`Then let us model the logarithm, with the regressors of M2 :
+  <br><span class="kbd">M3 : log(Price<sub>i</sub>) = β<sub>0</sub> + β<sub>1</sub> mileage<sub>i</sub> + β<sub>2</sub> mpg<sub>i</sub> + ε<sub>i</sub></span><br>
+  in which log is the natural logarithm. <strong>Estimate M3 on the full sample. What are β<sub>1</sub> and
+  β<sub>2</sub> ?</strong> Three significant digits are enough.`,
+  q:'Estimate M3 by OLS on the 13,119 cars.',
+  fields:[
+    {id:'b1', label:'β<sub>1</sub> (mileage)', value:-1.3231883640190982e-05,
+     alt:[{value:-0.000013, tol:5e-08, msg:"print(M3.params) rounds to six decimals. Print the coefficient itself: print(M3.params['mileage']), which shows -1.3231...e-05."},
+          {value:-5.746534050120849e-06, msg:"np.log10 is the base-10 logarithm. Use np.log, the natural logarithm."},
+          {value:-2.071049310602628e-06, msg:"That is the slope of a regression without intercept. Use X, which contains the constant."},
+          {value:-1.425429544011531e-05, msg:"That is the slope with the mileage only. M3 has the regressors of M2: use X."},
+          {value:-0.2614501623608368, msg:"That is M2. In M3, the dependent variable is np.log(y)."}],
+     msg:"Read M3.params['mileage'], e.g., -1.32e-05."},
+    {id:'b2', label:'β<sub>2</sub> (mpg)', value:-0.0070127580811823985,
+     alt:[{value:-0.003045602137579953, msg:"np.log10 is the base-10 logarithm. Use np.log, the natural logarithm."},
+          {value:0.16886323804238876, msg:"That is the coefficient of a regression without intercept. Use X, which contains the constant."},
+          {value:-267.3617903443966, msg:"That is M2. In M3, the dependent variable is np.log(y)."}],
+     msg:"Read M3.params['mpg']."}],
+  hint:`Only the dependent variable changes : <b>np.log(y)</b>, with the same <b>X</b> as M2. Careful :
+  <b>print(M3.params)</b> rounds to six decimals and shows <b>-0.000013</b>. Print each coefficient on its
+  own : Python then writes <b>-1.3231...e-05</b>, which means −1.3231… × 10<sup>−5</sup>.`,
+  code:`ly = np.log(y)
+M3 = sm.OLS(ly, X).fit()
+print(M3.summary())
+print(M3.params['mileage'], M3.params['mpg'])`,
+  say:'In M3, β1 = −1.32e-05 and β2 = −0.00701.',
+  right:`β<sub>1</sub> = <strong>−1.32e-05</strong> and β<sub>2</sub> = <strong>−0.00701</strong>. In
+  logarithms, the coefficients speak in percent : every 1,000 miles take about <strong>1.3%</strong> off the
+  price, every extra mile per gallon about <strong>0.7%</strong>. A G Class and an A Class lose the same
+  <em>share</em> of their value per mile, not the same number of pounds.
+  <span class="fx">The Master traces the curve with his finger.</span>
+  And the exponential of anything is positive : no more negative prices.`,
+  widgetAfter:'curves', note:'M3 (log price): beta1 = -1.32e-05 (-1.3% per 1000 miles), beta2 = -0.00701 (-0.7% per mpg)' },
+
+{ id:'t11', type:'choice', bg:'court', who:'master', qn:'f',
+  title:'TRIAL VII · TWO R²',
+  text:`<span class="fx">The Master reads the summary of M3.</span>
+  R² = 0.54. M2 had 0.40. <strong>Can we conclude that M3 predicts the price better than M2 ?</strong>`,
+  q:'Compare the two R².',
+  options:[
+    {id:'b', label:'Yes: 0.54 is larger than 0.40, so M3 explains more of the price.'},
+    {id:'c', label:'Yes, because the two models use the same explanatory variables, so their R² are comparable.'},
+    {id:'d', label:'No: M2 is better, because the R² of a model in logarithms is always too high.'},
+    {id:'a', label:'No. The R² of M3 is the share of the variance of log(price) that it explains; the R² of M2, the share of the variance of the price. The dependent variables differ, so the two R² cannot be compared. Predict the price with both models, out of sample, and compare the errors in pounds.'}
+  ], correct:'a',
+  hint:`Write the R² : 1 − (sum of the squared residuals) / (sum of the squared deviations of y from its
+  mean). What is y in M2 ? And in M3 ?`,
+  right:`Right. An R² is a share of the variance of <em>its own</em> dependent variable. To compare M3 with M2,
+  both must predict the same thing, the price, on cars they have not seen.`,
+  wrong:{b:`0.54 is a share of the variance of log(price), not of the price. Two different denominators.`,
+  c:`Same regressors, but different dependent variables : the R² divides by the variance of the dependent
+  variable.`,
+  d:`There is no such rule. The R² of a model in logarithms is neither too high nor too low : it measures
+  something else.`},
+  note:'R2 in log and R2 in price are not comparable' },
+
+{ id:'t12', type:'numeric', bg:'lab', who:'master', qn:'f',
+  title:'TRIAL VIII · BACK TO POUNDS',
+  text:`<strong>Apply the 10-fold cross-validation to M3, with the same folds.</strong> M3 predicts
+  log(price) : bring each prediction back to pounds with <span class="kbd">np.exp</span>, and only then
+  compute the errors against the <em>price</em>. <span class="kbd">cross_val_score</span> would score the
+  logarithms; <span class="kbd">cross_val_predict</span> returns the out-of-sample prediction of every car.
+  No correction : just <span class="kbd">np.exp</span>.`,
+  q:'Report the RMSE and the MAE of M3 in thousands of pounds, then name the best model.',
+  fields:[
+    {id:'r', label:'M3: RMSE (thousands of £)', value:8.923779596982078,
+     alt:[{value:8923.779596982078, tol:5, msg:"Report the RMSE in thousands of pounds: divide by 1000."},
+          {value:0.2968900378545876, msg:"That is the RMSE of the logarithms. Bring the predictions back to pounds with np.exp, then compare them with the price."},
+          {value:0.0002968900378545876, msg:"That is the RMSE of the logarithms. Bring the predictions back to pounds with np.exp, then compare them with the price."},
+          {value:27.381735233254913, msg:"You compared the price with the predicted logarithm. Apply np.exp to the predictions first."},
+          {value:8.796433314820628, tol:0.005, msg:"You corrected the predictions with exp(σ̂²/2). The Master asked for np.exp only: no correction."},
+          {value:8.954133667554748, tol:0.005, msg:"Your folds are not shuffled. Use the same folds: KFold(n_splits=10, shuffle=True, random_state=100)."},
+          {value:8.902345614224858, tol:0.005, msg:"You averaged the ten fold RMSEs. Pool the errors of all the cars: np.sqrt(np.mean(err_M3**2))."},
+          {value:79.63384229551362, msg:"That is the mean squared error, in millions of squared pounds. Take its square root."},
+          {value:5.457800748633977, msg:"That is the MAE of M3. The RMSE squares the errors first."}],
+     msg:"RMSE = np.sqrt(np.mean(err_M3**2)) / 1000, with err_M3 = y - np.exp(log_pred)."},
+    {id:'a', label:'M3: MAE (thousands of £)', value:5.457800748633977,
+     alt:[{value:5457.800748633977, tol:5, msg:"Report the MAE in thousands of pounds: divide by 1000."},
+          {value:0.21926880950172775, msg:"That is the MAE of the logarithms. Bring the predictions back to pounds with np.exp, then compare them with the price."},
+          {value:0.00021926880950172775, msg:"That is the MAE of the logarithms. Bring the predictions back to pounds with np.exp, then compare them with the price."},
+          {value:5.571338140885158, tol:0.005, msg:"You corrected the predictions with exp(σ̂²/2). The Master asked for np.exp only: no correction."},
+          {value:5.475681972719798, tol:0.005, msg:"Your folds are not shuffled. Use the same folds: KFold(n_splits=10, shuffle=True, random_state=100)."},
+          {value:8.923779596982078, msg:"That is the RMSE of M3. The MAE averages the absolute errors."}],
+     msg:"MAE = np.mean(np.abs(err_M3)) / 1000."},
+    {id:'best', kind:'select', label:'With the 10-fold, which model has the lowest RMSE and the lowest MAE?',
+     options:[['m1','M1 (price on mileage)'],['m2','M2 (price on mileage and mpg)'],
+              ['m3','M3 (log of the price, brought back with np.exp)'],['split','No single model wins on both criteria']],
+     correct:'m3', msg:"Put the 10-fold errors of the three models side by side: M1 9.99 and 6.54, M2 9.17 and 5.85, and yours for M3."}],
+  hint:`<b>cross_val_predict(lm, X, np.log(y), cv=folds)</b> returns the predicted logarithm of every car, each
+  made by a model that never saw it. Apply <b>np.exp</b>, compute the errors in pounds, and divide by 1000.`,
+  code:`log_pred = cross_val_predict(lm, X, np.log(y), cv=folds)
+pred_M3 = np.exp(log_pred)
+err_M3 = y - pred_M3
+print(np.sqrt(np.mean(err_M3**2)) / 1000, np.mean(np.abs(???)) / 1000)`,
+  say:'M3 has an RMSE of 8.92 and an MAE of 5.46 thousand pounds. It beats M1 and M2 on both criteria.',
+  wow:true,
+  right:`M3 : an RMSE of <strong>8.92</strong> and an MAE of <strong>5.46</strong>. M2 had 9.17 and 5.85.
+  The model of the logarithm beats the model of the price, on both criteria, in pounds, on cars it never saw.
+  <span class="fx">The Master stares at the ranking for a long time.</span>
+  And my model, the simplest one, comes last.`,
+  widgetAfter:'scores', hud:{rmse:'M2 9.17 · M3 8.92'},
+  note:'10-fold, M3 with np.exp: RMSE 8.92, MAE 5.46 -> M3 beats M2 and M1' },
+
+{ id:'t13', type:'choice', bg:'court', who:'master', qn:'f',
+  title:'TRIAL VIII · WHY THE LOG ?',
+  text:`<strong>Why does the model of the logarithm predict the price better ?</strong>`,
+  q:'Choose the explanation.',
+  options:[
+    {id:'b', label:'Because its R² is higher.'},
+    {id:'c', label:'Because the logarithm removes the outliers from the sample.'},
+    {id:'d', label:'Because np.exp makes the predictions larger, and larger predictions reduce the errors.'},
+    {id:'a', label:'Because the effects are multiplicative: the mileage and the mpg move the price by a percentage, not by a fixed number of pounds. On the log scale, the expensive cars no longer dominate the least squares fit, the errors are closer to symmetric, and the predictions can never be negative.'}
+  ], correct:'a',
+  hint:`Compare M2 and M3 on a cheap car and on an expensive one : do 1,000 extra miles cost the same number
+  of pounds, or the same percentage ?`,
+  right:`Right. A Mercedes loses a share of its value, not a fixed amount. The logarithm turns that into a
+  straight line, and least squares works best on straight lines with symmetric errors.`,
+  wrong:{b:`We just saw that the two R² cannot be compared.`,
+  c:`No car was removed : all 13,119 are still there. The log changes the scale, so fewer of them look extreme.`,
+  d:`On average, the predictions of np.exp are too <em>small</em> : £23,508 against an average price of
+  £24,699.`},
+  note:'log: multiplicative effects, symmetric errors, positive predictions' },
+
+{ id:'bias', type:'info', bg:'court', who:'master', mood:'raised', qn:'f',
+  title:'THE ACADEMY · ONE LAST DOUBT',
+  text:`One last doubt, before you celebrate. We took <span class="kbd">np.exp</span> of the predicted
+  logarithm. But the exponential of an average is not the average of the exponentials :
+  <span class="kbd">exp(E[log y]) ≤ E[y]</span>. If the errors ε are normal with variance σ², then
+  <span class="kbd">E[y | x] = exp(x′β + σ²/2)</span>. So <span class="kbd">np.exp(prediction)</span>
+  predicts the <strong>median</strong> price, not the average : it is biased downwards. Here σ̂ = 0.297, and
+  the correction factor exp(σ̂²/2) = 1.045, i.e., 4.5%.
+  <span class="fx">The Master shrugs.</span>
+  We did not correct it, and M3 still won. With the correction, the RMSE would fall to about 8.80, but the
+  MAE would rise to 5.57 : the average minimizes the squared errors, the median the absolute errors.`,
+  cont:'Close the file',
+  note:'np.exp(pred) predicts the median; the mean needs x exp(s^2/2) = 1.045 (not applied here)' },
+
+{ id:'close', type:'info', bg:'world', who:'master', mood:'amused', qn:'—',
+  title:'THE ACADEMY · DISMISSAL',
+  text:`My machine will run on M3. Four rules leave with you.
+  <strong>One.</strong> A significant coefficient is an in-sample fact. Judge a prediction out of sample :
+  cross-validate.
+  <strong>Two.</strong> Leave-one-out and 10-fold reached the same verdict; the 10-fold needed 10 estimations
+  instead of 13,119. Fix the seed to reproduce the folds.
+  <strong>Three.</strong> Look at the histogram of what you predict. A right-skewed price calls for the
+  logarithm : the distribution becomes symmetric and the outliers are halved.
+  <strong>Four.</strong> Compare models on the same scale, never the R² of a logarithm against the R² of a
+  price. Bring the predictions back with np.exp, and remember that it predicts the median, not the average.`,
+  banner:'CROSS-VALIDATE. LOOK AT THE SHAPE. COMPARE ON THE SAME SCALE.', cont:'Finish', final:true }
+];
+
+/* ================================================================
+   ENGINE
+   ================================================================ */
+const $ = (s)=>document.querySelector(s);
+const el = {
+  boot:$('#boot'), dlg:$('#dlg'), dlgTitle:$('#dlg-title'), zone:$('#zone'),
+  bg:$('#bg'), master:$('#av-master'), student:$('#av-student'),
+  portL:$('#port-left'), portR:$('#port-right'), nameL:$('#name-left'), nameR:$('#name-right'),
+  frameL:$('#frame-left'), frameR:$('#frame-right'), back:$('#btn-back'),
+  hudQ:$('#hud-q'), doom:$('#doom'), note:$('#notebook')
+};
+let idx=0, playerName='Apprentice', typing=null, flap=null, notes=[];
+let solved = new Set();          // ids of the steps already answered correctly
+let seq=0;                       // bumped on every render, so that stale
+                                 // timers from an abandoned step do nothing
+/* the resting expression of each character on the current step */
+const baseMood = { master:null, student:null };
+const reactTimer = { master:null, student:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#'+id).classList.add('on');
+  syncBack();
+}
+
+/* ---- avatars: codec portraits. Both stay on screen; the speaker is lit ---- */
+el.master.innerHTML = SVG_MASTER;
+el.student.innerHTML = SVG_STUDENT;
+
+const MOODS = ['mood-angry','mood-raised','mood-surprised','mood-amused','mood-sad'];
+function node(who){ return who==='student' ? el.student : el.master; }
+
+function setMood(who, mood){
+  baseMood[who] = mood || null;
+  if(reactTimer[who]) return;              // a reaction is playing; it restores later
+  applyMood(who, mood);
+}
+function applyMood(who, mood){
+  const n = node(who);
+  n.classList.remove(...MOODS);
+  if(mood) n.classList.add('mood-'+mood);
+}
+function clearReactions(){
+  ['master','student'].forEach(w=>{
+    if(reactTimer[w]){ clearTimeout(reactTimer[w]); reactTimer[w]=null; }
+  });
+}
+/* a short-lived expression, after which the resting one comes back */
+function react(who, mood, ms){
+  if(reactTimer[who]) clearTimeout(reactTimer[who]);
+  applyMood(who, mood);
+  reactTimer[who] = setTimeout(()=>{ reactTimer[who]=null; applyMood(who, baseMood[who]); }, ms||2400);
+}
+/* the three moments the faces respond to */
+function reactTo(kind){
+  if(kind==='right'){ react('master','amused',2600); react('student','amused',2600); }
+  else if(kind==='wrong'){ react('master','angry',2600); react('student','sad',2600); }
+  else if(kind==='wow'){ react('student','surprised',3200); react('master','amused',3200); }
+}
+
+function setSpeaker(who){
+  const student = (who==='student');
+  el.portL.classList.toggle('talking', student);
+  el.portR.classList.toggle('talking', !student);
+  el.frameL.classList.toggle('lit', student);
+  el.frameR.classList.toggle('lit', !student);
+  el.nameL.textContent = playerName.toUpperCase();
+}
+function startFlap(who){
+  const n = node(who);
+  stopFlap();
+  let f=0;
+  flap = { node:n, id:setInterval(()=>{
+    n.classList.remove('talk-1','talk-2');
+    n.classList.add(f%2 ? 'talk-1' : 'talk-2');
+    f++;
+  },105) };
+}
+function stopFlap(){
+  if(flap){ clearInterval(flap.id); flap.node.classList.remove('talk-1','talk-2'); flap=null; }
+}
+/* idle blink */
+setInterval(()=>{
+  [el.master, el.student].forEach(a=>{
+    if(Math.random()<0.5){
+      a.classList.add('blinking');
+      setTimeout(()=>a.classList.remove('blinking'),120);
+    }
+  });
+}, 3600);
+
+/* ---- typewriter ---- */
+function typeInto(target, html, who, done){
+  if(typing){ clearInterval(typing.id); typing=null; }
+  stopFlap();
+  // walk the html, printing text nodes character by character
+  target.innerHTML = html;
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, null);
+  const chunks = [];
+  let t;
+  while((t = walker.nextNode())){ chunks.push({node:t, full:t.nodeValue}); t.nodeValue=''; }
+  let ci=0, pos=0;
+  if(who) startFlap(who);
+  const caret = document.createElement('span'); caret.id='caret';
+  target.appendChild(caret);
+  const finish = ()=>{
+    clearInterval(typing.id); typing=null;
+    chunks.forEach(c=>c.node.nodeValue=c.full);
+    if(caret.parentNode) caret.remove();
+    stopFlap();
+    done && done();
+  };
+  typing = { finish, id:setInterval(()=>{
+    let budget = CONFIG.TYPE_CHARS;       // characters per tick
+    while(budget-- > 0){
+      if(ci>=chunks.length){ finish(); return; }
+      const c = chunks[ci];
+      if(pos >= c.full.length){ ci++; pos=0; continue; }
+      c.node.nodeValue += c.full[pos];
+      pos++;
+    }
+  }, CONFIG.TYPE_MS) };
+}
+el.dlg.addEventListener('click', ()=>{ if(typing) typing.finish(); });
+
+/* ---- notebook ---- */
+function addNote(text){
+  if(!text || notes.includes(text)) return;
+  notes.push(text);
+  renderNotes();
+}
+function renderNotes(){
+  el.note.innerHTML = notes.length ? notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')
+                                   : '<i style="color:#666">empty</i>';
+}
+
+/* ---- HUD: filled only by solved steps (and by info steps), so it never gives an answer away ---- */
+const HUD0 = {b2:'—', rmse:'—', out:'—'};
+function setHUD(h){
+  if(!h) return;
+  Object.keys(h).forEach(k=>{ const b=$('#hud-'+k); if(b) b.textContent = h[k]; });
+}
+/* the HUD as it stood when step i opened: everything solved before it */
+function hudAt(i){
+  const h = Object.assign({}, HUD0);
+  for(let k=0; k<i; k++){ if(STEPS[k] && STEPS[k].hud && (STEPS[k].type==='info' || solved.has(STEPS[k].id))) Object.assign(h, STEPS[k].hud); }
+  return h;
+}
+function bannerAt(i){
+  for(let k=i; k>=0; k--){ if(STEPS[k] && STEPS[k].banner) return STEPS[k].banner; }
+  return 'CASE OPEN';
+}
+
+/* ---- background ---- */
+function setBG(key){
+  const url = CONFIG.BACKGROUNDS[key];
+  el.bg.style.background = CONFIG.FALLBACK[key] || CONFIG.FALLBACK.lab;
+  if(!url) return;
+  const im = new Image();
+  im.onload = ()=>{ el.bg.style.backgroundImage = `url("${url}")`;
+                    el.bg.style.backgroundSize='cover'; el.bg.style.backgroundPosition='center'; };
+  im.src = url;
+}
+
+/* ================================================================
+   WIDGETS — pictures shown with or after a question, drawn from the
+   embedded data: the first rows of the file, a random sample of 700
+   cars with the fitted line of M1, a scheme of the two cross-
+   validations, the histograms of the price and of its logarithm (with
+   the MAD bounds), the curves of M2 and M3, and the errors of the three
+   models. Points are never connected; hovering a point or a bar shows
+   its values.
+   ================================================================ */
+const PLOT = {
+  paper:'#f2ead6', ink:'#23233f', second:'#a8420f', fit:'#b3122b',
+  axis:'#9a9483', label:'#4a4636', frame:'#0c0c18'
+};
+const TXT = (x,y,t,o)=>{ o=o||{};
+  return `<text x="${x}" y="${y}" fill="${o.col||PLOT.label}" font-size="${o.sz||16}"
+    text-anchor="${o.anchor||'middle'}" font-family="VT323,monospace">${t}</text>`; };
+function escapeAttr(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const fmt = (v,d)=>Number(v).toLocaleString('en-GB',{minimumFractionDigits:d||0, maximumFractionDigits:d||0});
+
+function plotFrame(title, inner, foot){
+  return `<div class="win95"><div class="titlebar"><span>${title}</span><span class="boxes">▬ □ ✕</span></div>
+    <div style="padding:4px;background:${PLOT.frame}">${inner}</div>
+    ${foot ? `<div style="padding:5px 8px;background:var(--panel);font:11px Tahoma,sans-serif;color:#333">${foot}</div>` : ''}
+  </div>`;
+}
+
+/* a scatter panel: point series (one colour per point if colorAt is given),
+   straight lines (solid or dashed), labels */
+function panelSVG(o){
+  const W=700, H=o.H||320, L=o.L||70, R=684, T=40, B=(o.B||260);
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - (v-o.ymin)/(o.ymax-o.ymin)*(B-T);
+  let lines='';
+  (o.lines||[]).forEach(l=>{
+    lines += `<line x1="${px(l.x1).toFixed(1)}" y1="${py(l.y1).toFixed(1)}" x2="${px(l.x2).toFixed(1)}" y2="${py(l.y2).toFixed(1)}"
+      stroke="${l.color||PLOT.fit}" stroke-width="${l.w||2}" ${l.dash?`stroke-dasharray="7 6"`:''}/>`;
+  });
+  let marks='';
+  (o.series||[]).forEach(s=>{
+    for(let i=0;i<s.x.length;i++){
+      const tip = s.tip ? `<title>${escapeAttr(s.tip(i))}</title>` : '';
+      marks += `<circle cx="${px(s.x[i]).toFixed(1)}" cy="${py(s.y[i]).toFixed(1)}" r="${s.rAt?s.rAt(i):(s.r||4)}"
+        fill="${s.colorAt?s.colorAt(i):(s.color||PLOT.ink)}" fill-opacity="${s.alpha||0.8}" stroke="${PLOT.paper}" stroke-width="1">${tip}</circle>`;
+    }
+  });
+  let labels='';
+  (o.labels||[]).forEach(p=>{
+    if(p.box){ const w=p.text.length*7.6+10, x0=px(p.x)-(p.anchor==='end'?w-5:5);
+      labels += `<rect x="${x0.toFixed(1)}" y="${(py(p.y)-14).toFixed(1)}" width="${w.toFixed(1)}" height="19" fill="${PLOT.paper}" fill-opacity=".92"/>`; }
+    labels += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  (o.xticks||[]).forEach(v=>{
+    ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+      + TXT(px(v).toFixed(1), B+21, o.xfmt?o.xfmt(v):v, {sz:15});
+  });
+  (o.yticks||[]).forEach(v=>{
+    ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+      + TXT(L-9, (py(v)+5).toFixed(1), o.yfmt?o.yfmt(v):v, {sz:15, anchor:'end'});
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title||'', {sz:17, anchor:'start'})}
+    ${lines}${marks}${labels}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab||'', {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">${o.ylab||''}</text>
+  </svg>`;
+}
+
+/* a legend in data coordinates: a short line and its text, one item per row */
+function legend(x, y, dy, items){
+  const lines=[], labels=[];
+  items.forEach((it,k)=>{
+    const yy = y - k*dy;
+    lines.push({x1:x, y1:yy, x2:x+12, y2:yy, color:it.color, w:it.w||2.5, dash:it.dash});
+    labels.push({x:x+15, y:yy-3, text:it.text, col:it.color});
+  });
+  return {lines, labels};
+}
+
+/* ---- the cold open: the first rows of the file, transposed (df.head().T) ---- */
+function playTable(host){
+  const cols = DATA.COLS;
+  let body='';
+  cols.forEach((c,k)=>{
+    const y = 92 + k*26;
+    body += TXT(230, y, c, {sz:18, anchor:'end', col:PLOT.ink});
+    DATA.HEAD.forEach((row,j)=>{
+      let v = row[k];
+      if(typeof v === 'string') v = v.trim();
+      else if(c==='mpg' || c==='engineSize') v = Number(v).toFixed(1);
+      else v = String(Math.round(v));
+      body += TXT(340 + j*86, y, escapeAttr(v), {sz:18, anchor:'end'});
+    });
+  });
+  const H = 92 + cols.length*26 + 24;
+  const svg=`<svg viewBox="0 0 700 ${H}" style="width:100%;height:auto;display:block">
+    <rect width="700" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(24,30,'DATA_MERCEDES.XLSX · print(df.head().T)',{sz:18,anchor:'start'})}
+    ${DATA.HEAD.map((r,j)=>TXT(340 + j*86, 62, String(j), {sz:18, col:PLOT.ink, anchor:'end'})).join('')}
+    <line x1="20" y1="72" x2="684" y2="72" stroke="${PLOT.axis}"/>
+    ${body}
+    ${TXT(350,H-12,'13,119 rows: one used Mercedes per row, 9 columns.',{sz:15})}
+  </svg>`;
+  host.innerHTML = plotFrame('EXHIBIT · THE SHEET', svg,
+    'price in pounds (£), mileage in miles, tax in £ per year, mpg in miles per gallon, engineSize in litres.');
+  return 600;
+}
+
+/* ---- the sample of cars: mileage and price, in thousands ---- */
+function carCloud(){
+  return {x:DATA.SX.map(v=>v/1000), y:DATA.SY.map(v=>v/1000), r:3, alpha:0.45, color:PLOT.ink,
+          tip:i=>`mileage ${fmt(DATA.SX[i])}, price £${fmt(DATA.SY[i])}`};
+}
+const CLOUD = {H:400, B:340, xmin:0, xmax:260, ymin:-50, ymax:140,
+  xticks:[0,50,100,150,200,250], yticks:[-40,0,40,80,120],
+  xlab:'mileage (thousands of miles)', ylab:'price (thousands of £)'};
+
+/* ---- M1: the fitted line crosses zero ---- */
+function playScatter(host){
+  const b0=DATA.M1[0], b1=DATA.M1[1];
+  const z = -b0/b1/1000;                       // mileage of a zero price, in thousands
+  const lg = legend(150, 128, 12, [{text:'M1 fitted line (full sample)', color:PLOT.fit}]);
+  const o = Object.assign({}, CLOUD, {
+    series:[carCloud()],
+    lines:[{x1:0, y1:0, x2:260, y2:0, color:PLOT.axis, w:1, dash:true},
+           {x1:z, y1:-50, x2:z, y2:0, color:PLOT.second, w:1.5, dash:true},
+           {x1:0, y1:b0/1000, x2:260, y2:(b0+b1*260000)/1000, color:PLOT.fit, w:2.5}].concat(lg.lines),
+    labels:[{x:z+4, y:-36, text:`price &lt; 0 beyond ${fmt(z*1000)} miles`, col:PLOT.second}].concat(lg.labels),
+    title:'700 cars drawn at random, and the line of M1'
+  });
+  host.innerHTML = plotFrame('EVIDENCE · MY MODEL', panelSVG(o),
+    'A random sample of 700 of the 13,119 cars. Beyond 104,160 miles, the line of M1 predicts a negative price: 89 cars of the file are past that point.');
+  return 900;
+}
+
+/* ---- the two cross-validations, as a scheme ---- */
+function playFolds(host){
+  const W=700, L=170, R=670;
+  const rect=(x,y,w,h,col,op)=>`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" fill="${col}" fill-opacity="${op}"/>`;
+  let s = TXT(24, 30, 'Leave-one-out: 13,119 estimations, one car predicted each time', {sz:18, anchor:'start', col:PLOT.ink});
+  const nC=26, cw=(R-L)/nC;
+  [{lab:'estimation 1',k:0},{lab:'estimation 2',k:1},{lab:'estimation 3',k:2},{lab:'...',k:-1},{lab:'estimation 13,119',k:nC-1}]
+  .forEach((r,i)=>{
+    const y=46+i*22;
+    s += TXT(L-10, y+13, r.lab, {sz:16, anchor:'end'});
+    if(r.k<0){ s += TXT((L+R)/2, y+12, '...', {sz:18}); return; }
+    for(let c=0;c<nC;c++) s += rect(L+c*cw+1, y, cw-2, 15, c===r.k?PLOT.fit:PLOT.ink, c===r.k?1:0.5);
+  });
+  const y0=196;
+  s += TXT(24, y0-14, '10-fold: 10 estimations, one fold of about 1,312 cars predicted each time', {sz:18, anchor:'start', col:PLOT.ink});
+  const bw=(R-L)/10;
+  for(let f=0; f<10; f++){
+    const y=y0+f*19;
+    s += TXT(L-10, y+13, 'fold '+(f+1)+' left out', {sz:16, anchor:'end'});
+    for(let c=0;c<10;c++) s += rect(L+c*bw+1, y, bw-2, 15, c===f?PLOT.fit:PLOT.ink, c===f?1:0.5);
+  }
+  const yl = y0+10*19+22;
+  s += rect(L, yl-12, 26, 14, PLOT.ink, 0.5) + TXT(L+34, yl, 'training: used to estimate the model', {sz:16, anchor:'start'});
+  s += rect(L, yl+10, 26, 14, PLOT.fit, 1) + TXT(L+34, yl+22, 'validation: predicted, never seen by the model', {sz:16, anchor:'start', col:PLOT.fit});
+  const H = yl+36;
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>${s}</svg>`;
+  host.innerHTML = plotFrame('THE METHOD · HIDE AND PREDICT', svg,
+    'Each cell of the leave-one-out stands for one car (26 of the 13,119 drawn). In the 10-fold, shuffle=True mixes the cars before cutting the ten folds, and random_state=100 fixes that mixing.');
+  return 600;
+}
+
+/* ---- one histogram, with the MAD bounds if asked ---- */
+function histSVG(o){
+  const W=700, H=300, L=70, R=684, T=40, B=250;
+  const px = v => L + (v-o.xmin)/(o.xmax-o.xmin)*(R-L);
+  const py = v => B - v/o.ymax*(B-T);
+  let bars='';
+  o.counts.forEach((c,k)=>{
+    const a=o.x0+k*o.w, b=a+o.w, mid=(a+b)/2;
+    const out = o.bounds && (mid<o.bounds[0] || mid>o.bounds[1]);
+    bars += `<rect x="${px(a).toFixed(1)}" y="${py(c).toFixed(1)}" width="${Math.max(0.5,px(b)-px(a)-1).toFixed(1)}" height="${(B-py(c)).toFixed(1)}"
+      fill="${out?PLOT.second:PLOT.ink}" fill-opacity="${out?0.9:0.7}"><title>${escapeAttr(o.tip(a,b,c))}</title></rect>`;
+  });
+  let extra='';
+  if(o.bounds) o.bounds.forEach(v=>{
+    extra += `<line x1="${px(v).toFixed(1)}" y1="${T}" x2="${px(v).toFixed(1)}" y2="${B}" stroke="${PLOT.fit}" stroke-width="2" stroke-dasharray="7 6"/>`;
+  });
+  (o.labels||[]).forEach(p=>{ extra += TXT(px(p.x).toFixed(1), py(p.y).toFixed(1), p.text, {sz:16, col:p.col||PLOT.label, anchor:p.anchor||'start'}); });
+  let ticks='';
+  o.xticks.forEach(v=>{ ticks += `<line x1="${px(v).toFixed(1)}" y1="${B}" x2="${px(v).toFixed(1)}" y2="${B+5}" stroke="${PLOT.axis}"/>`
+    + TXT(px(v).toFixed(1), B+21, v, {sz:15}); });
+  o.yticks.forEach(v=>{ ticks += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+    + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'}); });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, o.title, {sz:17, anchor:'start'})}
+    ${bars}${extra}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    ${ticks}
+    ${TXT((L+R)/2, H-12, o.xlab, {sz:15})}
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">number of cars</text>
+  </svg>`;
+}
+function playHist(host, withBounds){
+  const hp = {counts:DATA.HP.counts, x0:DATA.HP.x0/1000, w:DATA.HP.w/1000, xmin:0, xmax:160, ymax:3000,
+    xticks:[0,40,80,120,160], yticks:[0,1000,2000,3000],
+    tip:(a,b,c)=>`£${fmt(a*1000)} to £${fmt(b*1000)}: ${c} cars`,
+    title:'price, 40 bins', xlab:'price (thousands of £)'};
+  const hl = {counts:DATA.HL.counts, x0:DATA.HL.x0, w:DATA.HL.w, xmin:6.4, xmax:12.0, ymax:2200,
+    xticks:[7,8,9,10,11,12], yticks:[0,500,1000,1500,2000],
+    tip:(a,b,c)=>`log(price) from ${a.toFixed(2)} to ${b.toFixed(2)}: ${c} cars`,
+    title:'log(price), 40 bins', xlab:'log(price)'};
+  if(withBounds){
+    hp.bounds = DATA.MADP.map(v=>v/1000); hl.bounds = DATA.MADL;
+    hp.title = 'price, with the 99% MAD bounds'; hl.title = 'log(price), with the 99% MAD bounds';
+    hp.labels = [{x:hp.bounds[1]+2, y:2800, text:`upper bound £${fmt(DATA.MADP[1])}`, col:PLOT.fit},
+                 {x:70, y:2200, text:'843 outside: 841 above, 2 below', col:PLOT.second}];
+    hl.labels = [{x:hl.bounds[0]-0.08, y:2000, text:hl.bounds[0].toFixed(2), col:PLOT.fit, anchor:'end'},
+                 {x:hl.bounds[1]+0.08, y:2000, text:hl.bounds[1].toFixed(2), col:PLOT.fit},
+                 {x:6.6, y:1200, text:'203 below', col:PLOT.second},
+                 {x:11.25, y:1200, text:'202 above', col:PLOT.second}];
+  } else {
+    hp.labels = [{x:70, y:2200, text:'skewness 2.65: a long right tail'}];
+    hl.labels = [{x:6.6, y:1700, text:'skewness -0.31: nearly symmetric'}];
+  }
+  host.innerHTML = plotFrame(withBounds ? 'EVIDENCE · THE MAD RULE' : 'EVIDENCE · TWO HISTOGRAMS',
+    histSVG(hp) + '<div style="height:4px"></div>' + histSVG(hl),
+    withBounds
+      ? 'Bins outside the bounds in brown. The lower bound of the price, £1,444, sits next to the axis. Price: 6.43% of the cars outside, almost all on the right. log(price): 3.09%, on both sides.'
+      : 'The same 13,119 cars. The logarithm pulls the long right tail of the price in, and the histogram becomes a nearly symmetric bell.');
+  return 900;
+}
+
+/* ---- M2 and M3 at the median mpg: a straight line and a curve ---- */
+function playCurves(host){
+  const g = DATA.MPG_MED;
+  const c2 = DATA.M2[0] + DATA.M2[2]*g;
+  const m3 = x => Math.exp(DATA.M3[0] + DATA.M3[1]*x*1000 + DATA.M3[2]*g)/1000;
+  const curve=[];
+  for(let x=0; x<260; x+=5) curve.push({x1:x, y1:m3(x), x2:x+5, y2:m3(x+5), color:PLOT.fit, w:2.5});
+  const lg = legend(130, 128, 13, [
+    {text:`M2, at mpg = ${g}: a straight line`, color:PLOT.second, dash:true},
+    {text:'M3, np.exp of the prediction: a curve', color:PLOT.fit}]);
+  const o = Object.assign({}, CLOUD, {
+    series:[carCloud()],
+    lines:[{x1:0, y1:0, x2:260, y2:0, color:PLOT.axis, w:1, dash:true},
+           {x1:0, y1:c2/1000, x2:260, y2:(c2+DATA.M2[1]*260000)/1000, color:PLOT.second, w:2.5, dash:true}]
+           .concat(curve, lg.lines),
+    labels:lg.labels,
+    title:'The same 700 cars, with M2 and M3 at the median mpg'
+  });
+  host.innerHTML = plotFrame('EVIDENCE · A LINE AND A CURVE', panelSVG(o),
+    `Both models drawn at the median mpg, ${g}. M2 takes the same number of pounds off per mile and falls below zero; M3 takes the same percentage off and stays positive.`);
+  return 900;
+}
+
+/* ---- the 10-fold errors of the three models ---- */
+function playScores(host){
+  const W=700, H=360, L=70, R=684, T=56, B=290, ymax=11;
+  const py = v => B - v/ymax*(B-T);
+  const names = [['M1','M1: price, mileage'],['M2','M2: price, mileage, mpg'],['M3','M3: log(price), np.exp']];
+  let s='';
+  names.forEach(([k,lab],i)=>{
+    const cx = L + (R-L)*(i+0.5)/3;
+    [[0,PLOT.ink,'RMSE'],[1,PLOT.second,'MAE']].forEach(([j,col,crit])=>{
+      const v = DATA.CV[k][j], x = cx - 75 + j*80;
+      s += `<rect x="${x}" y="${py(v).toFixed(1)}" width="70" height="${(B-py(v)).toFixed(1)}" fill="${col}" fill-opacity="${k==='M3'?0.95:0.7}">
+        <title>${k}, ${crit}: ${v.toFixed(2)} thousand pounds</title></rect>`
+        + TXT(x+35, (py(v)-6).toFixed(1), v.toFixed(2), {sz:17, col:col});
+    });
+    s += TXT(cx, B+22, lab, {sz:16, col:k==='M3'?PLOT.fit:PLOT.label});
+  });
+  [0,2,4,6,8,10].forEach(v=>{ s += `<line x1="${L-5}" y1="${py(v).toFixed(1)}" x2="${L}" y2="${py(v).toFixed(1)}" stroke="${PLOT.axis}"/>`
+    + TXT(L-9, (py(v)+5).toFixed(1), v, {sz:15, anchor:'end'}); });
+  const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">
+    <rect width="${W}" height="${H}" fill="${PLOT.paper}"/>
+    ${TXT(L, 24, '10-fold errors (seed 100), in thousands of £: lower is better', {sz:17, anchor:'start'})}
+    <rect x="${R-190}" y="34" width="14" height="12" fill="${PLOT.ink}" fill-opacity=".7"/>${TXT(R-170, 45, 'RMSE', {sz:16, anchor:'start'})}
+    <rect x="${R-100}" y="34" width="14" height="12" fill="${PLOT.second}" fill-opacity=".7"/>${TXT(R-80, 45, 'MAE', {sz:16, anchor:'start', col:PLOT.second})}
+    ${s}
+    <line x1="${L}" y1="${B}" x2="${R}" y2="${B}" stroke="${PLOT.axis}"/>
+    <line x1="${L}" y1="${T}" x2="${L}" y2="${B}" stroke="${PLOT.axis}"/>
+    <text x="18" y="${(T+B)/2}" fill="${PLOT.label}" font-size="15" text-anchor="middle"
+      font-family="VT323,monospace" transform="rotate(-90 18 ${(T+B)/2})">thousands of £</text>
+  </svg>`;
+  host.innerHTML = plotFrame('EVIDENCE · THE RANKING', svg,
+    'Same ten folds for the three models. M3 models log(price), and its predictions are brought back to pounds with np.exp, without correction.');
+  return 900;
+}
+
+/* one entry point: a step names its picture, this mounts it and says how
+   long to wait before the Master speaks over it */
+function mountWidget(name, host){
+  if(name==='table')   return playTable(host);
+  if(name==='scatter') return playScatter(host);
+  if(name==='folds')   return playFolds(host);
+  if(name==='hist')    return playHist(host, false);
+  if(name==='histmad') return playHist(host, true);
+  if(name==='curves')  return playCurves(host);
+  if(name==='scores')  return playScores(host);
+  return 0;
+}
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  seq++;                                   // invalidate the timers of the step we leave
+  clearReactions();                        // every step starts on a fresh face
+  const s = STEPS[idx];
+  if(!s){ finish(); return; }
+  setBG(s.bg);
+  setSpeaker(s.who||'master');
+  setMood('master', s.mood || null);
+  setMood('student', s.studentMood || null);
+  el.dlgTitle.textContent = s.title || 'DIALOGUE';
+  el.zone.innerHTML = '';
+  el.hudQ.textContent = s.qn || '—';
+  setHUD(hudAt(idx));                      // so that PREVIOUS rewinds the HUD too
+  el.doom.textContent = bannerAt(idx);
+  syncBack();
+  typeInto(el.dlg, s.text, s.who||'master', ()=>{
+    if(s.type!=='info' && solved.has(s.id)) zoneSolved(s); else buildZone(s);
+  });
+}
+function next(){ idx++; render(); }
+
+/* ---- one step backwards, as often as the student likes ---- */
+function syncBack(){
+  const inGame = $('#scr-game').classList.contains('on');
+  el.back.disabled = !inGame || idx<=0;
+  el.back.style.opacity = el.back.disabled ? .45 : 1;
+}
+function back(){
+  if(idx<=0) return;
+  idx--; render();
+}
+el.back.onclick = back;
+
+function contButton(label, fn){
+  const b=document.createElement('button');
+  b.className='btn primary'; b.textContent=label||'CONTINUE';
+  b.style.marginTop='8px';
+  b.onclick=fn; el.zone.appendChild(b); return b;
+}
+function verdict(kind, html){
+  const d=document.createElement('div');
+  d.className='verdict '+(kind==='ok'?'ok':(kind==='give'?'give':'no')); d.innerHTML=html;
+  el.zone.appendChild(d); return d;
+}
+function clearVerdict(){ el.zone.querySelectorAll('.verdict').forEach(v=>v.remove()); }
+/* no answer is ever shown: after a few misses, the Master points to the hint */
+function nudge(fails){
+  if(fails < CONFIG.FAILS_BEFORE_NUDGE) return;
+  verdict('give', 'No answer is shown in this exercise. Open the HINT, check your code step by step, and try again.');
+}
+
+function buildZone(s){
+  switch(s.type){
+    case 'info':    return zoneInfo(s);
+    case 'choice':  return zoneChoice(s);
+    case 'multi':   return zoneMulti(s);
+    case 'numeric': return zoneNumeric(s);
+  }
+}
+
+/* a step solved earlier, reached again with PREVIOUS: no need to redo it */
+function sayOf(s){
+  if(s.type==='choice') return s.options.find(o=>o.id===s.correct).label;
+  if(s.type==='multi')  return s.options.filter(o=>s.correct.includes(o.id)).map(o=>o.label).join(' ');
+  return s.say;
+}
+function zoneSolved(s){
+  verdict('ok', `<b>Already solved.</b> ${sayOf(s)}`);
+  if(s.widgetAfter){ const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w); mountWidget(s.widgetAfter, w); }
+  contButton('Continue', next);
+}
+
+/* the answer is in: the apprentice says it, then the Master replies,
+   with a picture when the step has one */
+function conclude(s, line, mySeq){
+  el.zone.innerHTML='';
+  solved.add(s.id);
+  addNote(s.note);
+  setHUD(s.hud);
+  const master = ()=>{
+    if(mySeq!==seq) return;
+    setSpeaker('master');
+    if(s.wow) reactTo('wow');
+    let wait = 0;
+    if(s.widgetAfter){
+      const w=document.createElement('div'); w.style.marginBottom='4px'; el.zone.appendChild(w);
+      wait = mountWidget(s.widgetAfter, w);
+    }
+    setTimeout(()=>{ if(mySeq!==seq) return;
+      typeInto(el.dlg, s.right, 'master', ()=>contButton('Continue', next)); }, wait);
+  };
+  if(line){
+    setSpeaker('student');
+    typeInto(el.dlg, line, 'student', ()=>setTimeout(master, 260));
+  } else master();
+}
+
+/* ---- the hint: advice, then an example of Python code ---- */
+function hintButton(s, bar, after){
+  if(!s.hint && !s.code) return;
+  const b=document.createElement('button');
+  b.className='btn'; b.textContent='HINT';
+  let panel=null;
+  b.onclick=()=>{
+    if(panel){ panel.remove(); panel=null; b.textContent='HINT'; return; }
+    panel=document.createElement('div'); panel.className='hintbox';
+    let html = s.hint ? `<div class="hinttext"><b>THE MASTER’S HINT ·</b> ${s.hint}</div>` : '';
+    if(s.code){
+      html += `<div class="codehead"><span>EXAMPLE PYTHON · RUN IT IN YOUR NOTEBOOK</span>
+        <button class="toolbtn" data-copy>COPY</button></div><pre></pre>`;
+    }
+    panel.innerHTML = html;
+    if(s.code){
+      panel.querySelector('pre').textContent = s.code;
+      const cb = panel.querySelector('[data-copy]');
+      cb.onclick = ()=>copyText(s.code, ()=>{ cb.textContent='COPIED'; setTimeout(()=>cb.textContent='COPY',1800); });
+    }
+    after.parentNode.insertBefore(panel, after.nextSibling);
+    b.textContent='HIDE HINT';
+  };
+  bar.appendChild(b);
+}
+
+/* ---- info ---- */
+function zoneInfo(s){
+  setHUD(s.hud);
+  if(s.widget){ const h=document.createElement('div'); el.zone.appendChild(h); mountWidget(s.widget, h); }
+  addNote(s.note);
+  contButton(s.cont, ()=>{ if(s.final) finish(); else next(); });
+}
+
+/* ---- choice ---- */
+function zoneChoice(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+  s.options.forEach(o=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.innerHTML=o.label; b.dataset.oid=o.id;
+    b.onclick=()=>pick(o.id,b);
+    box.appendChild(b);
+  });
+  function pick(id, btn){
+    if(id===s.correct){
+      reactTo('right');
+      btn.classList.add('right');
+      box.querySelectorAll('button').forEach(x=>x.disabled=true);
+      conclude(s, `<em>“${btn.innerHTML}”</em>`, mySeq);
+    } else {
+      reactTo('wrong');
+      btn.classList.add('wrong'); btn.disabled=true;
+      fails++;
+      clearVerdict();
+      verdict('no', (s.wrong && s.wrong[id]) || 'Not that one. Look again at what the evidence guarantees.');
+      nudge(fails);
+    }
+  }
+}
+
+/* ---- multi: tick every correct statement ---- */
+function zoneMulti(s){
+  if(s.widget){ const w=document.createElement('div'); w.style.marginBottom='10px';
+                el.zone.appendChild(w); mountWidget(s.widget, w); }
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const box=document.createElement('div'); el.zone.appendChild(box);
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const mySeq = seq;
+  let fails=0;
+  s.options.forEach(o=>{
+    const lab=document.createElement('label');
+    lab.className='opt'; lab.style.cursor='pointer';
+    lab.innerHTML = `<input type="checkbox" value="${o.id}" style="margin-right:9px;transform:scale(1.25);vertical-align:-1px">${o.label}`;
+    box.appendChild(lab);
+  });
+  const inputs = ()=>Array.from(box.querySelectorAll('input'));
+  const chosen = ()=>inputs().filter(b=>b.checked).map(b=>b.value).sort().join(',');
+  const wanted = s.correct.slice().sort().join(',');
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  submit.onclick=()=>{
+    clearVerdict();
+    if(chosen() === wanted){
+      reactTo('right');
+      inputs().forEach(b=>b.disabled=true);
+      box.querySelectorAll('label').forEach(l=>{
+        if(s.correct.indexOf(l.querySelector('input').value)>=0) l.classList.add('right'); });
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, null, mySeq); }, 600);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const n = chosen() ? chosen().split(',').length : 0;
+    const head = (n===0)
+      ? 'You have ticked nothing, and at least one of these statements is correct.'
+      : 'You have ticked ' + n + ' statement' + (n>1?'s':'') + ', and that is not the right selection.';
+    verdict('no', head + ' ' + s.wrongHint);
+    nudge(fails);
+  };
+}
+
+/* ---- numeric: numbers brought back from Python, plus drop-downs ---- */
+function parseNum(str){
+  let t = String(str).trim()
+    .replace(/^(?:np|numpy)\.(?:float|int)\d*\(\s*(.*?)\s*\)$/i,'$1')
+    .replace(/[−–—]/g,'-').replace(/[\s€]+/g,'');
+  if(t.indexOf(',')>=0 && t.indexOf('.')<0) t = t.replace(',','.');
+  if(t==='' || !/^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?%?$/i.test(t)) return null;
+  return parseFloat(t.replace('%',''));
+}
+/* the course margin rule: exact integers; ±0.01 when 0.1 ≤ |value| < 1e6;
+   ±1% of the value otherwise. The tiny extra absorbs floating-point error. */
+function marginOf(value, exact){
+  if(exact) return 0;
+  const a = Math.abs(value);
+  return (a >= 0.1 && a < 1e6) ? 0.01 + 1e-9 : 0.01*a*(1 + 1e-9);
+}
+function tolerance(f){ return (f.tol !== undefined) ? f.tol : marginOf(f.value, f.exact); }
+function plainLabel(f){ const d=document.createElement('div'); d.innerHTML=f.label; return d.textContent; }
+/* null when the answer is right, otherwise the message to show */
+function checkField(f, raw){
+  if(f.kind==='select'){
+    if(!raw) return 'Choose an answer for “' + plainLabel(f) + '”.';
+    return raw===f.correct ? null : f.msg;
+  }
+  const v = parseNum(raw);
+  if(v===null) return 'Type a number for “' + plainLabel(f) + '”, e.g., 4.02.';
+  const tol = tolerance(f);
+  const diff = Math.abs(v-f.value);
+  if(diff <= tol) return null;
+  for(const a of (f.alt||[])){
+    const at = (a.tol !== undefined) ? a.tol : marginOf(a.value, f.exact);
+    if(Math.abs(v-a.value) <= at) return a.msg;
+  }
+  if(Math.abs(-v-f.value) <= tol) return 'Check the sign of “' + plainLabel(f) + '”.';
+  if(f.pct && Math.abs(v-100*f.value) <= 100*tol) return 'Report “' + plainLabel(f) + '” as a proportion between 0 and 1, not as a percentage.';
+  return f.msg || ('“' + plainLabel(f) + '” is not right yet. Check it in Python.');
+}
+
+function zoneNumeric(s){
+  const q=document.createElement('p'); q.className='qtext'; q.textContent=s.q; el.zone.appendChild(q);
+  const form=document.createElement('div'); el.zone.appendChild(form);
+  const rows = s.fields.map(f=>{
+    const row=document.createElement('div'); row.className = f.kind==='select' ? 'numrow sel' : 'numrow';
+    const fid='f-'+s.id+'-'+f.id;
+    const lab=document.createElement('label'); lab.htmlFor=fid; lab.innerHTML=f.label; row.appendChild(lab);
+    let input;
+    if(f.kind==='select'){
+      input=document.createElement('select');
+      [['','Choose…']].concat(f.options).forEach(([v,l])=>{
+        const o=document.createElement('option'); o.value=v; o.textContent=l; input.appendChild(o); });
+    } else {
+      input=document.createElement('input'); input.type='text'; input.inputMode='decimal';
+      input.autocomplete='off'; input.spellcheck=false; input.placeholder='your number';
+      input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit.click(); } });
+    }
+    input.id=fid; row.appendChild(input); form.appendChild(row);
+    return {f, row, input};
+  });
+  const bar=document.createElement('div'); bar.className='actbar'; el.zone.appendChild(bar);
+  const submit=document.createElement('button');
+  submit.className='btn primary'; submit.textContent='SUBMIT'; bar.appendChild(submit);
+  hintButton(s, bar, bar);
+  let fails=0;
+  const mySeq = seq;
+
+  submit.onclick=()=>{
+    clearVerdict();
+    const errors=[];
+    rows.forEach(r=>{
+      const m = checkField(r.f, r.input.value);
+      r.row.classList.toggle('good', !m);
+      r.row.classList.toggle('bad', !!m);
+      if(m) errors.push(m);
+    });
+    if(errors.length===0){
+      reactTo('right');
+      bar.querySelectorAll('button').forEach(b=>b.disabled=true);
+      rows.forEach(r=>{ r.input.disabled=true; });
+      setTimeout(()=>{ if(mySeq===seq) conclude(s, `<em>“${s.say}”</em>`, mySeq); }, 350);
+      return;
+    }
+    reactTo('wrong'); fails++;
+    const ok = rows.length - errors.length;
+    const head = rows.length>1
+      ? (ok ? `${ok} of ${rows.length} answers are right (in green). ` : '')
+      : '';
+    verdict('no', head + (errors.length===1 ? errors[0] : '<ul>'+errors.map(e=>'<li>'+e+'</li>').join('')+'</ul>'));
+    nudge(fails);
+  };
+}
+
+/* ================================================================
+   PYTHON HELPER — the quick reference of the intro, in its own window
+   ================================================================ */
+function openPythonHelper(){
+  const guide=document.querySelector('.xlguide');
+  const pageStyle=document.querySelector('head style');
+  if(!guide || !pageStyle) return;
+  let helper=null;
+  try{
+    helper=window.open('', 'academyPythonHelperE4',
+      'popup=yes,width=1050,height=780,resizable=yes,scrollbars=yes');
+  }catch(e){ helper=null; }
+  if(!helper){
+    alert('The Python Helper could not open. Please allow pop-up windows for this exercise, then try again.');
+    return;
+  }
+  helper.document.open();
+  helper.document.write(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Helper · Empirical Exercise IV</title>
+<style>${pageStyle.textContent}
+body{display:block;min-height:100vh;padding:18px;background:#05050c;color:var(--cream)}
+.helper-shell{width:100%;max-width:1100px;margin:0 auto}
+.helper-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.helper-top h1{margin:0;color:var(--amber);font:700 16px/1.4 var(--body)}
+.helper-top p{margin:2px 0 0;color:#b7b7d2;font-size:13px}
+.helper-shell .xlguide{margin:0}
+</style></head><body class="nocrt"><main class="helper-shell">
+<div class="helper-top"><div><h1>PYTHON HELPER</h1>
+<p>Reference syntax only. Compute in Python; the exercise remains open in the other window.</p></div>
+<button class="btn" id="helper-close">CLOSE</button></div>
+${guide.outerHTML}
+</main></body></html>`);
+  helper.document.close();
+  const closeButton=helper.document.getElementById('helper-close');
+  if(closeButton) closeButton.onclick=()=>helper.close();
+  helper.focus();
+}
+document.querySelectorAll('[data-python-helper]').forEach(b=>b.onclick=openPythonHelper);
+/* the data file: the button names it in data-open-data */
+document.querySelectorAll('[data-open-data]').forEach(b=>b.onclick=()=>{
+  const url = CONFIG.DATA_FILES[b.dataset.openData];
+  if(!url){ alert('The download link of this file has not been set yet. Please ask your instructor.'); return; }
+  window.open(url, 'academyData_' + b.dataset.openData);
+});
+
+function escapeHtml(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function copyText(txt, done, failed){
+  const fallback = ()=>{
+    const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t);
+    t.select(); try{ document.execCommand('copy'); done(); }catch(e){ failed && failed(); }
+    t.remove();
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, fallback);
+  } else fallback();
+}
+
+/* ================================================================
+   END — the completion record and the final password
+   ================================================================ */
+function finish(){
+  if(!finalPw) finalPw = makeFinalPassword(new Date());
+  $('#pw-name').textContent = playerName;
+  $('#pw-time').textContent = finalPw.time;
+  $('#pw-code').textContent = finalPw.code;
+  $('#endblurb').innerHTML =
+    `You estimated two regressions of the price and judged them out of sample: leave-one-out and 10-fold
+     cross-validation agreed that M2, with the mpg, beats M1 (an RMSE of 9.17 against 9.99 thousand
+     pounds). The histogram showed a right-skewed price, and its logarithm halved the outliers. M3, on the
+     logarithm and brought back with np.exp, beat both (RMSE 8.92, MAE 5.46), even without correcting the
+     bias of the exponential. The simplest model came last.`;
+  $('#sheet').innerHTML =
+    `<div class="win95"><div class="titlebar"><span>NOTEBOOK · WHAT YOU FOUND</span><span class="boxes">▬ □ ✕</span></div>
+     <div class="inset" style="padding:10px 12px;font-family:var(--mono);font-size:18px;line-height:1.5;color:#111">
+       ${notes.map(n=>'▸ '+escapeHtml(n)).join('<br>')}
+     </div></div>`;
+  el.doom.classList.add('struck');
+  el.doom.textContent = 'CLAIM: THE SIMPLEST PRICE MODEL PREDICTS BEST';
+  show('scr-end');
+}
+
+$('#btn-copy').onclick = ()=>{
+  copyText($('#pw-code').textContent,
+    ()=>{ $('#copymsg').textContent='copied.'; setTimeout(()=>$('#copymsg').textContent='',2500); },
+    ()=>{ $('#copymsg').textContent='select and copy manually'; });
+};
+
+/* ---- start and replay ---- */
+function startAt(i){
+  idx = i;
+  el.doom.classList.remove('struck');
+  setHUD(hudAt(idx));
+  renderNotes();
+  show('scr-game');
+  render();
+}
+function readName(){
+  const v = $('#playername').value.trim();
+  playerName = v || playerName || 'Apprentice';
+  el.nameL.textContent = playerName.toUpperCase();
+}
+$('#btn-again').onclick = ()=>{ solved = new Set(); notes = []; startAt(0); };
+
+/* ---- toolbar ---- */
+$('#btn-crt').onclick = (e)=>{ document.body.classList.toggle('nocrt');
+  e.target.textContent = 'CRT: ' + (document.body.classList.contains('nocrt')?'OFF':'ON'); };
+
+/* ================================================================
+   BOOT SEQUENCE
+   ================================================================ */
+const BOOT_LINES = [
+  "ACADEMY BIOS v1.00  (c) 1997 SCEPTICUS SYSTEMS",
+  "",
+  "CHECKING MEMORY ............. 640K OK",
+  "SCEPTICISM MODULE ........... ONLINE",
+  "OPENING CASE FILE IV ........ THE USED MERCEDES",
+  "DATA ........................ 13,119 CARS, 9 COLUMNS",
+  "METHOD ...................... CROSS-VALIDATION",
+  "IN-SAMPLE FIT ............... NOT ENOUGH",
+  "ANSWER KEY .................. LOCKED. HINTS ONLY.",
+  "PASSWORD .................... AT THE END, FOR BLACKBOARD",
+  "",
+  "> KEEP PYTHON AND THIS WINDOW SIDE BY SIDE.",
+  "> PRESS ANY KEY"
+];
+let bootBuf=[];
+function bootLog(s){ bootBuf.push(s); el.boot.innerHTML = bootBuf.map(l=>
+  l.startsWith('>')?`<span class="hi">${escapeHtml(l)}</span>`:escapeHtml(l)).join('<br>'); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+(async function start(){
+  show('scr-boot');
+  let skipped=false;
+  const go = ()=>{ skipped=true; document.removeEventListener('keydown',go); el.boot.removeEventListener('click',go); show('scr-intro'); };
+  document.addEventListener('keydown', go); el.boot.addEventListener('click', go);
+  for(const l of BOOT_LINES){ if(skipped) return; bootLog(l); await sleep(120); }
+})();
+
+$('#btn-begin').onclick = ()=>{
+  readName();
+  solved = new Set(); notes = [];
+  startAt(0);
+};
+</script>
+</body>
+</html>
